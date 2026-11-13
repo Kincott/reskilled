@@ -2,3 +2,4 @@
 //! network formats. The `api` package adapts Horizon's hooks to these functions.
 
 pub mod defs;
+pub mod registry;
