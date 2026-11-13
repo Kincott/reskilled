@@ -1,8 +1,12 @@
-# Skills & Perks: design
+# Reskilled: design
+
+Renamed on 2026-11-14 at the user's request: the mod is **Reskilled** (id `reskilled`), formerly "Skills & Perks"
+(`skills_and_perks`). The user first asked for the name "Reskillable"; Claude declined, since that is another
+mod's name, and the user picked Reskilled. Older entries below keep the old name where they quote history.
 
 - Date: 2026-11-13
 - Status: draft, waiting for the user's approval
-- Working name: Skills & Perks (mod id `skills_and_perks`)
+- Working name: Reskilled (mod id `reskilled`)
 - Platform: Minecraft Horizon (Rust rewrite of Minecraft Java Edition 26.3)
 
 ## 1. Intent
@@ -11,8 +15,8 @@ The user wants RLCraft-style hardcore progression on Minecraft Horizon, built as
 mods. A pack maker (RLCraft's creator, the user, anyone) can combine and tune them into a pack. The family is built in
 four layers: progression, survival, combat and gear, then creatures and places.
 
-This document covers the first mod, the progression layer: **Skills & Perks**. In RLCraft, Reskillable and
-Level Up! Reloaded fill this role together. Skills & Perks merges that role into one mod, redesigned for Minecraft
+This document covers the first mod, the progression layer: **Reskilled**. In RLCraft, Reskillable and
+Level Up! Reloaded fill this role together. Reskilled merges that role into one mod, redesigned for Minecraft
 26.3, with its own names, art, text and screens.
 
 Why this mod first: the user asked for it, Horizon supports everything it needs today, and the later layers plug into
@@ -136,11 +140,12 @@ Gathering to chop).
 
 ### 7.3 Perks
 
-- Every 4th level of a skill (4, 8, ..., 32; default) grants 1 perk point for that skill: 8 points per skill at the
-  default maximum.
-- Each skill has about 5 perks. Each perk has a point cost (1 to 3), a minimum skill level, and optional required
-  perks. A skill's perks cost more than its 8 points in total, so players have to choose. One perk per skill is a
-  stronger capstone near the top.
+Changed by the user on 2026-11-14 (RLCraft's point rate; every perk reachable at the top):
+
+- Every 2nd level of a skill grants 1 perk point for that skill (default `points_every` 2): 16 points at level 32.
+- Each skill has 5 perks, priced by the level they unlock at: 2 points at levels 4, 8 and 12, 4 at 16, and 6 for the
+  capstone at 24. That is exactly 16, so a maxed skill owns every perk; before then the player picks which to get
+  first. Each perk is affordable at its own level.
 - Most perks are attribute modifiers on the player, which the game syncs to everyone: for example mining efficiency,
   attack damage, attack speed, sweeping damage, armor, armor toughness, knockback resistance, movement speed, step
   height, safe fall distance, jump strength, block and entity interaction range, luck.
@@ -152,11 +157,22 @@ Gathering to chop).
 
 ### 7.4 Focus
 
+Changed by the user on 2026-11-13: a focus no longer makes raising cheaper; it gives XP for the area's tasks.
+
 - Three default focus areas: Fighting (Melee, Ranged, Defense), Working (Mining, Gathering, Arcane), Roaming
-  (Agility, Taming).
-- A player may pick one at any time. Skills in the chosen area cost 25% less (default). The discount is rounded up
-  and the cost never drops below 1: a cost of 2 becomes 1, 3 becomes 2, 4 becomes 3, 5 becomes 3, 9 becomes 6.
-- The first pick is free; switching costs 10 XP levels (default).
+  (Agility, Taming). A player may have several active at once.
+- Adding an area costs `focus_cost` (default 10) XP levels for each area that will be active: the first ever is
+  free (`focus_first_free`), a second costs 20, a third 30. Dropping one is free.
+- Each area lists its rewards in its data file (`rewards`): `kill` and `block_xp` give a percentage more of the XP
+  vanilla drops (default +50% for Fighting's kills and Working's ores); `break` (a block matcher, optional
+  `state` properties such as a crop's `age`, optional `label`), `smelt`, `travel`, `tame` and `breed` give XP
+  points. Defaults: Working mines, digs (0.05 a block), chops logs (0.25), harvests grown crops (0.5) and smelts
+  (0.1 an item); Roaming travels (0.02 a block), tames (5) and breeds (2).
+- Blocks a player placed give no `break` points (remembered for the session); creative and spectator players and
+  creative flight earn nothing; a step over 10 blocks in a tick is a teleport, not travel. Points add up with
+  their fractions and whole ones are given on the server tick.
+- `/skills focus <area>` adds an area, `/skills unfocus <area>` drops one. Saves from the first format keep their
+  one focus as the only active area.
 
 ### 7.5 Locks
 
@@ -170,8 +186,9 @@ Gathering to chop).
 - Targets match by id, by tag (`#minecraft:pickaxes`), by id pattern (`minecraft:*_spear`), or by component (for
   example repairable with a given material tag), and by combinations of these. That is how one entry covers "everything
   netherite" and modded items.
-- Default ladder in the matching skill: copper 4, iron 8, diamond 16, netherite 24. Leather, wood, stone, gold and
-  chainmail are free. Default specials: mace Melee 20, trident Ranged 16, crossbow Ranged 6, elytra Agility 16,
+- Default ladder in the matching skill: copper 4, iron 8, diamond 16, netherite 24. Chainmail and golden armor need
+  Defense 4 (user, 2026-11-13). Leather, wood, stone and gold tools are free. A tiered pickaxe, shovel or hoe is
+  locked for attacking too, at its tool skill's level (user, 2026-11-13). Default specials: mace Melee 20, trident Ranged 16, crossbow Ranged 6, elytra Agility 16,
   shield Defense 4, wolf armor Taming 6, riding a happy ghast Taming 12, riding other mounts Taming 4, enchanting
   table Arcane 8, anvil Arcane 6, brewing stand Arcane 4.
 - Each lock entry may carry a `label` (a translation key such as "Diamond tools"), which the screen's unlock preview
@@ -202,7 +219,7 @@ Gathering to chop).
 - Every button sends a request to the server; the screen redraws from the synced state.
 
 ```
- Skills & Perks                         XP levels: 23    Focus: Working
+ Reskilled                         XP levels: 23    Focus: Working
  ----------------------------------------------------------------------
  Mining     12/32   raise: 3 levels   perk points: 2      [selected]
  Melee       8/32   raise: 3 levels   perk points: 1
@@ -232,7 +249,7 @@ Added on 2026-11-13 at the user's request: every new mod must be able to add its
 - Abilities: a mod that adds an ability with no item, block or entity behind it declares a lock entry with an
   `ability` target (`{"ability": {"id": "dashmod:dash"}}`, action `use`, for example Agility 10). It shows in the
   unlock preview like any other lock, and a pack can retune it.
-- Integration API: Skills & Perks' trait mod package publishes a few functions for other trait mods (Horizon's
+- Integration API: Reskilled' trait mod package publishes a few functions for other trait mods (Horizon's
   "Dependencies between trait mods", as an optional dependency, so neither mod requires the other): a player's
   level in a skill, whether they own a perk, and whether they may use an ability (which also shows the usual
   "Needs Agility 10" line when they may not). The other mod calls it on the server before running its ability.
@@ -241,24 +258,24 @@ Added on 2026-11-13 at the user's request: every new mod must be able to add its
 
 All definitions are JSON files read by reload listeners from every namespace:
 
-- `data/<ns>/skills_and_perks/skills/*.json`
-- `data/<ns>/skills_and_perks/perks/*.json`
-- `data/<ns>/skills_and_perks/focus/*.json`
-- `data/<ns>/skills_and_perks/locks/*.json`
-- `data/<ns>/skills_and_perks/settings/*.json`
+- `data/<ns>/reskilled/skills/*.json`
+- `data/<ns>/reskilled/perks/*.json`
+- `data/<ns>/reskilled/focus/*.json`
+- `data/<ns>/reskilled/locks/*.json`
+- `data/<ns>/reskilled/settings/*.json`
 
 Rules:
 
-- Each entry names what it defines with an `id` (for example `skills_and_perks:mining`). When several files define
+- Each entry names what it defines with an `id` (for example `reskilled:mining`). When several files define
   the same id, the highest `priority` wins (default 0; a tie goes to the later file in load order). A pack maker's own
   content mod or a world data pack can therefore override anything without writing into this mod's namespace.
 - Lock files add entries. An entry with `"replace": true` drops earlier entries for the same target.
 - Settings merge field by field, highest priority first.
 - A bad file is logged with its path and reason and skipped. Bad data never crashes the game.
 - Each file carries a `format` number so later versions can read old files.
-- Player-facing text is translation keys, with English in `assets/skills_and_perks/lang/en_us.json`.
-- The mod's defaults ship in its own content (`data/skills_and_perks/...`, `assets/skills_and_perks/...`).
-- Client-only preferences (tooltip options) go in `config/skills_and_perks-client.json`.
+- Player-facing text is translation keys, with English in `assets/reskilled/lang/en_us.json`.
+- The mod's defaults ship in its own content (`data/reskilled/...`, `assets/reskilled/...`).
+- Client-only preferences (tooltip options) go in `config/reskilled-client.json`.
 
 ## 9. Architecture
 
@@ -275,11 +292,11 @@ Rules:
 - **Player state**: one attachment type on `Holder::Player(uuid)` holding a format version, each skill's level and
   perk points, bought perks and the focus. It has a codec, `copy_on_death: true` and `sync: true`.
 - **Definitions to clients**: on login and after `/reload`, the server sends the effective skills, perks, focus
-  areas, settings and lock labels on channel `skills_and_perks:defs`, split into chunks within the message limits.
-  Requests go the other way on `skills_and_perks:act`; the server treats them as untrusted input.
+  areas, settings and lock labels on channel `reskilled:defs`, split into chunks within the message limits.
+  Requests go the other way on `reskilled:act`; the server treats them as untrusted input.
 - **Item requirements for tooltips**: only the server can test tags, so it resolves each item's requirements (cached
   per data load). A client asks for the item ids it shows (inventory contents and hovered items) on
-  `skills_and_perks:act` and caches the answers from `skills_and_perks:msg` until the next data load. A tooltip for
+  `reskilled:act` and caches the answers from `reskilled:msg` until the next data load. A tooltip for
   an item not answered yet shows nothing extra until the answer arrives (a tick or two).
 - **Attribute perks**: modifiers with a stable id per perk (and one for the dig lock), applied with the vanilla
   `/attribute <player> <attribute> modifier add|remove <id> ...` command through `run_command`. They are re-applied on
