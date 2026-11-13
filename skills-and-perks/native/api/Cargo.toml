@@ -8,4 +8,6 @@ publish = false
 # The launcher points this at the Horizon source it builds the game from. Any other
 # dependency must be a crate and version in Horizon's Cargo.lock.
 horizon-client = { git = "https://github.com/horizon-rust/horizon", rev = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0" }
+log = "=0.4.34"
+serde_json = "=1.0.151"
 skills_core = { path = "../core" }

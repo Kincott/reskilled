@@ -2322,6 +2322,8 @@ name = "mod-skills_and_perks"
 version = "0.1.0"
 dependencies = [
  "horizon-client",
+ "log",
+ "serde_json",
  "skills_core",
 ]
 
