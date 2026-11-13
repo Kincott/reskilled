@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:taming_sure_seat",
+  "skill": "skills_and_perks:taming",
+  "name": "skills_and_perks.perk.taming_sure_seat",
+  "description": "skills_and_perks.perk.taming_sure_seat.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "mount_attribute",
+      "attribute": "minecraft:jump_strength",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

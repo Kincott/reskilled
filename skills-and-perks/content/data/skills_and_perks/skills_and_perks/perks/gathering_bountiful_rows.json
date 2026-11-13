@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:gathering_bountiful_rows",
+  "skill": "skills_and_perks:gathering",
+  "name": "skills_and_perks.perk.gathering_bountiful_rows",
+  "description": "skills_and_perks.perk.gathering_bountiful_rows.desc",
+  "cost": 1,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "drop_bonus",
+      "target": {
+        "tag": "#minecraft:crops"
+      },
+      "chance": 0.2
+    }
+  ]
+}

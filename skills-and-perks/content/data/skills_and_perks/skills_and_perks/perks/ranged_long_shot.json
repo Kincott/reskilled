@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:ranged_long_shot",
+  "skill": "skills_and_perks:ranged",
+  "name": "skills_and_perks.perk.ranged_long_shot",
+  "description": "skills_and_perks.perk.ranged_long_shot.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "damage",
+      "direction": "dealt",
+      "kind": "projectile",
+      "multiplier": 1.1
+    }
+  ]
+}

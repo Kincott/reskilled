@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:defense_blast_ward",
+  "skill": "skills_and_perks:defense",
+  "name": "skills_and_perks.perk.defense_blast_ward",
+  "description": "skills_and_perks.perk.defense_blast_ward.desc",
+  "cost": 2,
+  "min_level": 16,
+  "requires": [],
+  "effects": [
+    {
+      "type": "damage",
+      "direction": "taken",
+      "kind": "explosion",
+      "multiplier": 0.8
+    },
+    {
+      "type": "attribute",
+      "attribute": "minecraft:explosion_knockback_resistance",
+      "amount": 0.25,
+      "operation": "add_value"
+    }
+  ]
+}

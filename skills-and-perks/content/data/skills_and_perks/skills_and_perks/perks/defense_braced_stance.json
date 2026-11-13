@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:defense_braced_stance",
+  "skill": "skills_and_perks:defense",
+  "name": "skills_and_perks.perk.defense_braced_stance",
+  "description": "skills_and_perks.perk.defense_braced_stance.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:knockback_resistance",
+      "amount": 0.15,
+      "operation": "add_value"
+    }
+  ]
+}

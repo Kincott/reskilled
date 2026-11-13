@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:gathering_full_granary",
+  "skill": "skills_and_perks:gathering",
+  "name": "skills_and_perks.perk.gathering_full_granary",
+  "description": "skills_and_perks.perk.gathering_full_granary.desc",
+  "cost": 3,
+  "min_level": 24,
+  "requires": [
+    "skills_and_perks:gathering_bountiful_rows"
+  ],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:block_break_speed",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    },
+    {
+      "type": "drop_bonus",
+      "target": {
+        "tag": "#minecraft:crops"
+      },
+      "chance": 0.25
+    }
+  ]
+}

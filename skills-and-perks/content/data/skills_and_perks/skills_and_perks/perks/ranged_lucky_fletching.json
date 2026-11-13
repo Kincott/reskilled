@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:ranged_lucky_fletching",
+  "skill": "skills_and_perks:ranged",
+  "name": "skills_and_perks.perk.ranged_lucky_fletching",
+  "description": "skills_and_perks.perk.ranged_lucky_fletching.desc",
+  "cost": 2,
+  "min_level": 16,
+  "requires": [
+    "skills_and_perks:ranged_keen_eye"
+  ],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:luck",
+      "amount": 1.0,
+      "operation": "add_value"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:taming_gentle_hands",
+  "skill": "skills_and_perks:taming",
+  "name": "skills_and_perks.perk.taming_gentle_hands",
+  "description": "skills_and_perks.perk.taming_gentle_hands.desc",
+  "cost": 1,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "mount_attribute",
+      "attribute": "minecraft:movement_speed",
+      "amount": 0.05,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

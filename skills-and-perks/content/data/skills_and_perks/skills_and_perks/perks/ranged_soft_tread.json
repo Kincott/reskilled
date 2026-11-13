@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:ranged_soft_tread",
+  "skill": "skills_and_perks:ranged",
+  "name": "skills_and_perks.perk.ranged_soft_tread",
+  "description": "skills_and_perks.perk.ranged_soft_tread.desc",
+  "cost": 2,
+  "min_level": 12,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:sneaking_speed",
+      "amount": 0.5,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

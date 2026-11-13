@@ -1,0 +1,47 @@
+{
+  "format": 1,
+  "entries": [
+    {
+      "target": {
+        "block": {
+          "id": "minecraft:enchanting_table"
+        }
+      },
+      "actions": [
+        "open"
+      ],
+      "requires": {
+        "skills_and_perks:arcane": 8
+      },
+      "label": "skills_and_perks.lock.enchanting_table"
+    },
+    {
+      "target": {
+        "block": {
+          "tag": "#minecraft:anvil"
+        }
+      },
+      "actions": [
+        "open"
+      ],
+      "requires": {
+        "skills_and_perks:arcane": 6
+      },
+      "label": "skills_and_perks.lock.anvil"
+    },
+    {
+      "target": {
+        "block": {
+          "id": "minecraft:brewing_stand"
+        }
+      },
+      "actions": [
+        "open"
+      ],
+      "requires": {
+        "skills_and_perks:arcane": 4
+      },
+      "label": "skills_and_perks.lock.brewing_stand"
+    }
+  ]
+}

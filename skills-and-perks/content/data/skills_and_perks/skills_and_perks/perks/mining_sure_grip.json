@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:mining_sure_grip",
+  "skill": "skills_and_perks:mining",
+  "name": "skills_and_perks.perk.mining_sure_grip",
+  "description": "skills_and_perks.perk.mining_sure_grip.desc",
+  "cost": 1,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:block_break_speed",
+      "amount": 0.05,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

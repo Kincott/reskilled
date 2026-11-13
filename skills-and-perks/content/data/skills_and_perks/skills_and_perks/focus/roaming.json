@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:roaming",
+  "name": "skills_and_perks.focus.roaming",
+  "skills": [
+    "skills_and_perks:agility",
+    "skills_and_perks:taming"
+  ]
+}

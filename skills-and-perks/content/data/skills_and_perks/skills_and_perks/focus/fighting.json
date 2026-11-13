@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:fighting",
+  "name": "skills_and_perks.focus.fighting",
+  "skills": [
+    "skills_and_perks:melee",
+    "skills_and_perks:ranged",
+    "skills_and_perks:defense"
+  ]
+}

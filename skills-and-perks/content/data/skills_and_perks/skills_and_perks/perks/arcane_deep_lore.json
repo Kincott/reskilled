@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:arcane_deep_lore",
+  "skill": "skills_and_perks:arcane",
+  "name": "skills_and_perks.perk.arcane_deep_lore",
+  "description": "skills_and_perks.perk.arcane_deep_lore.desc",
+  "cost": 2,
+  "min_level": 16,
+  "requires": [
+    "skills_and_perks:arcane_scholars_ink"
+  ],
+  "effects": [
+    {
+      "type": "xp_gain",
+      "multiplier": 1.15
+    }
+  ]
+}

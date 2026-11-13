@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:mining_deep_veins",
+  "skill": "skills_and_perks:mining",
+  "name": "skills_and_perks.perk.mining_deep_veins",
+  "description": "skills_and_perks.perk.mining_deep_veins.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "drop_bonus",
+      "target": {
+        "any_of": [
+          {
+            "tag": "#minecraft:coal_ores"
+          },
+          {
+            "tag": "#minecraft:copper_ores"
+          },
+          {
+            "tag": "#minecraft:iron_ores"
+          }
+        ]
+      },
+      "chance": 0.15
+    }
+  ]
+}

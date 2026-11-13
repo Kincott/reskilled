@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "id": "skills_and_perks:arcane_frugal_smith",
+  "skill": "skills_and_perks:arcane",
+  "name": "skills_and_perks.perk.arcane_frugal_smith",
+  "description": "skills_and_perks.perk.arcane_frugal_smith.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "anvil_cost",
+      "multiplier": 0.85
+    }
+  ]
+}
