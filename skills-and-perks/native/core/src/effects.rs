@@ -1,0 +1,491 @@
+//! What a player's active perks do, and the `/attribute` commands that bring the game in line with them.
+
+use crate::defs::{DamageKind, Direction, Effect, Matcher, Operation};
+use crate::progress::{PlayerState, active_perks};
+use crate::registry::Defs;
+
+/// The modifier that stops a player digging while they hold a tool they may not break with.
+pub const DIG_LOCK: &str = "skills_and_perks:dig_lock";
+const DIG_LOCK_ATTRIBUTE: &str = "minecraft:block_break_speed";
+/// With `add_multiplied_total`, -1 takes the whole speed away.
+const DIG_LOCK_AMOUNT: f64 = -1.0;
+/// Namespace of every modifier this mod adds.
+const MODIFIER_NAMESPACE: &str = "skills_and_perks";
+const NO_CHANGE: f64 = 1.0;
+
+/// One attribute modifier, identified by its id.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttributeMod {
+    pub id: String,
+    pub attribute: String,
+    pub amount: f64,
+    pub operation: Operation,
+}
+
+/// Everything the active perks do, gathered by kind.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActiveEffects {
+    pub attributes: Vec<AttributeMod>,
+    pub mount_attributes: Vec<AttributeMod>,
+    /// Product of every XP gain multiplier; 1.0 when none.
+    pub xp_gain: f64,
+    /// Product of every anvil cost multiplier; 1.0 when none.
+    pub anvil_cost: f64,
+    pub damage: Vec<(Direction, DamageKind, f64)>,
+    pub drops: Vec<(Matcher, f64)>,
+}
+
+impl Default for ActiveEffects {
+    fn default() -> Self {
+        Self {
+            attributes: Vec::new(),
+            mount_attributes: Vec::new(),
+            xp_gain: NO_CHANGE,
+            anvil_cost: NO_CHANGE,
+            damage: Vec::new(),
+            drops: Vec::new(),
+        }
+    }
+}
+
+/// Gathers the effects of every active perk. Modifier ids are `skills_and_perks:<perk namespace>/<perk path>/<effect
+/// index>`, so they stay stable and two namespaces' perks never share one.
+pub fn active_effects(defs: &Defs, state: &PlayerState) -> ActiveEffects {
+    let mut effects = ActiveEffects::default();
+    for perk in active_perks(defs, state) {
+        let base = perk.id.replacen(':', "/", 1);
+        for (index, effect) in perk.effects.iter().enumerate() {
+            let id = || format!("{MODIFIER_NAMESPACE}:{base}/{index}");
+            match effect {
+                Effect::Attribute {
+                    attribute,
+                    amount,
+                    operation,
+                } => effects.attributes.push(AttributeMod {
+                    id: id(),
+                    attribute: attribute.clone(),
+                    amount: *amount,
+                    operation: *operation,
+                }),
+                Effect::MountAttribute {
+                    attribute,
+                    amount,
+                    operation,
+                } => effects.mount_attributes.push(AttributeMod {
+                    id: id(),
+                    attribute: attribute.clone(),
+                    amount: *amount,
+                    operation: *operation,
+                }),
+                Effect::DropBonus { target, chance } => {
+                    effects.drops.push((target.clone(), *chance))
+                }
+                Effect::Damage {
+                    direction,
+                    kind,
+                    multiplier,
+                } => effects.damage.push((*direction, *kind, *multiplier)),
+                Effect::XpGain { multiplier } => effects.xp_gain *= multiplier,
+                Effect::AnvilCost { multiplier } => effects.anvil_cost *= multiplier,
+            }
+        }
+    }
+    effects
+}
+
+/// The product of the damage rules for this direction and kind; rules for `Any` apply to every kind.
+pub fn damage_multiplier(effects: &ActiveEffects, direction: Direction, kind: DamageKind) -> f64 {
+    effects
+        .damage
+        .iter()
+        .filter(|(d, k, _)| *d == direction && (*k == kind || *k == DamageKind::Any))
+        .map(|(_, _, multiplier)| multiplier)
+        .product()
+}
+
+/// The modifier [`DIG_LOCK`] names.
+pub fn dig_lock() -> AttributeMod {
+    AttributeMod {
+        id: DIG_LOCK.to_string(),
+        attribute: DIG_LOCK_ATTRIBUTE.to_string(),
+        amount: DIG_LOCK_AMOUNT,
+        operation: Operation::AddMultipliedTotal,
+    }
+}
+
+/// Vanilla `/attribute` commands (without the slash) turning `before` into `after` on `target`: removals first,
+/// then additions, each sorted by id. A modifier whose values changed is removed and added again, since vanilla
+/// refuses to add an id the entity already has.
+pub fn attribute_commands(
+    target: &str,
+    before: &[AttributeMod],
+    after: &[AttributeMod],
+) -> Vec<String> {
+    let mut removed: Vec<&AttributeMod> = before.iter().filter(|m| !after.contains(m)).collect();
+    let mut added: Vec<&AttributeMod> = after.iter().filter(|m| !before.contains(m)).collect();
+    removed.sort_by(|a, b| a.id.cmp(&b.id));
+    added.sort_by(|a, b| a.id.cmp(&b.id));
+    let removals = removed.into_iter().map(|m| {
+        format!(
+            "attribute {target} {} modifier remove {}",
+            m.attribute, m.id
+        )
+    });
+    let additions = added.into_iter().map(|m| {
+        format!(
+            "attribute {target} {} modifier add {} {} {}",
+            m.attribute,
+            m.id,
+            m.amount,
+            operation_name(m.operation)
+        )
+    });
+    removals.chain(additions).collect()
+}
+
+/// The operation as `/attribute` spells it.
+fn operation_name(operation: Operation) -> &'static str {
+    match operation {
+        Operation::AddValue => "add_value",
+        Operation::AddMultipliedBase => "add_multiplied_base",
+        Operation::AddMultipliedTotal => "add_multiplied_total",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::defs::{Effect, PerkDef, SkillDef};
+    use crate::progress::{SkillProgress, on_death};
+
+    const MINING: &str = "skills_and_perks:mining";
+    const PLAYER: &str = "Steve";
+
+    fn perk(id: &str, min_level: u32, effects: Vec<Effect>) -> PerkDef {
+        PerkDef {
+            id: id.into(),
+            priority: 0,
+            skill: MINING.into(),
+            name: "n".into(),
+            description: "d".into(),
+            cost: 1,
+            min_level,
+            requires: vec![],
+            effects,
+        }
+    }
+
+    /// Mining and the given perks; the player owns every perk, at the given Mining level.
+    fn owning(perks: Vec<PerkDef>, mining_level: u32) -> (Defs, PlayerState) {
+        let mining = SkillDef {
+            id: MINING.into(),
+            priority: 0,
+            name: "n".into(),
+            icon: "minecraft:stone".into(),
+            max_level: None,
+            cost: None,
+            points_every: None,
+        };
+        let mut state = PlayerState::default();
+        let owned = perks.iter().map(|p| p.id.clone()).collect();
+        state.skills.insert(
+            MINING.into(),
+            SkillProgress {
+                level: mining_level,
+                perks: owned,
+                ..SkillProgress::default()
+            },
+        );
+        let defs = Defs {
+            skills: [(MINING.into(), mining)].into(),
+            perks: perks.into_iter().map(|p| (p.id.clone(), p)).collect(),
+            ..Defs::default()
+        };
+        (defs, state)
+    }
+
+    fn modifier(id: &str, attribute: &str, amount: f64, operation: Operation) -> AttributeMod {
+        AttributeMod {
+            id: id.into(),
+            attribute: attribute.into(),
+            amount,
+            operation,
+        }
+    }
+
+    #[test]
+    fn effects_are_collected_by_type() {
+        // Given one perk with an attribute, a mount attribute and a drop bonus, from another namespace
+        let (defs, state) = owning(
+            vec![perk(
+                "pack:deep_roots",
+                1,
+                vec![
+                    Effect::Attribute {
+                        attribute: "minecraft:block_break_speed".into(),
+                        amount: 0.1,
+                        operation: Operation::AddMultipliedBase,
+                    },
+                    Effect::MountAttribute {
+                        attribute: "minecraft:movement_speed".into(),
+                        amount: 0.05,
+                        operation: Operation::AddValue,
+                    },
+                    Effect::DropBonus {
+                        target: Matcher::Tag("#minecraft:coal_ores".into()),
+                        chance: 0.25,
+                    },
+                ],
+            )],
+            1,
+        );
+
+        // When the active effects are read
+        let effects = active_effects(&defs, &state);
+
+        // Then each lands in its list, and modifier ids carry the perk's namespace, path and effect index
+        assert_eq!(
+            effects.attributes,
+            vec![modifier(
+                "skills_and_perks:pack/deep_roots/0",
+                "minecraft:block_break_speed",
+                0.1,
+                Operation::AddMultipliedBase
+            )]
+        );
+        assert_eq!(
+            effects.mount_attributes,
+            vec![modifier(
+                "skills_and_perks:pack/deep_roots/1",
+                "minecraft:movement_speed",
+                0.05,
+                Operation::AddValue
+            )]
+        );
+        assert_eq!(
+            effects.drops,
+            vec![(Matcher::Tag("#minecraft:coal_ores".into()), 0.25)]
+        );
+    }
+
+    #[test]
+    fn multipliers_multiply() {
+        // Given two perks raising XP gain by 10% and 20% and lowering anvil costs to 90% and 50%
+        let (defs, state) = owning(
+            vec![
+                perk(
+                    "skills_and_perks:a",
+                    1,
+                    vec![
+                        Effect::XpGain { multiplier: 1.1 },
+                        Effect::AnvilCost { multiplier: 0.9 },
+                    ],
+                ),
+                perk(
+                    "skills_and_perks:b",
+                    1,
+                    vec![
+                        Effect::XpGain { multiplier: 1.2 },
+                        Effect::AnvilCost { multiplier: 0.5 },
+                    ],
+                ),
+            ],
+            1,
+        );
+
+        // When the active effects are read, with the perks and with none
+        let effects = active_effects(&defs, &state);
+        let none = active_effects(&defs, &PlayerState::default());
+
+        // Then the multipliers are the products, and 1.0 with no perk
+        assert!((effects.xp_gain - 1.32).abs() < 1e-9, "{}", effects.xp_gain);
+        assert!(
+            (effects.anvil_cost - 0.45).abs() < 1e-9,
+            "{}",
+            effects.anvil_cost
+        );
+        assert_eq!((none.xp_gain, none.anvil_cost), (1.0, 1.0));
+    }
+
+    #[test]
+    fn any_damage_rule_applies_to_every_kind() {
+        // Given +50% melee damage dealt, +20% of any damage dealt, and half fall damage taken
+        let (defs, state) = owning(
+            vec![perk(
+                "skills_and_perks:fighter",
+                1,
+                vec![
+                    Effect::Damage {
+                        direction: Direction::Dealt,
+                        kind: DamageKind::Melee,
+                        multiplier: 1.5,
+                    },
+                    Effect::Damage {
+                        direction: Direction::Dealt,
+                        kind: DamageKind::Any,
+                        multiplier: 1.2,
+                    },
+                    Effect::Damage {
+                        direction: Direction::Taken,
+                        kind: DamageKind::Fall,
+                        multiplier: 0.5,
+                    },
+                ],
+            )],
+            1,
+        );
+        let effects = active_effects(&defs, &state);
+
+        // When multipliers are read per direction and kind
+        let dealt_melee = damage_multiplier(&effects, Direction::Dealt, DamageKind::Melee);
+        let dealt_projectile =
+            damage_multiplier(&effects, Direction::Dealt, DamageKind::Projectile);
+        let taken_fall = damage_multiplier(&effects, Direction::Taken, DamageKind::Fall);
+        let taken_melee = damage_multiplier(&effects, Direction::Taken, DamageKind::Melee);
+
+        // Then `any` rules join every kind in their direction, and nothing else changes
+        assert!((dealt_melee - 1.8).abs() < 1e-9, "{dealt_melee}");
+        assert!((dealt_projectile - 1.2).abs() < 1e-9, "{dealt_projectile}");
+        assert_eq!((taken_fall, taken_melee), (0.5, 1.0));
+    }
+
+    #[test]
+    fn attribute_commands_remove_then_add_sorted() {
+        // Given modifiers b (changed), c (gone) and d (kept) before, and a (new), b (changed) and d after
+        let before = vec![
+            modifier(
+                "skills_and_perks:c",
+                "minecraft:luck",
+                1.0,
+                Operation::AddValue,
+            ),
+            modifier(
+                "skills_and_perks:b",
+                "minecraft:armor",
+                2.0,
+                Operation::AddValue,
+            ),
+            modifier(
+                "skills_and_perks:d",
+                "minecraft:armor",
+                1.0,
+                Operation::AddValue,
+            ),
+        ];
+        let after = vec![
+            modifier(
+                "skills_and_perks:d",
+                "minecraft:armor",
+                1.0,
+                Operation::AddValue,
+            ),
+            modifier(
+                "skills_and_perks:b",
+                "minecraft:armor",
+                2.5,
+                Operation::AddValue,
+            ),
+            modifier(
+                "skills_and_perks:a",
+                "minecraft:attack_speed",
+                0.15,
+                Operation::AddMultipliedTotal,
+            ),
+        ];
+
+        // When the commands are worked out
+        let commands = attribute_commands(PLAYER, &before, &after);
+
+        // Then removals come first, then additions, each sorted by id, and the unchanged one is left alone
+        assert_eq!(
+            commands,
+            vec![
+                "attribute Steve minecraft:armor modifier remove skills_and_perks:b",
+                "attribute Steve minecraft:luck modifier remove skills_and_perks:c",
+                "attribute Steve minecraft:attack_speed modifier add skills_and_perks:a 0.15 add_multiplied_total",
+                "attribute Steve minecraft:armor modifier add skills_and_perks:b 2.5 add_value",
+            ]
+        );
+    }
+
+    #[test]
+    fn no_change_gives_no_commands() {
+        // Given the same modifiers before and after, in another order
+        let one = modifier(
+            "skills_and_perks:a",
+            "minecraft:luck",
+            1.0,
+            Operation::AddValue,
+        );
+        let two = modifier(
+            "skills_and_perks:b",
+            "minecraft:armor",
+            2.0,
+            Operation::AddValue,
+        );
+
+        // When the commands are worked out
+        let commands = attribute_commands(PLAYER, &[one.clone(), two.clone()], &[two, one]);
+
+        // Then there are none
+        assert_eq!(commands, Vec::<String>::new());
+    }
+
+    #[test]
+    fn inactive_perk_yields_remove_command() {
+        // Given a player at Mining 9 owning a level-8 armor perk, and a 2-level death penalty
+        let (mut defs, state) = owning(
+            vec![perk(
+                "skills_and_perks:mining_hard_hat",
+                8,
+                vec![Effect::Attribute {
+                    attribute: "minecraft:armor".into(),
+                    amount: 2.0,
+                    operation: Operation::AddValue,
+                }],
+            )],
+            9,
+        );
+        defs.settings.death_penalty_levels = 2;
+        let before = active_effects(&defs, &state).attributes;
+
+        // When they die (Mining 7) and the attributes are brought in line
+        let after = active_effects(&defs, &on_death(&defs, &state)).attributes;
+        let commands = attribute_commands(PLAYER, &before, &after);
+
+        // Then the perk's modifier is removed
+        assert_eq!(
+            commands,
+            vec![
+                "attribute Steve minecraft:armor modifier remove skills_and_perks:skills_and_perks/mining_hard_hat/0"
+            ]
+        );
+    }
+
+    #[test]
+    fn dig_lock_constants_match_spec() {
+        // Given the dig lock modifier
+        let lock = dig_lock();
+
+        // When it is added to a player
+        let commands = attribute_commands(PLAYER, &[], std::slice::from_ref(&lock));
+
+        // Then it takes 100% off the block break speed under its own id
+        assert_eq!(DIG_LOCK, "skills_and_perks:dig_lock");
+        assert_eq!(
+            lock,
+            modifier(
+                DIG_LOCK,
+                "minecraft:block_break_speed",
+                -1.0,
+                Operation::AddMultipliedTotal
+            )
+        );
+        assert_eq!(
+            commands,
+            vec![
+                "attribute Steve minecraft:block_break_speed modifier add skills_and_perks:dig_lock -1 add_multiplied_total"
+            ]
+        );
+    }
+}
