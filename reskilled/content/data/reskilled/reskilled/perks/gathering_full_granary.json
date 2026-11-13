@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "id": "reskilled:gathering_full_granary",
+  "skill": "reskilled:gathering",
+  "name": "reskilled.perk.gathering_full_granary",
+  "description": "reskilled.perk.gathering_full_granary.desc",
+  "cost": 6,
+  "min_level": 24,
+  "requires": [
+    "reskilled:gathering_bountiful_rows"
+  ],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:block_break_speed",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    },
+    {
+      "type": "drop_bonus",
+      "target": {
+        "tag": "#minecraft:crops"
+      },
+      "chance": 0.25
+    }
+  ]
+}

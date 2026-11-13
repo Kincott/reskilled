@@ -1,0 +1,10 @@
+id = "reskilled"
+name = "Reskilled"
+version = "0.1.0"
+description = "Skills, perks and gear locks for Horizon. Fills the role of Reskillable and Level Up! Reloaded on Horizon (not affiliated)."
+authors = []
+# Content part: the default data files and English text. The rules run in the native bundle (../native).
+api = "0.2"
+side = "both"
+# registries: "May add blocks, items, mob effects and entity types to your worlds".
+capabilities = ["registries"]

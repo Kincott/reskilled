@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "id": "reskilled:arcane_scholars_ink",
+  "skill": "reskilled:arcane",
+  "name": "reskilled.perk.arcane_scholars_ink",
+  "description": "reskilled.perk.arcane_scholars_ink.desc",
+  "cost": 2,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "xp_gain",
+      "multiplier": 1.1
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:agility_soft_landing",
+  "skill": "reskilled:agility",
+  "name": "reskilled.perk.agility_soft_landing",
+  "description": "reskilled.perk.agility_soft_landing.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:safe_fall_distance",
+      "amount": 2.0,
+      "operation": "add_value"
+    }
+  ]
+}

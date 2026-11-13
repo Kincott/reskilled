@@ -2318,7 +2318,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mod-skills_and_perks"
+name = "mod-reskilled"
 version = "0.1.0"
 dependencies = [
  "horizon-client",

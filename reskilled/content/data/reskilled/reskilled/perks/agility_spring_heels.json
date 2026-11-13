@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:agility_spring_heels",
+  "skill": "reskilled:agility",
+  "name": "reskilled.perk.agility_spring_heels",
+  "description": "reskilled.perk.agility_spring_heels.desc",
+  "cost": 2,
+  "min_level": 12,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:jump_strength",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

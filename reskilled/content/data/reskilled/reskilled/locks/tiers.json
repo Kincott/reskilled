@@ -1,0 +1,954 @@
+{
+  "format": 1,
+  "entries": [
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:pickaxes"
+            },
+            {
+              "repairable": "#minecraft:gold_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break",
+        "attack"
+      ],
+      "requires": {
+        "reskilled:mining": 2,
+        "reskilled:arcane": 4
+      },
+      "label": "reskilled.lock.golden_pickaxes"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:axes"
+                },
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:gold_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break"
+      ],
+      "requires": {
+        "reskilled:gathering": 2,
+        "reskilled:arcane": 4
+      },
+      "label": "reskilled.lock.golden_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:gold_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:gathering": 2,
+        "reskilled:arcane": 4
+      },
+      "label": "reskilled.lock.golden_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:swords"
+                },
+                {
+                  "tag": "#minecraft:axes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:gold_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:melee": 2,
+        "reskilled:arcane": 4
+      },
+      "label": "reskilled.lock.golden_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:spears"
+            },
+            {
+              "repairable": "#minecraft:gold_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack",
+        "use"
+      ],
+      "requires": {
+        "reskilled:melee": 2,
+        "reskilled:arcane": 4
+      },
+      "label": "reskilled.lock.golden_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:pickaxes"
+            },
+            {
+              "repairable": "#minecraft:copper_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break",
+        "attack"
+      ],
+      "requires": {
+        "reskilled:mining": 4
+      },
+      "label": "reskilled.lock.copper_pickaxes"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:axes"
+                },
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:copper_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break"
+      ],
+      "requires": {
+        "reskilled:gathering": 4
+      },
+      "label": "reskilled.lock.copper_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:copper_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:gathering": 4
+      },
+      "label": "reskilled.lock.copper_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:swords"
+                },
+                {
+                  "tag": "#minecraft:axes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:copper_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:melee": 4
+      },
+      "label": "reskilled.lock.copper_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:spears"
+            },
+            {
+              "repairable": "#minecraft:copper_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack",
+        "use"
+      ],
+      "requires": {
+        "reskilled:melee": 4
+      },
+      "label": "reskilled.lock.copper_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:head_armor"
+                },
+                {
+                  "tag": "#minecraft:chest_armor"
+                },
+                {
+                  "tag": "#minecraft:leg_armor"
+                },
+                {
+                  "tag": "#minecraft:foot_armor"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:repairs_copper_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:defense": 4
+      },
+      "label": "reskilled.lock.copper_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:head_armor"
+                },
+                {
+                  "tag": "#minecraft:chest_armor"
+                },
+                {
+                  "tag": "#minecraft:leg_armor"
+                },
+                {
+                  "tag": "#minecraft:foot_armor"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:repairs_chain_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:defense": 4
+      },
+      "label": "reskilled.lock.chainmail_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:head_armor"
+                },
+                {
+                  "tag": "#minecraft:chest_armor"
+                },
+                {
+                  "tag": "#minecraft:leg_armor"
+                },
+                {
+                  "tag": "#minecraft:foot_armor"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:repairs_gold_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:defense": 2,
+        "reskilled:arcane": 4
+      },
+      "label": "reskilled.lock.golden_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "any_of": [
+            {
+              "id": "minecraft:copper_horse_armor"
+            },
+            {
+              "id": "minecraft:copper_nautilus_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:taming": 4
+      },
+      "label": "reskilled.lock.copper_mount_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:pickaxes"
+            },
+            {
+              "repairable": "#minecraft:iron_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break",
+        "attack"
+      ],
+      "requires": {
+        "reskilled:mining": 8
+      },
+      "label": "reskilled.lock.iron_pickaxes"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:axes"
+                },
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:iron_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break"
+      ],
+      "requires": {
+        "reskilled:gathering": 8
+      },
+      "label": "reskilled.lock.iron_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:iron_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:gathering": 8
+      },
+      "label": "reskilled.lock.iron_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:swords"
+                },
+                {
+                  "tag": "#minecraft:axes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:iron_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:melee": 8
+      },
+      "label": "reskilled.lock.iron_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:spears"
+            },
+            {
+              "repairable": "#minecraft:iron_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack",
+        "use"
+      ],
+      "requires": {
+        "reskilled:melee": 8
+      },
+      "label": "reskilled.lock.iron_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:head_armor"
+                },
+                {
+                  "tag": "#minecraft:chest_armor"
+                },
+                {
+                  "tag": "#minecraft:leg_armor"
+                },
+                {
+                  "tag": "#minecraft:foot_armor"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:repairs_iron_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:defense": 8
+      },
+      "label": "reskilled.lock.iron_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "any_of": [
+            {
+              "id": "minecraft:iron_horse_armor"
+            },
+            {
+              "id": "minecraft:iron_nautilus_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:taming": 8
+      },
+      "label": "reskilled.lock.iron_mount_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:pickaxes"
+            },
+            {
+              "repairable": "#minecraft:diamond_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break",
+        "attack"
+      ],
+      "requires": {
+        "reskilled:mining": 16
+      },
+      "label": "reskilled.lock.diamond_pickaxes"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:axes"
+                },
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:diamond_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break"
+      ],
+      "requires": {
+        "reskilled:gathering": 16
+      },
+      "label": "reskilled.lock.diamond_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:diamond_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:gathering": 16
+      },
+      "label": "reskilled.lock.diamond_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:swords"
+                },
+                {
+                  "tag": "#minecraft:axes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:diamond_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:melee": 16
+      },
+      "label": "reskilled.lock.diamond_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:spears"
+            },
+            {
+              "repairable": "#minecraft:diamond_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack",
+        "use"
+      ],
+      "requires": {
+        "reskilled:melee": 16
+      },
+      "label": "reskilled.lock.diamond_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:head_armor"
+                },
+                {
+                  "tag": "#minecraft:chest_armor"
+                },
+                {
+                  "tag": "#minecraft:leg_armor"
+                },
+                {
+                  "tag": "#minecraft:foot_armor"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:repairs_diamond_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:defense": 16
+      },
+      "label": "reskilled.lock.diamond_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "any_of": [
+            {
+              "id": "minecraft:diamond_horse_armor"
+            },
+            {
+              "id": "minecraft:diamond_nautilus_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:taming": 16
+      },
+      "label": "reskilled.lock.diamond_mount_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:pickaxes"
+            },
+            {
+              "repairable": "#minecraft:netherite_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break",
+        "attack"
+      ],
+      "requires": {
+        "reskilled:mining": 24
+      },
+      "label": "reskilled.lock.netherite_pickaxes"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:axes"
+                },
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:netherite_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "break"
+      ],
+      "requires": {
+        "reskilled:gathering": 24
+      },
+      "label": "reskilled.lock.netherite_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:shovels"
+                },
+                {
+                  "tag": "#minecraft:hoes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:netherite_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:gathering": 24
+      },
+      "label": "reskilled.lock.netherite_harvest_tools"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:swords"
+                },
+                {
+                  "tag": "#minecraft:axes"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:netherite_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:melee": 24
+      },
+      "label": "reskilled.lock.netherite_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "tag": "#minecraft:spears"
+            },
+            {
+              "repairable": "#minecraft:netherite_tool_materials"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "attack",
+        "use"
+      ],
+      "requires": {
+        "reskilled:melee": 24
+      },
+      "label": "reskilled.lock.netherite_weapons"
+    },
+    {
+      "target": {
+        "item": {
+          "all_of": [
+            {
+              "any_of": [
+                {
+                  "tag": "#minecraft:head_armor"
+                },
+                {
+                  "tag": "#minecraft:chest_armor"
+                },
+                {
+                  "tag": "#minecraft:leg_armor"
+                },
+                {
+                  "tag": "#minecraft:foot_armor"
+                }
+              ]
+            },
+            {
+              "repairable": "#minecraft:repairs_netherite_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:defense": 24
+      },
+      "label": "reskilled.lock.netherite_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "any_of": [
+            {
+              "id": "minecraft:netherite_horse_armor"
+            },
+            {
+              "id": "minecraft:netherite_nautilus_armor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:taming": 24
+      },
+      "label": "reskilled.lock.netherite_mount_armor"
+    }
+  ]
+}

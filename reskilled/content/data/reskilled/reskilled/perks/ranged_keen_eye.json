@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:ranged_keen_eye",
+  "skill": "reskilled:ranged",
+  "name": "reskilled.perk.ranged_keen_eye",
+  "description": "reskilled.perk.ranged_keen_eye.desc",
+  "cost": 2,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "damage",
+      "direction": "dealt",
+      "kind": "projectile",
+      "multiplier": 1.05
+    }
+  ]
+}

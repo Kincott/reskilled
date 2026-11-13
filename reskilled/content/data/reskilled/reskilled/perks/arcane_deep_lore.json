@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:arcane_deep_lore",
+  "skill": "reskilled:arcane",
+  "name": "reskilled.perk.arcane_deep_lore",
+  "description": "reskilled.perk.arcane_deep_lore.desc",
+  "cost": 4,
+  "min_level": 16,
+  "requires": [
+    "reskilled:arcane_scholars_ink"
+  ],
+  "effects": [
+    {
+      "type": "xp_gain",
+      "multiplier": 1.15
+    }
+  ]
+}

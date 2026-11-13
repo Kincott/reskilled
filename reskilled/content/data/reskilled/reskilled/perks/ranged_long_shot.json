@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:ranged_long_shot",
+  "skill": "reskilled:ranged",
+  "name": "reskilled.perk.ranged_long_shot",
+  "description": "reskilled.perk.ranged_long_shot.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "damage",
+      "direction": "dealt",
+      "kind": "projectile",
+      "multiplier": 1.1
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "id": "reskilled:fighting",
+  "name": "reskilled.focus.fighting",
+  "skills": [
+    "reskilled:melee",
+    "reskilled:ranged",
+    "reskilled:defense"
+  ],
+  "rewards": [
+    {
+      "task": "kill",
+      "bonus_percent": 50
+    }
+  ]
+}

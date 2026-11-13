@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "reskilled:melee",
+  "name": "reskilled.skill.melee",
+  "icon": "minecraft:wooden_sword",
+  "icon_levels": {
+    "4": "minecraft:copper_sword",
+    "8": "minecraft:iron_sword",
+    "16": "minecraft:diamond_sword",
+    "24": "minecraft:netherite_sword"
+  }
+}

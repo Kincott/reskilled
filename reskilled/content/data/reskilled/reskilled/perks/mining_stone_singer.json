@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "id": "reskilled:mining_stone_singer",
+  "skill": "reskilled:mining",
+  "name": "reskilled.perk.mining_stone_singer",
+  "description": "reskilled.perk.mining_stone_singer.desc",
+  "cost": 6,
+  "min_level": 24,
+  "requires": [
+    "reskilled:mining_sure_grip"
+  ],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:mining_efficiency",
+      "amount": 5.0,
+      "operation": "add_value"
+    },
+    {
+      "type": "attribute",
+      "attribute": "minecraft:block_break_speed",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:gathering_foragers_pace",
+  "skill": "reskilled:gathering",
+  "name": "reskilled.perk.gathering_foragers_pace",
+  "description": "reskilled.perk.gathering_foragers_pace.desc",
+  "cost": 2,
+  "min_level": 12,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:movement_efficiency",
+      "amount": 0.25,
+      "operation": "add_value"
+    }
+  ]
+}

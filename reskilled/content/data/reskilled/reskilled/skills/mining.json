@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "reskilled:mining",
+  "name": "reskilled.skill.mining",
+  "icon": "minecraft:wooden_pickaxe",
+  "icon_levels": {
+    "4": "minecraft:copper_pickaxe",
+    "8": "minecraft:iron_pickaxe",
+    "16": "minecraft:diamond_pickaxe",
+    "24": "minecraft:netherite_pickaxe"
+  }
+}

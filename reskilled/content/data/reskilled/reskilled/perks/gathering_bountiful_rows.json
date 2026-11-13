@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "id": "reskilled:gathering_bountiful_rows",
+  "skill": "reskilled:gathering",
+  "name": "reskilled.perk.gathering_bountiful_rows",
+  "description": "reskilled.perk.gathering_bountiful_rows.desc",
+  "cost": 2,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "drop_bonus",
+      "target": {
+        "tag": "#minecraft:crops"
+      },
+      "chance": 0.2
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:mining_tunnel_reach",
+  "skill": "reskilled:mining",
+  "name": "reskilled.perk.mining_tunnel_reach",
+  "description": "reskilled.perk.mining_tunnel_reach.desc",
+  "cost": 2,
+  "min_level": 12,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:block_interaction_range",
+      "amount": 0.5,
+      "operation": "add_value"
+    }
+  ]
+}

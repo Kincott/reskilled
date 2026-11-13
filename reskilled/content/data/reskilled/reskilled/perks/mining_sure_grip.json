@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:mining_sure_grip",
+  "skill": "reskilled:mining",
+  "name": "reskilled.perk.mining_sure_grip",
+  "description": "reskilled.perk.mining_sure_grip.desc",
+  "cost": 2,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:block_break_speed",
+      "amount": 0.05,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

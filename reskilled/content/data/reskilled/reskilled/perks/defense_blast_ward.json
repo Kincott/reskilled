@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "id": "reskilled:defense_blast_ward",
+  "skill": "reskilled:defense",
+  "name": "reskilled.perk.defense_blast_ward",
+  "description": "reskilled.perk.defense_blast_ward.desc",
+  "cost": 4,
+  "min_level": 16,
+  "requires": [],
+  "effects": [
+    {
+      "type": "damage",
+      "direction": "taken",
+      "kind": "explosion",
+      "multiplier": 0.8
+    },
+    {
+      "type": "attribute",
+      "attribute": "minecraft:explosion_knockback_resistance",
+      "amount": 0.25,
+      "operation": "add_value"
+    }
+  ]
+}

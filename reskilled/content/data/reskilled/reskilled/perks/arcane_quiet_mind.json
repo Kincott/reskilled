@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "id": "reskilled:arcane_quiet_mind",
+  "skill": "reskilled:arcane",
+  "name": "reskilled.perk.arcane_quiet_mind",
+  "description": "reskilled.perk.arcane_quiet_mind.desc",
+  "cost": 6,
+  "min_level": 24,
+  "requires": [
+    "reskilled:arcane_frugal_smith"
+  ],
+  "effects": [
+    {
+      "type": "anvil_cost",
+      "multiplier": 0.75
+    },
+    {
+      "type": "xp_gain",
+      "multiplier": 1.1
+    }
+  ]
+}

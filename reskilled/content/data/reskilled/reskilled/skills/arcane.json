@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "reskilled:arcane",
+  "name": "reskilled.skill.arcane",
+  "icon": "minecraft:book",
+  "icon_levels": {
+    "4": "minecraft:writable_book",
+    "8": "minecraft:enchanted_book",
+    "16": "minecraft:experience_bottle",
+    "32": "minecraft:nether_star"
+  }
+}

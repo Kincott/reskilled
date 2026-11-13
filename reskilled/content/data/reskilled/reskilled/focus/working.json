@@ -1,0 +1,98 @@
+{
+  "format": 1,
+  "id": "reskilled:working",
+  "name": "reskilled.focus.working",
+  "skills": [
+    "reskilled:mining",
+    "reskilled:gathering",
+    "reskilled:arcane"
+  ],
+  "rewards": [
+    {
+      "task": "block_xp",
+      "bonus_percent": 50
+    },
+    {
+      "task": "break",
+      "blocks": {
+        "tag": "#minecraft:mineable/pickaxe"
+      },
+      "points": 0.05,
+      "label": "reskilled.reward.mining"
+    },
+    {
+      "task": "break",
+      "blocks": {
+        "tag": "#minecraft:mineable/shovel"
+      },
+      "points": 0.05,
+      "label": "reskilled.reward.digging"
+    },
+    {
+      "task": "break",
+      "blocks": {
+        "tag": "#minecraft:logs"
+      },
+      "points": 0.25,
+      "label": "reskilled.reward.chopping"
+    },
+    {
+      "task": "break",
+      "blocks": {
+        "any_of": [
+          {
+            "id": "minecraft:wheat"
+          },
+          {
+            "id": "minecraft:carrots"
+          },
+          {
+            "id": "minecraft:potatoes"
+          }
+        ]
+      },
+      "points": 0.5,
+      "state": {
+        "age": "7"
+      },
+      "label": "reskilled.reward.harvesting"
+    },
+    {
+      "task": "break",
+      "blocks": {
+        "any_of": [
+          {
+            "id": "minecraft:beetroots"
+          },
+          {
+            "id": "minecraft:nether_wart"
+          }
+        ]
+      },
+      "points": 0.5,
+      "state": {
+        "age": "3"
+      },
+      "label": "reskilled.reward.harvesting"
+    },
+    {
+      "task": "break",
+      "blocks": {
+        "any_of": [
+          {
+            "id": "minecraft:melon"
+          },
+          {
+            "id": "minecraft:pumpkin"
+          }
+        ]
+      },
+      "points": 0.25,
+      "label": "reskilled.reward.harvesting"
+    },
+    {
+      "task": "smelt",
+      "points": 0.1
+    }
+  ]
+}

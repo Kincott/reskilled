@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "reskilled:gathering",
+  "name": "reskilled.skill.gathering",
+  "icon": "minecraft:wooden_axe",
+  "icon_levels": {
+    "4": "minecraft:copper_axe",
+    "8": "minecraft:iron_axe",
+    "16": "minecraft:diamond_axe",
+    "24": "minecraft:netherite_axe"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "id": "reskilled:mining_deep_veins",
+  "skill": "reskilled:mining",
+  "name": "reskilled.perk.mining_deep_veins",
+  "description": "reskilled.perk.mining_deep_veins.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "drop_bonus",
+      "target": {
+        "any_of": [
+          {
+            "tag": "#minecraft:coal_ores"
+          },
+          {
+            "tag": "#minecraft:copper_ores"
+          },
+          {
+            "tag": "#minecraft:iron_ores"
+          }
+        ]
+      },
+      "chance": 0.15
+    }
+  ]
+}

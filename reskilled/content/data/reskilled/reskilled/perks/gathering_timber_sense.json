@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "id": "reskilled:gathering_timber_sense",
+  "skill": "reskilled:gathering",
+  "name": "reskilled.perk.gathering_timber_sense",
+  "description": "reskilled.perk.gathering_timber_sense.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "drop_bonus",
+      "target": {
+        "tag": "#minecraft:logs"
+      },
+      "chance": 0.15
+    }
+  ]
+}

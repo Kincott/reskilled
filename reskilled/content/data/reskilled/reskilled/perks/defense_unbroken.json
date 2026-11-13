@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "id": "reskilled:defense_unbroken",
+  "skill": "reskilled:defense",
+  "name": "reskilled.perk.defense_unbroken",
+  "description": "reskilled.perk.defense_unbroken.desc",
+  "cost": 6,
+  "min_level": 24,
+  "requires": [
+    "reskilled:defense_tempered_plates"
+  ],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:max_health",
+      "amount": 4.0,
+      "operation": "add_value"
+    },
+    {
+      "type": "damage",
+      "direction": "taken",
+      "kind": "melee",
+      "multiplier": 0.9
+    }
+  ]
+}

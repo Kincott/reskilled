@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "id": "reskilled:ranged_deadeye",
+  "skill": "reskilled:ranged",
+  "name": "reskilled.perk.ranged_deadeye",
+  "description": "reskilled.perk.ranged_deadeye.desc",
+  "cost": 6,
+  "min_level": 24,
+  "requires": [
+    "reskilled:ranged_long_shot"
+  ],
+  "effects": [
+    {
+      "type": "damage",
+      "direction": "dealt",
+      "kind": "projectile",
+      "multiplier": 1.2
+    }
+  ]
+}

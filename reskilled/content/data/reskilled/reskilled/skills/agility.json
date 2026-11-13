@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "id": "reskilled:agility",
+  "name": "reskilled.skill.agility",
+  "icon": "minecraft:feather",
+  "icon_levels": {
+    "8": "minecraft:rabbit_foot",
+    "16": "minecraft:elytra"
+  }
+}

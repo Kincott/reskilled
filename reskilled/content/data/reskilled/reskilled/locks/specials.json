@@ -1,0 +1,176 @@
+{
+  "format": 1,
+  "entries": [
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:mace"
+        }
+      },
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:melee": 20
+      },
+      "label": "reskilled.lock.mace"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:trident"
+        }
+      },
+      "actions": [
+        "use",
+        "attack"
+      ],
+      "requires": {
+        "reskilled:ranged": 16
+      },
+      "label": "reskilled.lock.trident"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:crossbow"
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:ranged": 6
+      },
+      "label": "reskilled.lock.crossbow"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:bow"
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:agility": 2
+      },
+      "label": "reskilled.lock.bow"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:elytra"
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:agility": 32
+      },
+      "label": "reskilled.lock.elytra"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:shield"
+        }
+      },
+      "actions": [
+        "equip",
+        "use"
+      ],
+      "requires": {
+        "reskilled:defense": 12
+      },
+      "label": "reskilled.lock.shield"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:wolf_armor"
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:taming": 6
+      },
+      "label": "reskilled.lock.wolf_armor"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:shears"
+        }
+      },
+      "actions": [
+        "break",
+        "use"
+      ],
+      "requires": {
+        "reskilled:gathering": 2
+      },
+      "label": "reskilled.lock.shears"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:ender_pearl"
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:arcane": 8
+      },
+      "label": "reskilled.lock.ender_pearl"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:ender_eye"
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:arcane": 16
+      },
+      "label": "reskilled.lock.ender_eye"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:firework_rocket"
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:agility": 4
+      },
+      "label": "reskilled.lock.fireworks"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:lead"
+        }
+      },
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:taming": 4
+      },
+      "label": "reskilled.lock.lead"
+    }
+  ]
+}

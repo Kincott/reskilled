@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "id": "reskilled:gathering_sapling_keeper",
+  "skill": "reskilled:gathering",
+  "name": "reskilled.perk.gathering_sapling_keeper",
+  "description": "reskilled.perk.gathering_sapling_keeper.desc",
+  "cost": 4,
+  "min_level": 16,
+  "requires": [
+    "reskilled:gathering_timber_sense"
+  ],
+  "effects": [
+    {
+      "type": "drop_bonus",
+      "target": {
+        "tag": "#minecraft:leaves"
+      },
+      "chance": 0.25
+    }
+  ]
+}

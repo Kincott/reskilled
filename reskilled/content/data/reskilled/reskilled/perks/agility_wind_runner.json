@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "id": "reskilled:agility_wind_runner",
+  "skill": "reskilled:agility",
+  "name": "reskilled.perk.agility_wind_runner",
+  "description": "reskilled.perk.agility_wind_runner.desc",
+  "cost": 6,
+  "min_level": 24,
+  "requires": [
+    "reskilled:agility_soft_landing"
+  ],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:movement_speed",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    },
+    {
+      "type": "damage",
+      "direction": "taken",
+      "kind": "fall",
+      "multiplier": 0.5
+    }
+  ]
+}

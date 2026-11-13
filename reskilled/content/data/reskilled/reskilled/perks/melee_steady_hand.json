@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:melee_steady_hand",
+  "skill": "reskilled:melee",
+  "name": "reskilled.perk.melee_steady_hand",
+  "description": "reskilled.perk.melee_steady_hand.desc",
+  "cost": 2,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:attack_speed",
+      "amount": 0.05,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "max_level": 32,
+  "cost": {
+    "base": 1,
+    "every": 1
+  },
+  "points_every": 2,
+  "focus_first_free": true,
+  "focus_cost": 10,
+  "death_penalty_levels": 0,
+  "creative_ignores_locks": true,
+  "lock_message_cooldown_ticks": 20
+}

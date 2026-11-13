@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:melee_planted_feet",
+  "skill": "reskilled:melee",
+  "name": "reskilled.perk.melee_planted_feet",
+  "description": "reskilled.perk.melee_planted_feet.desc",
+  "cost": 4,
+  "min_level": 16,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:knockback_resistance",
+      "amount": 0.2,
+      "operation": "add_value"
+    }
+  ]
+}

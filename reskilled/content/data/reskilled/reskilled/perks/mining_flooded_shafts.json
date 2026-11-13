@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "id": "reskilled:mining_flooded_shafts",
+  "skill": "reskilled:mining",
+  "name": "reskilled.perk.mining_flooded_shafts",
+  "description": "reskilled.perk.mining_flooded_shafts.desc",
+  "cost": 4,
+  "min_level": 16,
+  "requires": [
+    "reskilled:mining_sure_grip"
+  ],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:submerged_mining_speed",
+      "amount": 1.0,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

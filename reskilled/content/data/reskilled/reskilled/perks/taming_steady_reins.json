@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "id": "reskilled:taming_steady_reins",
+  "skill": "reskilled:taming",
+  "name": "reskilled.perk.taming_steady_reins",
+  "description": "reskilled.perk.taming_steady_reins.desc",
+  "cost": 4,
+  "min_level": 16,
+  "requires": [
+    "reskilled:taming_gentle_hands"
+  ],
+  "effects": [
+    {
+      "type": "mount_attribute",
+      "attribute": "minecraft:armor",
+      "amount": 2.0,
+      "operation": "add_value"
+    },
+    {
+      "type": "mount_attribute",
+      "attribute": "minecraft:safe_fall_distance",
+      "amount": 3.0,
+      "operation": "add_value"
+    }
+  ]
+}

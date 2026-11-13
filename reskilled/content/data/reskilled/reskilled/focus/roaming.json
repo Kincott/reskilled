@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "id": "reskilled:roaming",
+  "name": "reskilled.focus.roaming",
+  "skills": [
+    "reskilled:agility",
+    "reskilled:taming"
+  ],
+  "rewards": [
+    {
+      "task": "travel",
+      "points": 0.02
+    },
+    {
+      "task": "tame",
+      "points": 5
+    },
+    {
+      "task": "breed",
+      "points": 2
+    }
+  ]
+}

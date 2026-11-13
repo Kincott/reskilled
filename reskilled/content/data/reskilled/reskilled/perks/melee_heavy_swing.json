@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:melee_heavy_swing",
+  "skill": "reskilled:melee",
+  "name": "reskilled.perk.melee_heavy_swing",
+  "description": "reskilled.perk.melee_heavy_swing.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:attack_damage",
+      "amount": 1.0,
+      "operation": "add_value"
+    }
+  ]
+}

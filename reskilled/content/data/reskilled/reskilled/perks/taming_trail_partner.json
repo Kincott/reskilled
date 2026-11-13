@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:taming_trail_partner",
+  "skill": "reskilled:taming",
+  "name": "reskilled.perk.taming_trail_partner",
+  "description": "reskilled.perk.taming_trail_partner.desc",
+  "cost": 2,
+  "min_level": 12,
+  "requires": [],
+  "effects": [
+    {
+      "type": "mount_attribute",
+      "attribute": "minecraft:max_health",
+      "amount": 4.0,
+      "operation": "add_value"
+    }
+  ]
+}

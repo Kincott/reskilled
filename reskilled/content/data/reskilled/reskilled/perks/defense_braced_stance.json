@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:defense_braced_stance",
+  "skill": "reskilled:defense",
+  "name": "reskilled.perk.defense_braced_stance",
+  "description": "reskilled.perk.defense_braced_stance.desc",
+  "cost": 2,
+  "min_level": 8,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:knockback_resistance",
+      "amount": 0.15,
+      "operation": "add_value"
+    }
+  ]
+}

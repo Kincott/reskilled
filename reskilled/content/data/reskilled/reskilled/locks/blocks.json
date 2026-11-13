@@ -1,0 +1,47 @@
+{
+  "format": 1,
+  "entries": [
+    {
+      "target": {
+        "block": {
+          "id": "minecraft:enchanting_table"
+        }
+      },
+      "actions": [
+        "open"
+      ],
+      "requires": {
+        "reskilled:arcane": 12
+      },
+      "label": "reskilled.lock.enchanting_table"
+    },
+    {
+      "target": {
+        "block": {
+          "tag": "#minecraft:anvil"
+        }
+      },
+      "actions": [
+        "open"
+      ],
+      "requires": {
+        "reskilled:arcane": 12
+      },
+      "label": "reskilled.lock.anvil"
+    },
+    {
+      "target": {
+        "block": {
+          "id": "minecraft:brewing_stand"
+        }
+      },
+      "actions": [
+        "open"
+      ],
+      "requires": {
+        "reskilled:arcane": 8
+      },
+      "label": "reskilled.lock.brewing_stand"
+    }
+  ]
+}

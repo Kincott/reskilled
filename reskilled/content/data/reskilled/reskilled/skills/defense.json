@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "reskilled:defense",
+  "name": "reskilled.skill.defense",
+  "icon": "minecraft:leather_chestplate",
+  "icon_levels": {
+    "4": "minecraft:chainmail_chestplate",
+    "8": "minecraft:iron_chestplate",
+    "16": "minecraft:diamond_chestplate",
+    "24": "minecraft:netherite_chestplate"
+  }
+}

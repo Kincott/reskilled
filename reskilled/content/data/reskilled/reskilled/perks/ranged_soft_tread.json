@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:ranged_soft_tread",
+  "skill": "reskilled:ranged",
+  "name": "reskilled.perk.ranged_soft_tread",
+  "description": "reskilled.perk.ranged_soft_tread.desc",
+  "cost": 2,
+  "min_level": 12,
+  "requires": [],
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:sneaking_speed",
+      "amount": 0.5,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}
