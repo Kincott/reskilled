@@ -14,7 +14,7 @@ use skills_core::wire::{chunk_defs, client_defs_json};
 use super::lock;
 use super::queue;
 use super::state::online_players;
-use crate::DEFS_CHANNEL;
+use crate::{DEFS_CHANNEL, MAX_MESSAGE_BYTES};
 
 const NAMESPACE: &str = "skills_and_perks";
 /// The data folders under `data/<namespace>/skills_and_perks/`, in the order their files are merged.
@@ -25,8 +25,6 @@ const FOLDERS: [(&str, DefKind); 5] = [
     ("locks", DefKind::Lock),
     ("settings", DefKind::Settings),
 ];
-/// Horizon's limit for one mod message.
-const MAX_MESSAGE_BYTES: usize = 30_000;
 const REPAIRABLE: &str = "minecraft:repairable";
 const REPAIRABLE_ITEMS: &str = "items";
 
@@ -35,10 +33,6 @@ pub struct ServerData {
     pub defs: Arc<Defs>,
     /// Counts data loads; clients keep the definitions of the newest.
     pub generation: u64,
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "lock enforcement (Task 10) reads it")
-    )]
     pub locks: Mutex<LockCache>,
     /// The definitions as clients get them, worked out once per load.
     pub client_defs: String,
@@ -140,10 +134,6 @@ pub fn send_defs(player: u128) {
 }
 
 /// The target's lock requirements, through this load's cache; nothing is locked before the first load.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "lock enforcement (Task 10) calls it")
-)]
 pub fn requirements(host: &dyn Host, kind: TargetKind, id: &str) -> Requirements {
     let Some(data) = current() else {
         return Requirements::default();
@@ -176,19 +166,8 @@ pub fn note_repair_material(item: &str, components: &Map<String, Value>) {
 }
 
 /// The server's answers to what lock matchers ask.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "lock enforcement (Task 10) builds it")
-)]
 pub struct HostFacts<'a>(pub &'a dyn Host);
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "lock enforcement (Task 10) uses it through HostFacts"
-    )
-)]
 fn single(item: &str) -> ItemStack {
     ItemStack {
         item: item.into(),

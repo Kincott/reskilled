@@ -2,11 +2,14 @@
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+pub mod actions;
+pub mod commands;
 pub mod data;
 pub mod queue;
 pub mod state;
 #[cfg(test)]
 pub mod test_host;
+pub mod text;
 
 /// Locks a mutex, going on with the data a panicking holder left: the game keeps running after a hook panics.
 pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {

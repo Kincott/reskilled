@@ -1,6 +1,6 @@
 //! Each player's skills, saved with the player (kept through death) and synced to their own client.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use horizon_client::mod_api::{
@@ -47,8 +47,8 @@ fn decode_attachment(saved: &Compound) -> Result<PlayerState, AttachmentError> {
     })
 }
 
-/// The players on the server now, by login and logout.
-static ONLINE: Mutex<BTreeSet<u128>> = Mutex::new(BTreeSet::new());
+/// The players on the server now and their names, by login and logout.
+static ONLINE: Mutex<BTreeMap<u128, String>> = Mutex::new(BTreeMap::new());
 
 /// The player's state. An unreadable save is an error, never a fresh state that would be saved over it.
 pub fn state_of(host: &mut dyn Host, player: u128) -> Result<PlayerState, AttachmentError> {
@@ -64,11 +64,20 @@ pub fn set_state(
 }
 
 pub fn online_players() -> Vec<u128> {
-    lock(&ONLINE).iter().copied().collect()
+    lock(&ONLINE).keys().copied().collect()
 }
 
-pub fn logged_in(player: u128) {
-    lock(&ONLINE).insert(player);
+/// The online player with this name (any case, as Minecraft names are), and the name as they spell it.
+pub fn player_named(name: &str) -> Option<(u128, String)> {
+    let online = lock(&ONLINE);
+    let (id, spelled) = online
+        .iter()
+        .find(|(_, spelled)| spelled.eq_ignore_ascii_case(name))?;
+    Some((*id, spelled.clone()))
+}
+
+pub fn logged_in(player: u128, name: &str) {
+    lock(&ONLINE).insert(player, name.to_string());
     queue::refresh(player);
 }
 
