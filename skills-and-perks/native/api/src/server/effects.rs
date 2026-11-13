@@ -376,7 +376,7 @@ mod tests {
     use crate::server::data::tests::load;
     use crate::server::queue::{Job, take_queued};
     use crate::server::state::set_state;
-    use crate::server::test_host::{TestHost, exclusive, mods};
+    use crate::test_host::{TestHost, exclusive, mods};
 
     const PLAYER: u128 = 0x0123_4567_89ab_cdef_0123_4567_89ab_cdef;
     const TARGET: &str = "01234567-89ab-cdef-0123-456789abcdef";

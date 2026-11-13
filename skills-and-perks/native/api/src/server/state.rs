@@ -114,7 +114,7 @@ mod tests {
     use super::*;
     use crate::server::data::current;
     use crate::server::queue::{Job, run, take_queued};
-    use crate::server::test_host::{TestHost, exclusive, mods};
+    use crate::test_host::{TestHost, exclusive, mods};
 
     const MINING: &str = "skills_and_perks:mining";
     const PLAYER: u128 = 0x1234;

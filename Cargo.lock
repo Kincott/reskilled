@@ -2323,6 +2323,7 @@ version = "0.1.0"
 dependencies = [
  "horizon-client",
  "log",
+ "serde",
  "serde_json",
  "skills_core",
 ]

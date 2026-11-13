@@ -129,7 +129,7 @@ mod tests {
     use super::*;
     use crate::DEFS_CHANNEL;
     use crate::server::data::current;
-    use crate::server::test_host::{TestHost, exclusive, mods};
+    use crate::test_host::{TestHost, exclusive, mods};
 
     /// Any channel other than the definitions'.
     const MSG_CHANNEL: &str = "skills_and_perks:msg";
@@ -192,6 +192,12 @@ mod tests {
             whole = reassembler.push(chunk).or(whole);
         }
         assert_eq!(whole, Some(client_defs_json(&data.defs)));
+        let you: Vec<skills_core::wire::ToClient> = host
+            .sent_to(7, MSG_CHANNEL)
+            .iter()
+            .map(|m| serde_json::from_slice(m).unwrap())
+            .collect();
+        assert_eq!(you, vec![skills_core::wire::ToClient::You { player: 7 }]);
     }
 
     #[test]
@@ -218,7 +224,7 @@ mod tests {
 
         // Then only one send's chunks go out, and the other message still does
         assert_eq!(host.sent_to(7, DEFS_CHANNEL).len(), one_send);
-        assert_eq!(host.sent_to(7, MSG_CHANNEL).len(), 1);
+        assert!(host.sent_to(7, MSG_CHANNEL).contains(&&[1u8][..]));
     }
 
     #[test]

@@ -48,6 +48,15 @@ messages! {
     PLAYERS_ONLY = "skills_and_perks.cmd.players_only" => "Only players can do that.";
     NOT_ALLOWED = "skills_and_perks.cmd.not_allowed" => "You may not do that.";
     USAGE = "skills_and_perks.cmd.usage" => "Usage: /skills [raise <skill> | perk <perk> | focus <area> | open]";
+    REQUIRES = "skills_and_perks.ui.requires" => "%s: %s %s";
+    ACTION_USE = "skills_and_perks.ui.action.use" => "Use";
+    ACTION_ATTACK = "skills_and_perks.ui.action.attack" => "Attack";
+    ACTION_BREAK = "skills_and_perks.ui.action.break" => "Break";
+    ACTION_EQUIP = "skills_and_perks.ui.action.equip" => "Wear";
+    ACTION_OPEN = "skills_and_perks.ui.action.open" => "Open";
+    ACTION_PLACE = "skills_and_perks.ui.action.place" => "Place";
+    ACTION_MOUNT = "skills_and_perks.ui.action.mount" => "Ride";
+    ACTION_INTERACT = "skills_and_perks.ui.action.interact" => "Interact";
 }
 
 pub fn say(message: &Message, args: &[Text]) -> Text {

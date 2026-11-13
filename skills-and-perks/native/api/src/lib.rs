@@ -1,21 +1,28 @@
 //! The trait mod: the launcher links this crate into the game and calls `hooks()`. Each method of `Hooks` is one of
 //! Horizon's hook points (Horizon docs/native-mods.md, "Trait mods"); each hands its work to the module that owns it.
 use horizon_client::mod_api::{
-    AddServerReloadListenersEvent, AttackEntityEvent, ContainerOpenedEvent, DestroyBlockEvent,
-    EntityMountEvent, Flow, Hooks, Host, InteractEntityEvent, ItemStack, LivingIncomingDamageEvent,
-    LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent, OnEquipEvent,
+    AddServerReloadListenersEvent, AttackEntityEvent, ClientDisconnectingEvent,
+    ContainerOpenedEvent, DestroyBlockEvent, EntityMountEvent, Flow, Hooks, Host,
+    InteractEntityEvent, ItemStack, LivingIncomingDamageEvent, LootDropsEvent,
+    ModifyDefaultComponentsEvent, NetFromClientEvent, NetFromServerEvent, OnEquipEvent,
     PerformCommandEvent, PerformConsoleCommandEvent, PlayerCloneEvent, PlayerLoggedInEvent,
     PlayerLoggedOutEvent, PlayerXpChangeEvent, PrepareAnvilEvent, RegisterCommandsEvent,
     ServerDataLoadedEvent, ServerReloadListenerApplyEvent, ServerTickEvent, ServerTickPhase,
-    UseItemEvent, UseItemOnEvent,
+    TickEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
 };
 
+mod client;
 mod server;
+#[cfg(test)]
+mod test_host;
+mod text;
 
 use server::commands::{Source, run_command};
 use server::enforce::{self, Actor, acting};
 use server::queue::{Job, queue};
 
+/// The mod's id: its namespace, and the id of its screen.
+pub(crate) const MOD_ID: &str = "skills_and_perks";
 /// Server to client: definition chunks.
 pub(crate) const DEFS_CHANNEL: &str = "skills_and_perks:defs";
 /// Server to client: every other message (`ToClient`).
@@ -202,6 +209,24 @@ impl Hooks for Mod {
                 event.new.map(|stack| &*stack.item),
             );
         }
+    }
+
+    fn net_from_server(&self, host: &mut dyn Host, event: &mut NetFromServerEvent<'_>) {
+        client::cache::on_message(host, event.channel, event.data);
+    }
+
+    fn tick(&self, host: &mut dyn Host, _event: &mut TickEvent) {
+        client::cache::on_tick(host);
+    }
+
+    fn tooltip(&self, _host: &dyn Host, event: &mut TooltipEvent<'_>) {
+        event
+            .lines
+            .extend(client::tooltip::requirement_lines(&event.stack.item));
+    }
+
+    fn client_disconnecting(&self, _host: &dyn Host, _event: &mut ClientDisconnectingEvent) {
+        client::cache::on_disconnect();
     }
 
     fn server_tick(&self, host: &mut dyn Host, event: &mut ServerTickEvent<'_>) {

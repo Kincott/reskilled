@@ -42,6 +42,8 @@ pub enum ToClient {
     Open,
     /// A lock refused an action: the client plays its sound.
     Refused { skill: String, level: u32 },
+    /// The player this client plays as, so it can read its own synced state.
+    You { player: u128 },
 }
 
 /// What clients get of the definitions: no lock matchers (only the server can test tags), and the lock labels per
@@ -268,6 +270,9 @@ mod tests {
             ToClient::Refused {
                 skill: MINING.into(),
                 level: 16,
+            },
+            ToClient::You {
+                player: u128::MAX - 7,
             },
         ];
 

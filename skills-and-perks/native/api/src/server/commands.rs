@@ -9,12 +9,12 @@ use super::actions::act;
 use super::data::current;
 use super::queue::{self, Job};
 use super::state::{player_named, set_state, state_of};
-use super::text::{
+use crate::MSG_CHANNEL;
+use crate::text::{
     FOCUS_SET, NO_FOCUS, NO_PLAYER, NOT_ALLOWED, PERK_BOUGHT, PLAYERS_ONLY, RAISED, RESET_ALL,
     RESET_ONE, SET_LEVEL, SET_POINTS, SKILL_LINE, SKILL_LINE_MAX, SUMMARY, UNAVAILABLE,
     UNKNOWN_SKILL, USAGE, focus_name, number, perk_name, say, skill_name,
 };
-use crate::MSG_CHANNEL;
 
 const COMMAND: &str = "skills";
 /// The id namespace assumed for a skill, perk or focus argument written without one (`mining`).
@@ -308,7 +308,7 @@ mod tests {
     use crate::server::data::tests::load;
     use crate::server::queue::{Job, run, take_queued};
     use crate::server::state::{set_state, state_of};
-    use crate::server::test_host::{TestHost, exclusive, mods};
+    use crate::test_host::{TestHost, exclusive, mods};
 
     const MINING: &str = "skills_and_perks:mining";
     const MELEE: &str = "skills_and_perks:melee";

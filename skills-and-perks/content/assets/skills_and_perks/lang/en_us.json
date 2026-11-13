@@ -147,5 +147,14 @@
   "skills_and_perks.skill.melee": "Melee",
   "skills_and_perks.skill.mining": "Mining",
   "skills_and_perks.skill.ranged": "Ranged",
-  "skills_and_perks.skill.taming": "Taming"
+  "skills_and_perks.skill.taming": "Taming",
+  "skills_and_perks.ui.action.attack": "Attack",
+  "skills_and_perks.ui.action.break": "Break",
+  "skills_and_perks.ui.action.equip": "Wear",
+  "skills_and_perks.ui.action.interact": "Interact",
+  "skills_and_perks.ui.action.mount": "Ride",
+  "skills_and_perks.ui.action.open": "Open",
+  "skills_and_perks.ui.action.place": "Place",
+  "skills_and_perks.ui.action.use": "Use",
+  "skills_and_perks.ui.requires": "%s: %s %s"
 }

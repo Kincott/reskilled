@@ -8,7 +8,7 @@ use skills_core::wire::{ToClient, ToServer};
 use super::data::{current, requirements};
 use super::queue::{self, Job};
 use super::state::{set_state, state_of};
-use super::text::{UNAVAILABLE, refusal, say};
+use crate::text::{UNAVAILABLE, refusal, say};
 use crate::{ACT_CHANNEL, MAX_MESSAGE_BYTES, MSG_CHANNEL};
 
 /// Item ids answered in one `Reqs` message.
@@ -135,7 +135,7 @@ mod tests {
     use crate::server::data::tests::load;
     use crate::server::queue::{Job, run, take_queued};
     use crate::server::state::state_of;
-    use crate::server::test_host::{TestHost, exclusive, mods};
+    use crate::test_host::{TestHost, exclusive, mods};
     use crate::{ACT_CHANNEL, MSG_CHANNEL};
 
     const MINING: &str = "skills_and_perks:mining";

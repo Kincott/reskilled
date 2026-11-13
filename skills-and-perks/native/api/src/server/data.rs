@@ -9,12 +9,12 @@ use serde_json::{Map, Value};
 use skills_core::defs::DefKind;
 use skills_core::locks::{Facts, LockCache, Requirements, TargetKind};
 use skills_core::registry::{Defs, SourceFile, build};
-use skills_core::wire::{chunk_defs, client_defs_json};
+use skills_core::wire::{ToClient, chunk_defs, client_defs_json};
 
 use super::lock;
 use super::queue;
 use super::state::online_players;
-use crate::{DEFS_CHANNEL, MAX_MESSAGE_BYTES};
+use crate::{DEFS_CHANNEL, MAX_MESSAGE_BYTES, MSG_CHANNEL};
 
 const NAMESPACE: &str = "skills_and_perks";
 /// The data folders under `data/<namespace>/skills_and_perks/`, in the order their files are merged.
@@ -125,6 +125,8 @@ pub fn send_defs(player: u128) {
         return;
     };
     queue::drop_waiting(player, DEFS_CHANNEL);
+    let you = serde_json::to_vec(&ToClient::You { player }).expect("You always encodes");
+    queue::send(player, MSG_CHANNEL, you);
     // Send ids only need to grow within one server run; 2^32 data loads never happen.
     let send_id = data.generation as u32;
     for chunk in chunk_defs(&data.client_defs, send_id, MAX_MESSAGE_BYTES) {
@@ -226,7 +228,7 @@ pub(crate) mod tests {
 
     use super::*;
     use crate::server::queue::{Job, take_queued};
-    use crate::server::test_host::{TestHost, exclusive, logged, mods};
+    use crate::test_host::{TestHost, exclusive, logged, mods};
 
     const MINING: &str = "skills_and_perks:mining";
 

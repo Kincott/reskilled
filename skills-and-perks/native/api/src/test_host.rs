@@ -6,7 +6,8 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use horizon_client::mod_api::{
     AttachmentResult, Attachments, Compound, EntityRef, EquipmentSlot, Holder, Hooks, Host,
-    ItemStack, LegacyRandom, LevelRef, LivingRef, NativeBlockReadError, NativeWorldEpoch, Text,
+    ItemStack, LegacyRandom, LevelRef, LivingRef, NativeBlockReadError, NativeClientState,
+    NativeWorldEpoch, Text,
 };
 
 /// Records what the server sends and answers the tag helpers from its tables.
@@ -44,6 +45,18 @@ pub struct TestHost {
     pub entity_uuids: HashMap<u32, u128>,
     /// The level's random source, when the test seeds one.
     pub random: Option<LegacyRandom>,
+    /// Messages the client sent to the server: channel and data.
+    pub sent_to_server: Vec<(String, Vec<u8>)>,
+    /// Sounds the client played: event, position, volume, pitch.
+    pub sounds: Vec<(String, [f64; 3], f32, f32)>,
+    /// Where the client's eyes are.
+    pub eye: Option<[f64; 3]>,
+    /// The client's own 36 inventory slots.
+    pub inventory: Vec<Option<ItemStack>>,
+    /// Mod screens the client opened.
+    pub screens_opened: Vec<String>,
+    /// The config folder, when the test makes one.
+    pub config: Option<std::path::PathBuf>,
 }
 
 /// Where the test player stands.
@@ -177,6 +190,49 @@ impl Host for TestHost {
         self.random.as_mut()
     }
 
+    fn window(&self) -> bool {
+        true
+    }
+
+    fn net_send_to_server(&mut self, channel: &str, data: &[u8]) -> Result<(), String> {
+        self.sent_to_server
+            .push((channel.to_string(), data.to_vec()));
+        Ok(())
+    }
+
+    fn play_local_sound(
+        &mut self,
+        sound: &str,
+        at: [f64; 3],
+        volume: f32,
+        pitch: f32,
+        _delay: i32,
+    ) -> bool {
+        self.sounds.push((sound.to_string(), at, volume, pitch));
+        true
+    }
+
+    fn client_state(&self) -> Option<NativeClientState> {
+        let mut state = NativeClientState::default();
+        state.eye_position = self.eye;
+        Some(state)
+    }
+
+    fn own_inventory(&mut self) -> Option<Vec<Option<ItemStack>>> {
+        Some(self.inventory.clone())
+    }
+
+    fn mod_screen_open(&mut self, mod_id: &str) -> bool {
+        self.screens_opened.push(mod_id.to_string());
+        true
+    }
+
+    fn config_dir(&self) -> Result<std::path::PathBuf, String> {
+        self.config
+            .clone()
+            .ok_or_else(|| "no config folder in this test".to_string())
+    }
+
     /// Players cannot be built in a test (`NativeServerPlayer` is `#[non_exhaustive]`): nobody is listed.
     fn server_players(&self) -> Vec<horizon_client::mod_api::NativeServerPlayer> {
         Vec::new()
@@ -222,11 +278,12 @@ static SERIAL: Mutex<()> = Mutex::new(());
 /// Runs the calling test alone, with the mod's server state and the captured log emptied.
 pub fn exclusive() -> MutexGuard<'static, ()> {
     let guard = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
-    super::data::reset();
-    super::effects::reset();
-    super::enforce::reset();
-    super::queue::reset();
-    super::state::reset();
+    crate::server::data::reset();
+    crate::server::effects::reset();
+    crate::server::enforce::reset();
+    crate::server::queue::reset();
+    crate::server::state::reset();
+    crate::client::cache::reset();
     logged();
     guard
 }

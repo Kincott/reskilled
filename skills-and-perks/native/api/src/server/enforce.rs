@@ -21,8 +21,8 @@ use super::effects;
 use super::lock;
 use super::queue::{self, Job};
 use super::state::state_of;
-use super::text::{NEEDS, number, say, skill_name};
 use crate::MSG_CHANNEL;
+use crate::text::{NEEDS, number, say, skill_name};
 
 /// `NativeServerPlayer::game_mode` values that may ignore locks.
 const CREATIVE: i32 = 1;
@@ -373,7 +373,7 @@ mod tests {
     use crate::server::data::tests::load;
     use crate::server::queue::{Job, run, take_queued};
     use crate::server::state::set_state;
-    use crate::server::test_host::{PLAYER_POSITION, SUMMONED_ID, TestHost, exclusive};
+    use crate::test_host::{PLAYER_POSITION, SUMMONED_ID, TestHost, exclusive};
 
     const PLAYER: u128 = 0xfeed;
     const ENTITY: u32 = 42;
