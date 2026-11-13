@@ -5,6 +5,7 @@
 //! registry's job.
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -161,6 +162,24 @@ pub struct LockEntry {
     /// Drops earlier entries for an equal target.
     #[serde(default)]
     pub replace: bool,
+}
+
+/// The three kinds of thing a lock can target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TargetKind {
+    Item,
+    Block,
+    Entity,
+}
+
+impl fmt::Display for TargetKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            TargetKind::Item => "item",
+            TargetKind::Block => "block",
+            TargetKind::Entity => "entity",
+        })
+    }
 }
 
 /// What a lock applies to.
@@ -362,7 +381,7 @@ impl Effect {
                 check_finite("amount", *amount)
             }
             Effect::DropBonus { target, chance } => {
-                target.validate()?;
+                target.validate(TargetKind::Block)?;
                 if (0.0..=1.0).contains(chance) {
                     Ok(())
                 } else {
@@ -396,12 +415,8 @@ impl FocusDef {
 
 impl LockEntry {
     fn validate(&self) -> Result<(), String> {
-        let (kind, matcher) = match &self.target {
-            Target::Item(matcher) => ("item", matcher),
-            Target::Block(matcher) => ("block", matcher),
-            Target::Entity(matcher) => ("entity", matcher),
-        };
-        matcher.validate()?;
+        let (kind, matcher) = self.target.parts();
+        matcher.validate(kind)?;
         if self.actions.is_empty() {
             return Err("actions must not be empty".into());
         }
@@ -420,6 +435,14 @@ impl LockEntry {
 }
 
 impl Target {
+    pub fn parts(&self) -> (TargetKind, &Matcher) {
+        match self {
+            Target::Item(matcher) => (TargetKind::Item, matcher),
+            Target::Block(matcher) => (TargetKind::Block, matcher),
+            Target::Entity(matcher) => (TargetKind::Entity, matcher),
+        }
+    }
+
     /// Items are used, swung, dug with and worn; blocks are opened and placed; entities are ridden and used.
     fn allows(&self, action: Action) -> bool {
         match self {
@@ -434,10 +457,17 @@ impl Target {
 }
 
 impl Matcher {
-    fn validate(&self) -> Result<(), String> {
+    /// Entities have no tags the server can test, and only items have a repair material.
+    fn validate(&self, kind: TargetKind) -> Result<(), String> {
         match self {
             Matcher::Id(id) => check_id("id", id),
+            Matcher::Tag(_) if kind == TargetKind::Entity => {
+                Err("tag matchers do not work on an entity target".into())
+            }
             Matcher::Tag(tag) => check_tag("tag", tag),
+            Matcher::Repairable(_) if kind != TargetKind::Item => Err(format!(
+                "repairable matchers only work on items, not on a {kind} target"
+            )),
             Matcher::Pattern(pattern) => {
                 if is_id(&pattern.replace('*', "x")) {
                     Ok(())
@@ -455,7 +485,7 @@ impl Matcher {
                 if matchers.is_empty() {
                     return Err("all_of and any_of need at least one matcher".into());
                 }
-                matchers.iter().try_for_each(Matcher::validate)
+                matchers.iter().try_for_each(|m| m.validate(kind))
             }
         }
     }
@@ -917,6 +947,39 @@ mod tests {
                 creative_ignores_locks: true,
                 lock_message_cooldown_ticks: 20,
             }
+        );
+    }
+
+    #[test]
+    fn refuses_matchers_the_target_kind_cannot_use() {
+        // Given an entity lock by tag, a block lock by repair material nested in any_of, and a drop bonus (which
+        // matches broken blocks) by repair material
+        let entity_tag = r##"{"format": 1, "entries": [{"target": {"entity": {"tag": "#minecraft:skeletons"}},
+            "actions": ["mount"], "requires": {"skills_and_perks:taming": 4}}]}"##;
+        let block_repairable = r##"{"format": 1, "entries": [{"target": {"block": {"any_of": [
+            {"id": "minecraft:anvil"}, {"repairable": "#minecraft:iron_tool_materials"}]}},
+            "actions": ["open"], "requires": {"skills_and_perks:arcane": 6}}]}"##;
+        let drop_repairable = perk_with_effect(
+            r##"{"type": "drop_bonus", "target": {"repairable": "minecraft:diamond"}, "chance": 0.5}"##,
+        );
+
+        // When they are parsed
+        let entity_tag = refusal(DefKind::Lock, entity_tag);
+        let block_repairable = refusal(DefKind::Lock, block_repairable);
+        let drop_repairable = refusal(DefKind::Perk, &drop_repairable);
+
+        // Then each is refused, naming the matcher and the kind it cannot apply to
+        assert!(
+            entity_tag.contains("tag") && entity_tag.contains("entity"),
+            "{entity_tag}"
+        );
+        assert!(
+            block_repairable.contains("repairable") && block_repairable.contains("block"),
+            "{block_repairable}"
+        );
+        assert!(
+            drop_repairable.contains("repairable") && drop_repairable.contains("block"),
+            "{drop_repairable}"
         );
     }
 
