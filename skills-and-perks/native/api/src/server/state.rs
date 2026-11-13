@@ -84,6 +84,7 @@ pub fn logged_in(player: u128, name: &str) {
 pub fn logged_out(player: u128) {
     lock(&ONLINE).remove(&player);
     queue::forget(player);
+    super::effects::forget(player);
 }
 
 /// Takes the settings' death penalty off a respawned player, then brings their perks' attributes in line.
@@ -217,7 +218,8 @@ mod tests {
         let after_run = take_queued();
         dispatch_player_clone(&mut host, &mods(), PLAYER, "Ann", false);
 
-        // Then the death costs 2 levels and asks for an attribute sync, and the End exit costs nothing
+        // Then the death costs 2 levels and asks for an attribute sync, and the End exit costs no levels but still
+        // resyncs the new player's attributes
         let defs = &current().unwrap().defs;
         assert_eq!(after_death, vec![Job::ApplyDeath(PLAYER)]);
         assert_eq!(
@@ -225,6 +227,6 @@ mod tests {
             8
         );
         assert_eq!(after_run, vec![Job::SyncAttributes(PLAYER)]);
-        assert_eq!(take_queued(), vec![]);
+        assert_eq!(take_queued(), vec![Job::SyncAttributes(PLAYER)]);
     }
 }

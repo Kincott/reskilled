@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use horizon_client::mod_api::{EquipmentSlot, Host};
 
-use super::{data, enforce, lock, state};
+use super::{data, effects, enforce, lock, state};
 
 /// Horizon sends at most this many mod messages to one player in a tick.
 const MESSAGES_PER_TICK: usize = 32;
@@ -25,6 +25,12 @@ pub enum Job {
         slot: EquipmentSlot,
     },
     ApplyDeath(u128),
+    /// A rider got on (or off) a vehicle, by the vehicle's entity id.
+    Mount {
+        player: u128,
+        vehicle: u32,
+        mounting: bool,
+    },
 }
 
 static JOBS: Mutex<Vec<Job>> = Mutex::new(Vec::new());
@@ -42,6 +48,7 @@ pub fn queue(job: Job) {
 /// What a player needs after joining or a data load: the definitions, their perks' attributes, and a check of what
 /// they wear.
 pub fn refresh(player: u128) {
+    effects::mark_full(player);
     lock(&JOBS).extend([
         Job::SendDefs(player),
         Job::SyncAttributes(player),
@@ -82,8 +89,7 @@ pub fn run(host: &mut dyn Host, jobs: Vec<Job>) {
             Job::SendDefs(player) => data::send_defs(player),
             Job::ApplyDeath(player) => state::apply_death(host, player),
             Job::CheckEquipment(_) | Job::Unequip { .. } => enforce::run_job(host, job),
-            // Perk effects take this over in the next version of this module.
-            Job::SyncAttributes(_) => log::debug!("Skills & Perks has no handler for {job:?} yet"),
+            Job::SyncAttributes(_) | Job::Mount { .. } => effects::run_job(host, job),
         }
     }
     flush(host);

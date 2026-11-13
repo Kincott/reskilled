@@ -17,6 +17,7 @@ use skills_core::registry::Defs;
 use skills_core::wire::ToClient;
 
 use super::data::{current, requirements};
+use super::effects;
 use super::lock;
 use super::queue::{self, Job};
 use super::state::state_of;
@@ -50,12 +51,15 @@ pub struct Actor {
 }
 
 impl Actor {
+    /// The player as a hook sees them; their entity id is remembered for the damage hook, which only has ids.
     pub fn of(player: &NativeServerPlayer, settings: &Settings) -> Self {
-        Actor {
+        let actor = Actor {
             player: player.uuid,
             entity: u32::try_from(player.entity_id).unwrap_or_default(),
             exempt: exempt(player.game_mode, settings),
-        }
+        };
+        effects::remember_entity(actor.player, actor.entity);
+        actor
     }
 }
 
@@ -223,6 +227,7 @@ pub fn on_container(host: &mut dyn Host, actor: &Actor, block: Option<&str>) -> 
 pub fn on_equip(host: &mut dyn Host, actor: &Actor, slot: &str, item: Option<&str>) {
     let Some(slot) = slot_named(slot) else { return };
     if slot == EquipmentSlot::MainHand {
+        effects::note_main_hand(actor.player, item, actor.exempt);
         queue::queue(Job::SyncAttributes(actor.player));
         return;
     }
@@ -271,6 +276,15 @@ pub fn run_job(host: &mut dyn Host, job: Job) {
 
 /// Takes off every worn item the player may not wear, telling them once.
 pub fn check_equipment(host: &mut dyn Host, actor: &Actor) {
+    let main_hand = host
+        .entity(actor.entity)
+        .and_then(|e| host.living(e))
+        .and_then(|living| host.living_equipment(living, EquipmentSlot::MainHand));
+    effects::note_main_hand(
+        actor.player,
+        main_hand.as_ref().map(|stack| &*stack.item),
+        actor.exempt,
+    );
     if actor.exempt {
         return;
     }

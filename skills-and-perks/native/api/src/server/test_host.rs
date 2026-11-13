@@ -6,7 +6,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use horizon_client::mod_api::{
     AttachmentResult, Attachments, Compound, EntityRef, EquipmentSlot, Holder, Hooks, Host,
-    ItemStack, LevelRef, LivingRef, NativeBlockReadError, NativeWorldEpoch, Text,
+    ItemStack, LegacyRandom, LevelRef, LivingRef, NativeBlockReadError, NativeWorldEpoch, Text,
 };
 
 /// Records what the server sends and answers the tag helpers from its tables.
@@ -38,6 +38,12 @@ pub struct TestHost {
     pub item_entities: Vec<(u32, ItemStack)>,
     /// Stacks given to players.
     pub given: Vec<(u128, ItemStack)>,
+    /// Commands run as the console.
+    pub commands: Vec<String>,
+    /// Entity id to uuid, for `entity_uuid`.
+    pub entity_uuids: HashMap<u32, u128>,
+    /// The level's random source, when the test seeds one.
+    pub random: Option<LegacyRandom>,
 }
 
 /// Where the test player stands.
@@ -158,6 +164,19 @@ impl Host for TestHost {
         true
     }
 
+    fn run_command(&mut self, line: &str) -> bool {
+        self.commands.push(line.to_string());
+        true
+    }
+
+    fn entity_uuid(&mut self, entity: EntityRef) -> Option<u128> {
+        self.entity_uuids.get(&entity.id()).copied()
+    }
+
+    fn level_random(&mut self, _dimension: &str) -> Option<&mut LegacyRandom> {
+        self.random.as_mut()
+    }
+
     /// Players cannot be built in a test (`NativeServerPlayer` is `#[non_exhaustive]`): nobody is listed.
     fn server_players(&self) -> Vec<horizon_client::mod_api::NativeServerPlayer> {
         Vec::new()
@@ -204,6 +223,7 @@ static SERIAL: Mutex<()> = Mutex::new(());
 pub fn exclusive() -> MutexGuard<'static, ()> {
     let guard = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
     super::data::reset();
+    super::effects::reset();
     super::enforce::reset();
     super::queue::reset();
     super::state::reset();

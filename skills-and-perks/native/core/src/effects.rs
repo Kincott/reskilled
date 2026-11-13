@@ -1,5 +1,7 @@
 //! What a player's active perks do, and the `/attribute` commands that bring the game in line with them.
 
+use serde::{Deserialize, Serialize};
+
 use crate::defs::{DamageKind, Direction, Effect, Matcher, Operation};
 use crate::progress::{PlayerState, active_perks};
 use crate::registry::Defs;
@@ -13,8 +15,8 @@ const DIG_LOCK_AMOUNT: f64 = -1.0;
 const MODIFIER_NAMESPACE: &str = "skills_and_perks";
 const NO_CHANGE: f64 = 1.0;
 
-/// One attribute modifier, identified by its id.
-#[derive(Debug, Clone, PartialEq)]
+/// One attribute modifier, identified by its id. Serializable so the server can remember what it applied.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AttributeMod {
     pub id: String,
     pub attribute: String,
@@ -93,12 +95,17 @@ pub fn active_effects(defs: &Defs, state: &PlayerState) -> ActiveEffects {
     effects
 }
 
-/// The product of the damage rules for this direction and kind; rules for `Any` apply to every kind.
-pub fn damage_multiplier(effects: &ActiveEffects, direction: Direction, kind: DamageKind) -> f64 {
+/// The product of the damage rules for this direction whose kind is one of the hit's kinds (a fireball is both fire
+/// and projectile); rules for `Any` apply to every hit.
+pub fn damage_multiplier(
+    effects: &ActiveEffects,
+    direction: Direction,
+    kinds: &[DamageKind],
+) -> f64 {
     effects
         .damage
         .iter()
-        .filter(|(d, k, _)| *d == direction && (*k == kind || *k == DamageKind::Any))
+        .filter(|(d, k, _)| *d == direction && (*k == DamageKind::Any || kinds.contains(k)))
         .map(|(_, _, multiplier)| multiplier)
         .product()
 }
@@ -336,17 +343,27 @@ mod tests {
         );
         let effects = active_effects(&defs, &state);
 
-        // When multipliers are read per direction and kind
-        let dealt_melee = damage_multiplier(&effects, Direction::Dealt, DamageKind::Melee);
+        // When multipliers are read per direction and kinds, a fireball being both fire and projectile, and a hit
+        // of no kind the rules name
+        let dealt_melee = damage_multiplier(&effects, Direction::Dealt, &[DamageKind::Melee]);
         let dealt_projectile =
-            damage_multiplier(&effects, Direction::Dealt, DamageKind::Projectile);
-        let taken_fall = damage_multiplier(&effects, Direction::Taken, DamageKind::Fall);
-        let taken_melee = damage_multiplier(&effects, Direction::Taken, DamageKind::Melee);
+            damage_multiplier(&effects, Direction::Dealt, &[DamageKind::Projectile]);
+        let taken_fall = damage_multiplier(&effects, Direction::Taken, &[DamageKind::Fall]);
+        let taken_melee = damage_multiplier(&effects, Direction::Taken, &[DamageKind::Melee]);
+        let dealt_both = damage_multiplier(
+            &effects,
+            Direction::Dealt,
+            &[DamageKind::Fire, DamageKind::Melee],
+        );
+        let dealt_none = damage_multiplier(&effects, Direction::Dealt, &[]);
 
-        // Then `any` rules join every kind in their direction, and nothing else changes
+        // Then `any` rules join every kind in their direction, a rule counts once when its kind is listed, and
+        // nothing else changes
         assert!((dealt_melee - 1.8).abs() < 1e-9, "{dealt_melee}");
         assert!((dealt_projectile - 1.2).abs() < 1e-9, "{dealt_projectile}");
         assert_eq!((taken_fall, taken_melee), (0.5, 1.0));
+        assert!((dealt_both - 1.8).abs() < 1e-9, "{dealt_both}");
+        assert!((dealt_none - 1.2).abs() < 1e-9, "{dealt_none}");
     }
 
     #[test]

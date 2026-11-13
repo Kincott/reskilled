@@ -2,9 +2,10 @@
 //! Horizon's hook points (Horizon docs/native-mods.md, "Trait mods"); each hands its work to the module that owns it.
 use horizon_client::mod_api::{
     AddServerReloadListenersEvent, AttackEntityEvent, ContainerOpenedEvent, DestroyBlockEvent,
-    EntityMountEvent, Flow, Hooks, Host, InteractEntityEvent, ModifyDefaultComponentsEvent,
-    NetFromClientEvent, OnEquipEvent, PerformCommandEvent, PerformConsoleCommandEvent,
-    PlayerCloneEvent, PlayerLoggedInEvent, PlayerLoggedOutEvent, RegisterCommandsEvent,
+    EntityMountEvent, Flow, Hooks, Host, InteractEntityEvent, ItemStack, LivingIncomingDamageEvent,
+    LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent, OnEquipEvent,
+    PerformCommandEvent, PerformConsoleCommandEvent, PlayerCloneEvent, PlayerLoggedInEvent,
+    PlayerLoggedOutEvent, PlayerXpChangeEvent, PrepareAnvilEvent, RegisterCommandsEvent,
     ServerDataLoadedEvent, ServerReloadListenerApplyEvent, ServerTickEvent, ServerTickPhase,
     UseItemEvent, UseItemOnEvent,
 };
@@ -63,11 +64,15 @@ impl Hooks for Mod {
         server::state::logged_out(event.player);
     }
 
-    /// The new player is not placed yet, so the death penalty waits for the tick.
+    /// The new player is not placed yet, so the death penalty waits for the tick. Either way (a death or the End's
+    /// exit) the new player's modifiers are resynced in full.
     fn player_clone(&self, _host: &mut dyn Host, event: &mut PlayerCloneEvent<'_>) {
-        if event.was_death {
-            queue(Job::ApplyDeath(event.player));
-        }
+        server::effects::mark_full(event.player);
+        queue(if event.was_death {
+            Job::ApplyDeath(event.player)
+        } else {
+            Job::SyncAttributes(event.player)
+        });
     }
 
     fn net_from_client(&self, host: &mut dyn Host, event: &mut NetFromClientEvent<'_>) {
@@ -123,9 +128,54 @@ impl Hooks for Mod {
     }
 
     fn entity_mount(&self, host: &mut dyn Host, event: &mut EntityMountEvent<'_>) -> Flow {
-        match enforce::rider(host, event.entity, event.kind) {
-            Some(actor) => enforce::on_mount(host, &actor, event.vehicle_kind, event.mounting),
-            None => Flow::Continue,
+        let Some(actor) = enforce::rider(host, event.entity, event.kind) else {
+            return Flow::Continue;
+        };
+        let flow = enforce::on_mount(host, &actor, event.vehicle_kind, event.mounting);
+        if flow == Flow::Continue {
+            queue(Job::Mount {
+                player: actor.player,
+                vehicle: event.vehicle,
+                mounting: event.mounting,
+            });
+        }
+        flow
+    }
+
+    fn living_incoming_damage(&self, event: &mut LivingIncomingDamageEvent<'_>) -> Flow {
+        server::effects::on_damage(
+            event.entity,
+            event.damage_type,
+            event.causing,
+            &mut event.amount,
+        );
+        Flow::Continue
+    }
+
+    fn player_xp_change(&self, _host: &mut dyn Host, event: &mut PlayerXpChangeEvent<'_>) -> Flow {
+        server::effects::on_xp(event.player, &mut event.amount);
+        Flow::Continue
+    }
+
+    fn prepare_anvil(
+        &self,
+        _host: &mut dyn Host,
+        event: &mut PrepareAnvilEvent<'_>,
+    ) -> Option<ItemStack> {
+        server::effects::on_anvil(event.player, &mut event.cost);
+        None
+    }
+
+    fn loot_drops(&self, host: &mut dyn Host, event: &mut LootDropsEvent<'_>) {
+        let context = event.context;
+        if let (Some(player), Some(_)) = (context.player, context.block) {
+            server::effects::bonus_drops(
+                host,
+                player,
+                context.dimension,
+                context.table,
+                event.drops,
+            );
         }
     }
 
