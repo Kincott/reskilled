@@ -1,15 +1,18 @@
 //! The trait mod: the launcher links this crate into the game and calls `hooks()`. Each method of `Hooks` is one of
 //! Horizon's hook points (Horizon docs/native-mods.md, "Trait mods"); each hands its work to the module that owns it.
 use horizon_client::mod_api::{
-    AddServerReloadListenersEvent, Flow, Hooks, Host, ModifyDefaultComponentsEvent,
-    NetFromClientEvent, PerformCommandEvent, PerformConsoleCommandEvent, PlayerCloneEvent,
-    PlayerLoggedInEvent, PlayerLoggedOutEvent, RegisterCommandsEvent, ServerDataLoadedEvent,
-    ServerReloadListenerApplyEvent, ServerTickEvent, ServerTickPhase,
+    AddServerReloadListenersEvent, AttackEntityEvent, ContainerOpenedEvent, DestroyBlockEvent,
+    EntityMountEvent, Flow, Hooks, Host, InteractEntityEvent, ModifyDefaultComponentsEvent,
+    NetFromClientEvent, OnEquipEvent, PerformCommandEvent, PerformConsoleCommandEvent,
+    PlayerCloneEvent, PlayerLoggedInEvent, PlayerLoggedOutEvent, RegisterCommandsEvent,
+    ServerDataLoadedEvent, ServerReloadListenerApplyEvent, ServerTickEvent, ServerTickPhase,
+    UseItemEvent, UseItemOnEvent,
 };
 
 mod server;
 
 use server::commands::{Source, run_command};
+use server::enforce::{self, Actor, acting};
 use server::queue::{Job, queue};
 
 /// Server to client: definition chunks.
@@ -93,6 +96,64 @@ impl Hooks for Mod {
         took(run_command(host, &Source::CONSOLE, event.command))
     }
 
+    fn use_item(&self, host: &mut dyn Host, event: &mut UseItemEvent<'_>) -> Flow {
+        acted(host, |host, actor| {
+            enforce::on_use_item(host, actor, &event.stack.item)
+        })
+    }
+
+    fn use_item_on(&self, host: &mut dyn Host, event: &mut UseItemOnEvent<'_>) -> Flow {
+        acted(host, |host, actor| {
+            enforce::on_use_item_on(host, actor, &event.stack.item)
+        })
+    }
+
+    fn attack_entity(&self, host: &mut dyn Host, _event: &mut AttackEntityEvent<'_>) -> Flow {
+        let main_hand = host.held().map(|(item, _, _)| item);
+        acted(host, |host, actor| {
+            enforce::on_attack(host, actor, main_hand.as_deref())
+        })
+    }
+
+    fn destroy_block(&self, host: &mut dyn Host, _event: &mut DestroyBlockEvent) -> Flow {
+        let main_hand = host.held().map(|(item, _, _)| item);
+        acted(host, |host, actor| {
+            enforce::on_destroy(host, actor, main_hand.as_deref())
+        })
+    }
+
+    fn entity_mount(&self, host: &mut dyn Host, event: &mut EntityMountEvent<'_>) -> Flow {
+        match enforce::rider(host, event.entity, event.kind) {
+            Some(actor) => enforce::on_mount(host, &actor, event.vehicle_kind, event.mounting),
+            None => Flow::Continue,
+        }
+    }
+
+    fn interact_entity(&self, host: &mut dyn Host, event: &mut InteractEntityEvent<'_>) -> Flow {
+        let held = event.stack.map(|stack| stack.item.clone());
+        acted(host, |host, actor| {
+            enforce::on_interact(host, actor, event.kind, held.as_deref())
+        })
+    }
+
+    fn container_opened(&self, host: &mut dyn Host, event: &mut ContainerOpenedEvent<'_>) -> Flow {
+        let block = event.pos.map(|pos| host.block(pos));
+        acted(host, |host, actor| {
+            enforce::on_container(host, actor, block.as_deref())
+        })
+    }
+
+    fn on_equip(&self, host: &mut dyn Host, event: &mut OnEquipEvent<'_>) {
+        if let Some(actor) = acting(host) {
+            enforce::on_equip(
+                host,
+                &actor,
+                event.slot,
+                event.new.map(|stack| &*stack.item),
+            );
+        }
+    }
+
     fn server_tick(&self, host: &mut dyn Host, event: &mut ServerTickEvent<'_>) {
         if matches!(event.phase, ServerTickPhase::ServerTickEnd { .. }) {
             server::queue::run(host, server::queue::take_queued());
@@ -103,4 +164,12 @@ impl Hooks for Mod {
 /// `Cancel` tells the game this mod ran the command, so no other mod and not vanilla answers it.
 fn took(ran: bool) -> Flow {
     if ran { Flow::Cancel } else { Flow::Continue }
+}
+
+/// Runs an enforcement check for the acting player; with no acting player there is nothing to check.
+fn acted(host: &mut dyn Host, decide: impl FnOnce(&mut dyn Host, &Actor) -> Flow) -> Flow {
+    match acting(host) {
+        Some(actor) => decide(host, &actor),
+        None => Flow::Continue,
+    }
 }

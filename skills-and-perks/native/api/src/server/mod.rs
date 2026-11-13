@@ -5,6 +5,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 pub mod actions;
 pub mod commands;
 pub mod data;
+pub mod enforce;
 pub mod queue;
 pub mod state;
 #[cfg(test)]

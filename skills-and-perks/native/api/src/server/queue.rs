@@ -3,10 +3,11 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use horizon_client::mod_api::{EquipmentSlot, Host};
 
-use super::{data, lock, state};
+use super::{data, enforce, lock, state};
 
 /// Horizon sends at most this many mod messages to one player in a tick.
 const MESSAGES_PER_TICK: usize = 32;
@@ -17,15 +18,18 @@ pub enum Job {
     SendDefs(u128),
     SyncAttributes(u128),
     CheckEquipment(u128),
-    #[expect(dead_code, reason = "lock enforcement (Task 10) queues it")]
+    /// Take a worn item off a player (by their entity id this session).
     Unequip {
         player: u128,
+        entity: u32,
         slot: EquipmentSlot,
     },
     ApplyDeath(u128),
 }
 
 static JOBS: Mutex<Vec<Job>> = Mutex::new(Vec::new());
+/// Server ticks run since the server started, for cooldowns.
+static TICKS: AtomicU64 = AtomicU64::new(0);
 /// One player's waiting messages, oldest first, each with its channel.
 type Waiting = VecDeque<(&'static str, Vec<u8>)>;
 
@@ -72,17 +76,22 @@ pub fn forget(player: u128) {
 
 /// Does the jobs, then sends what is waiting, at most 32 messages a player.
 pub fn run(host: &mut dyn Host, jobs: Vec<Job>) {
+    TICKS.fetch_add(1, Ordering::Relaxed);
     for job in jobs {
         match job {
             Job::SendDefs(player) => data::send_defs(player),
             Job::ApplyDeath(player) => state::apply_death(host, player),
-            // Lock enforcement and perk effects take these over in later versions of this module.
-            Job::SyncAttributes(_) | Job::CheckEquipment(_) | Job::Unequip { .. } => {
-                log::debug!("Skills & Perks has no handler for {job:?} yet");
-            }
+            Job::CheckEquipment(_) | Job::Unequip { .. } => enforce::run_job(host, job),
+            // Perk effects take this over in the next version of this module.
+            Job::SyncAttributes(_) => log::debug!("Skills & Perks has no handler for {job:?} yet"),
         }
     }
     flush(host);
+}
+
+/// The server ticks run so far.
+pub fn now() -> u64 {
+    TICKS.load(Ordering::Relaxed)
 }
 
 fn flush(host: &mut dyn Host) {
@@ -101,6 +110,7 @@ fn flush(host: &mut dyn Host) {
 
 #[cfg(test)]
 pub(crate) fn reset() {
+    TICKS.store(0, Ordering::Relaxed);
     lock(&JOBS).clear();
     lock(&OUTBOX).clear();
 }

@@ -21,6 +21,7 @@ macro_rules! messages {
 }
 
 messages! {
+    NEEDS = "skills_and_perks.msg.needs" => "Needs %s %s";
     UNKNOWN_SKILL = "skills_and_perks.msg.unknown_skill" => "There is no such skill.";
     UNKNOWN_PERK = "skills_and_perks.msg.unknown_perk" => "There is no such perk.";
     UNKNOWN_FOCUS = "skills_and_perks.msg.unknown_focus" => "There is no such focus.";
