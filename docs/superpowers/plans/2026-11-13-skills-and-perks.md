@@ -402,7 +402,33 @@ skills-and-perks/
 - [ ] **Step 5: In-game check (user runs the native build).** Expected: K opens the screen, raising Mining with XP works, a perk can be bought, Escape closes it.
 - [ ] **Step 6: Commit** `feat(client): skills screen and hotkey`.
 
-### Task 14: Packaging and in-game acceptance
+### Task 14: Abilities and the integration API for other mods
+
+Added on 2026-11-13 at the user's request (spec 7.10). Runs after Task 13, before packaging.
+
+**Files:**
+- Modify: `skills-and-perks/native/core/src/defs.rs`, `skills-and-perks/native/core/src/locks.rs`
+- Create: `skills-and-perks/native/api/src/integration.rs`, `skills-and-perks/INTEGRATION.md`
+
+**Interfaces:**
+- Consumes: `Target`, `TargetKind`, `Matcher`, `check`, `requirements`, `state_of`, `level`, refusal messaging (Task 10).
+- Produces:
+  - `Target::Ability(Matcher)` (`{"ability": {"id": "dashmod:dash"}}`) and `TargetKind::Ability`; abilities allow
+    only `use`; `id` and `pattern` matchers only (no tags or repair materials)
+  - In the `api` crate, `pub mod integration` re-exported at the crate root: `pub fn skill_level(host: &mut dyn Host,
+    player: u128, skill: &str) -> u32`, `pub fn has_perk(host: &mut dyn Host, player: u128, perk: &str) -> bool`,
+    `pub fn may_use_ability(host: &mut dyn Host, player: u128, ability: &str) -> bool` (checks the `ability` locks,
+    honours `creative_ignores_locks`, and on refusal sends the same action-bar line and sound as other locks)
+  - `INTEGRATION.md`: how another mod declares an ability lock in data and calls the API behind
+    `#[cfg(feature = "skills_and_perks")]`
+
+- [ ] **Step 1: Write failing tests:** `parses_an_ability_lock`, `ability_allows_only_use`, `ability_refuses_tag_matchers`, `ability_requirements_are_matched_by_id_and_pattern`, `ability_labels_join_the_preview`, `may_use_ability_checks_the_level`, `may_use_ability_refusal_sends_the_needs_line`, `creative_may_use_locked_abilities`, `skill_level_and_has_perk_read_the_saved_state`.
+- [ ] **Step 2: Run** `cargo test --workspace`; expect failures.
+- [ ] **Step 3: Implement**, then write `INTEGRATION.md` with a worked example (a `dashmod:dash` ability at Agility 10).
+- [ ] **Step 4: Run**; expect PASS.
+- [ ] **Step 5: Commit** `feat: ability locks and an integration api for other mods`.
+
+### Task 15: Packaging and in-game acceptance
 
 **Files:**
 - Create: `skills-and-perks/tools/package.py`, `skills-and-perks/tools/test_package.py`

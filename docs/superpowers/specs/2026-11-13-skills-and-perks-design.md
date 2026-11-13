@@ -73,7 +73,7 @@ Checked against `horizon-rust/horizon` at commit `298c01b` (2026-11-13), mostly 
 
 ## 4. Non-goals (version 1)
 
-- The other layers (survival, combat and gear, creatures and places), and any code-level integration with them.
+- The other layers (survival, combat and gear, creatures and places). They integrate like any other mod (7.10).
 - A server-only mode or a chest-menu interface (approaches 1 and 3 below were rejected).
 - Parties, leaderboards, shared progress, or classes beyond the focus choice.
 - Importing saves from Reskillable or Level Up! Reloaded.
@@ -165,6 +165,8 @@ Gathering to chop).
     shield in the off hand)
   - blocks: `open` (enchanting table, anvil, brewing stand, any container), `place`
   - entities: `mount`, `interact`
+  - abilities: `use`. An ability is something another mod adds that is not an item, block or entity (a dash, a
+    double jump), named by that mod's own id (`dashmod:dash`). See 7.10.
 - Targets match by id, by tag (`#minecraft:pickaxes`), by id pattern (`minecraft:*_spear`), or by component (for
   example repairable with a given material tag), and by combinations of these. That is how one entry covers "everything
   netherite" and modded items.
@@ -220,6 +222,20 @@ Gathering to chop).
   `/skills open`.
 - Operators (permission level 2): `/skills set <player> <skill> <level>`, `/skills points <player> <skill> <n>`,
   `/skills reset <player> [skill]`.
+
+### 7.10 Other mods' unlockables
+
+Added on 2026-11-13 at the user's request: every new mod must be able to add its own unlockables.
+
+- With data only: any mod (or a pack) ships skills, perks and locks for its own items, blocks and entities in its own
+  namespace, with no code (section 8).
+- Abilities: a mod that adds an ability with no item, block or entity behind it declares a lock entry with an
+  `ability` target (`{"ability": {"id": "dashmod:dash"}}`, action `use`, for example Agility 10). It shows in the
+  unlock preview like any other lock, and a pack can retune it.
+- Integration API: Skills & Perks' trait mod package publishes a few functions for other trait mods (Horizon's
+  "Dependencies between trait mods", as an optional dependency, so neither mod requires the other): a player's
+  level in a skill, whether they own a perk, and whether they may use an ability (which also shows the usual
+  "Needs Agility 10" line when they may not). The other mod calls it on the server before running its ability.
 
 ## 8. Data
 
