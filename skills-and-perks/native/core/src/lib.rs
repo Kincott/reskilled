@@ -3,4 +3,5 @@
 
 pub mod defs;
 pub mod locks;
+pub mod progress;
 pub mod registry;
