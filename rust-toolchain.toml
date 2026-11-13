@@ -1,0 +1,5 @@
+# The toolchain Horizon's launcher compiles native mods with at the pinned commit (docs/native-mods.md,
+# "What the launcher does": Rust 1.99.1), so local builds and tests match the in-game build.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]

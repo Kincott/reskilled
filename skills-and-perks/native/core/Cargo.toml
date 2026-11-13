@@ -1,0 +1,8 @@
+[package]
+name = "skills_core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Only crates and versions in Horizon's Cargo.lock at the pinned commit (see ../../HORIZON_PIN.md).
+[dependencies]

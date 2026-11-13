@@ -1,0 +1,16 @@
+# Skills & Perks: a native trait mod (Horizon docs/native-mods.md, "Trait mods"). The game-facing package is
+# `api`; the rules live in the `skills_core` crate, which has no horizon-client dependency.
+# Build it with `horizon-launcher native-build <this folder> --instance <instance> --trust-native-code`.
+[mod]
+id = "skills_and_perks"
+version = "0.1.0"
+
+[compatibility]
+horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+
+[api]
+path = "api"
+
+[[crate]]
+id = "skills_core"
+path = "core"

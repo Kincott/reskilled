@@ -1,0 +1,5 @@
+# Development workspace only: lets `cargo build` and `cargo test` run the Skills & Perks crates together.
+# It is not shipped; the launcher stages the bundle (skills-and-perks/native) into Horizon's own workspace.
+[workspace]
+resolver = "3"
+members = ["skills-and-perks/native/core", "skills-and-perks/native/api"]
