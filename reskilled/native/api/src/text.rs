@@ -76,7 +76,8 @@ messages! {
     LEVEL_UP = "reskilled.ui.level_up" => "Level up";
     PROGRESS = "reskilled.ui.progress" => "Progress: %s/%s";
     RAISE_TO = "reskilled.ui.raise_to" => "Raise to level %s";
-    RAISE_MANY = "reskilled.ui.raise_many" => "Shift: 5 levels. Ctrl: all you can pay for.";
+    RAISE_MANY = "reskilled.ui.raise_many" => "Hold Shift for +5, Ctrl for all you can pay for.";
+    RAISE_BY = "reskilled.ui.raise_by" => "Raise to level %s (+%s)";
     COST = "reskilled.ui.cost" => "Cost: %s XP levels";
     COST_POINTS = "reskilled.ui.cost_points" => "Cost: %s XP points";
     AT_TOP = "reskilled.ui.at_top" => "Max level";

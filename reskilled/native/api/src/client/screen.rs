@@ -4,8 +4,8 @@
 use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
 use skills_core::defs::{PerkDef, Reward};
 use skills_core::progress::{
-    PlayerState, Request, earn_threshold, focus_cost, level, mastered, points_available,
-    raise_cost, switched_off, total_points,
+    PlayerState, Request, apply_under, earn_threshold, focus_cost, level, mastered,
+    points_available, raise_cost, switched_off, total_points,
 };
 use skills_core::registry::Defs;
 use skills_core::rules::{CostUnit, Respec, Rules};
@@ -21,11 +21,11 @@ use crate::MOD_ID;
 use crate::text::{
     ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
     FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
-    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_MANY,
-    RAISE_TO, REFUND, REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED,
-    REWARD_KILL, REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, SWITCHED_OFF, TITLE, UNLOCK,
-    VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say,
-    skill_name,
+    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_BY,
+    RAISE_MANY, RAISE_TO, REFUND, REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK,
+    REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, SWITCHED_OFF,
+    TITLE, UNLOCK, VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description,
+    perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -416,11 +416,57 @@ fn draw_mastery(pen: &mut Pen<'_>, card: &Card) {
     pen.text(&label, card.bar.x, card.bar.y + 6.0, GOLD);
 }
 
+/// XP levels enough to price any run of raises, without overflowing the points they stand for.
+const PRICING_XP: u32 = 10_000;
+
+/// Where `times` raises of the skill lead and their whole price in the rules' unit, as the server would grant them
+/// to a player with `xp` levels; None when not even one would be granted.
+fn raises_price(
+    d: &Defs,
+    rules: &Rules,
+    state: &PlayerState,
+    xp: u32,
+    skill: &str,
+    times: u32,
+) -> Option<(u32, u32)> {
+    let request = Request::Raise {
+        skill: skill.to_string(),
+        times,
+    };
+    let outcome = apply_under(d, rules, state, xp, &request).ok()?;
+    let price = match rules.cost_unit {
+        CostUnit::Levels => outcome.levels_spent,
+        CostUnit::Points => outcome.points_spent,
+    };
+    Some((level(&outcome.state, d, skill), price))
+}
+
 fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
     let Some(cost) = price(d, pen.rules, state, skill) else {
         return vec![say(&AT_TOP, &[]).with_color(GOLD)];
     };
+    let now = level(state, d, skill);
+    let held = raises_wanted(pen.host);
+    if held > 1 {
+        let xp = pen.xp.unwrap_or(0);
+        // Shift prices five raises whatever the XP; Control the most the XP pays for, or one when none.
+        let priced = if held == u32::MAX {
+            raises_price(d, pen.rules, state, xp, skill, held)
+                .map(|(reach, price)| (reach, price, true))
+        } else {
+            raises_price(d, pen.rules, state, PRICING_XP, skill, held).map(|(reach, price)| {
+                let paid = raises_price(d, pen.rules, state, xp, skill, held)
+                    .is_some_and(|(got, _)| got == reach);
+                (reach, price, paid)
+            })
+        };
+        let (reach, price, paid) = priced.unwrap_or((now + 1, cost, false));
+        return vec![
+            say(&RAISE_BY, &[number(reach), number(reach - now)]).with_color(WHITE),
+            cost_line(pen.rules, price).with_color(if paid { GREEN } else { RED }),
+        ];
+    }
     let colour = if can_raise(d, pen.rules, state, pen.xp, skill) {
         GREEN
     } else {
@@ -1465,9 +1511,58 @@ mod tests {
             vec![
                 "Raise to level 13",
                 "Cost: 12 XP levels",
-                "Shift: 5 levels. Ctrl: all you can pay for."
+                "Hold Shift for +5, Ctrl for all you can pay for."
             ]
         );
+    }
+
+    #[test]
+    fn holding_shift_shows_where_five_raises_lead_and_their_price() {
+        // Given Mining at 12 (raises cost 12, 13, 14, 15, 16) and 23 XP levels, the mouse on its raise button
+        let _serial = exclusive();
+        let mut host = screen_open();
+        host.shift = true;
+
+        // When the screen is drawn with Shift held
+        drawn(&host, inside(&cards()[1].raise));
+
+        // Then the tooltip shows level 17 for 70 levels, in red as 23 do not pay for it
+        assert_eq!(
+            tooltip(&host),
+            vec!["Raise to level 17 (+5)", "Cost: 70 XP levels"]
+        );
+        assert_eq!(cost_colour(&host), Some(RED));
+    }
+
+    #[test]
+    fn holding_control_shows_the_highest_level_the_xp_pays_for() {
+        // Given Mining at 12 and 40 XP levels (12 + 13 + 14 = 39 fits, 15 more does not)
+        let _serial = exclusive();
+        let mut host = screen_open();
+        host.control = true;
+        with(|cache| cache.xp_levels = Some(40));
+
+        // When the screen is drawn with Control held
+        drawn(&host, inside(&cards()[1].raise));
+
+        // Then the tooltip shows level 15 for 39 levels, in green
+        assert_eq!(
+            tooltip(&host),
+            vec!["Raise to level 15 (+3)", "Cost: 39 XP levels"]
+        );
+        assert_eq!(cost_colour(&host), Some(GREEN));
+    }
+
+    /// The colour of the tooltip's cost line.
+    fn cost_colour(host: &TestHost) -> Option<u32> {
+        let painted = host.painted.borrow();
+        painted.iter().find_map(|p| match p {
+            Paint::Tooltip { spans, .. } => spans
+                .get(1)
+                .and_then(|line| line.first())
+                .and_then(|(_, colour)| *colour),
+            _ => None,
+        })
     }
 
     #[test]
@@ -1655,7 +1750,7 @@ mod tests {
         // Then its tooltip ends with the hint
         assert_eq!(
             tooltip(&host).last().map(String::as_str),
-            Some("Shift: 5 levels. Ctrl: all you can pay for.")
+            Some("Hold Shift for +5, Ctrl for all you can pay for.")
         );
     }
 
