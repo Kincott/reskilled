@@ -8,6 +8,8 @@ pub mod options;
 pub mod paint;
 #[cfg(test)]
 mod preview;
+#[expect(dead_code, reason = "the guide screen draws it, in a later task")]
+pub mod scene;
 pub mod screen;
 pub mod settings;
 pub mod strip;
