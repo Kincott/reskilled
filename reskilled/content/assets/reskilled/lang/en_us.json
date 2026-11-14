@@ -281,6 +281,7 @@
   "reskilled.ui.level": "%s/%s",
   "reskilled.ui.level_of": "Level %s of %s",
   "reskilled.ui.level_up": "Level up",
+  "reskilled.ui.locked": "Locked",
   "reskilled.ui.mastered": "Mastered",
   "reskilled.ui.named_value": "%s: %s",
   "reskilled.ui.next_unlocks": "Next unlocks",

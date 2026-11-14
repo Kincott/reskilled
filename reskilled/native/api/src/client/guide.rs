@@ -7,20 +7,20 @@ use horizon_client::mod_api::{Flow, Host, HudBatch, NativeSceneBlock, NativeScen
 use skills_core::card::{CardChance, CardLine, card_lines, with_modifier};
 use skills_core::defs::{DamageKind, Direction, GuideDef, Operation, Overlay, PerkDef};
 use skills_core::guide::{Frame, caption_values, frame_at, yaw_at};
-use skills_core::progress::PlayerState;
+use skills_core::progress::{PlayerState, active_perks};
 use skills_core::registry::Defs;
 
 use super::cache::{CLICK_SOUND, ClientCache, View, with};
 use super::layout::{GUIDE_FOOTER_Y, GUIDE_RULE_Y, GuidePage, HEADER_H, Rect, page};
-use super::paint::{self, GOLD, GRAY, Look, WHITE};
+use super::paint::{self, GOLD, GRAY, Look, RED, WHITE};
 use super::scene::scene_blocks;
-use super::screen::{LEFT_BUTTON, RIGHT_BUTTON, need_lines, owns, shown};
+use super::screen::{LEFT_BUTTON, PerkStatus, RIGHT_BUTTON, need_lines, owns, shown, status};
 use crate::text::{
     BACK, CARD_ATTRIBUTE, CARD_ATTRIBUTE_CHANGE, CARD_CROP_GROWTH, CARD_DAMAGE_DEALT,
     CARD_DAMAGE_TAKEN, CARD_EXTRA_DROP, CARD_MOUNT, DAMAGE_ANY, DAMAGE_ENDER_PEARL,
     DAMAGE_EXPLOSION, DAMAGE_FALL, DAMAGE_FIRE, DAMAGE_MAGIC, DAMAGE_MELEE, DAMAGE_PROJECTILE,
-    Message, OWNED, REPLAY, attribute_name, caption_text, card_value, perk_description, perk_name,
-    say,
+    LOCKED, Message, OWNED, REPLAY, attribute_name, caption_text, card_value, perk_description,
+    perk_name, say,
 };
 
 const TICKS_PER_SECOND: f32 = 20.0;
@@ -160,7 +160,11 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
         let partial = host.client_state().map_or(0.0, |s| s.world_partial_tick);
         let ticks = cache.ticks.saturating_sub(cache.guide_started) as f64 + partial;
         let seconds = (ticks / f64::from(TICKS_PER_SECOND)) as f32;
-        let lines = card_texts(perk, &cache.attributes, owns(&cache.state, &perk.id));
+        // The live values include the perk's modifier only while the server applies it.
+        let applied = active_perks(d, &cache.state)
+            .iter()
+            .any(|active| active.id == perk.id);
+        let lines = card_texts(perk, &cache.attributes, applied);
         paint::slot(host, batch, &p.scene);
         match d.guides.get(&perk.id) {
             Some(guide) => {
@@ -296,7 +300,8 @@ fn draw_lines(host: &dyn Host, batch: &mut HudBatch, area: &Rect, lines: &[(Stri
     }
 }
 
-/// The footer: "Owned", or what the perk costs and needs, each part green once met.
+/// The footer: "Owned", or what the perk costs and needs, each part green once met, with "Locked" at its end
+/// while the player cannot unlock it.
 fn draw_footer(
     host: &dyn Host,
     batch: &mut HudBatch,
@@ -317,6 +322,14 @@ fn draw_footer(
         host.text(batch, &say(&OWNED, &[]).plain(), [left, y], GOLD, true);
         return;
     }
+    let right = match status(d, state, perk) {
+        PerkStatus::Locked(_) => {
+            let locked = say(&LOCKED, &[]).plain();
+            paint::text_right(host, batch, &locked, right, y, RED);
+            right - host.text_width(&locked) - FOOTER_GAP
+        }
+        PerkStatus::Owned | PerkStatus::Buyable => right,
+    };
     let mut x = left;
     for part in need_lines(d, state, perk) {
         let rgb = part
@@ -906,5 +919,59 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_switched_off_perk_shows_the_numbers_it_would_give() {
+        // Given Steady Hand owned but switched off, so the live attack speed of 4 lacks its modifier
+        let _serial = exclusive();
+        let mut host = melee_open();
+        with(|cache| {
+            let melee = cache.state.skills.get_mut(MELEE).unwrap();
+            melee.perks.insert("reskilled:melee_steady_hand".into());
+            melee.points_spent = 2;
+            melee.disabled.insert("reskilled:melee_steady_hand".into());
+        });
+
+        // When its page is drawn
+        press_g_over(&mut host, row(0));
+        painted(&host);
+
+        // Then the card reads 4 without the perk and 4.4 with it
+        let drawn = host.drawn_text();
+        assert!(drawn.iter().any(|t| t.contains("4.0 -> 4.4")), "{drawn:?}");
+    }
+
+    #[test]
+    fn the_footer_says_owned_or_locked() {
+        // Given Steady Hand owned and Salvage needing more perk points than the player has
+        let _serial = exclusive();
+        let mut host = melee_open();
+        with(|cache| {
+            let melee = cache.state.skills.get_mut(MELEE).unwrap();
+            melee.perks.insert("reskilled:melee_steady_hand".into());
+            melee.points_spent = 2;
+            cache
+                .defs
+                .as_mut()
+                .unwrap()
+                .defs
+                .perks
+                .get_mut("reskilled:melee_salvage")
+                .unwrap()
+                .cost = 9;
+        });
+
+        // When each page is drawn
+        press_g_over(&mut host, row(0));
+        painted(&host);
+        let owned = host.drawn_text();
+        with(|cache| cache.guide_perk = 1);
+        painted(&host);
+        let locked = host.drawn_text();
+
+        // Then the first says Owned and the second Locked
+        assert!(owned.iter().any(|t| t == "Owned"), "{owned:?}");
+        assert!(locked.iter().any(|t| t == "Locked"), "{locked:?}");
     }
 }

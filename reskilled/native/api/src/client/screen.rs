@@ -55,7 +55,7 @@ const PREVIEW_LINE: f32 = 9.0;
 const PREVIEW_LINES: usize = 2;
 
 /// A perk as the screen shows it.
-enum PerkStatus {
+pub(super) enum PerkStatus {
     Owned,
     Buyable,
     Locked(Text),
@@ -72,7 +72,7 @@ pub(super) fn owns(state: &PlayerState, perk: &str) -> bool {
     state.skills.values().any(|p| p.perks.contains(perk))
 }
 
-fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
+pub(super) fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
     if owns(state, &perk.id) {
         return PerkStatus::Owned;
     }

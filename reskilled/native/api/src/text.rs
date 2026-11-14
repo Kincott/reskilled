@@ -94,6 +94,7 @@ messages! {
     SWITCHED_OFF = "reskilled.ui.switched_off" => "Switched off: it does nothing until switched on.";
     PERK_COST = "reskilled.ui.perk_cost" => "Cost: %s perk points";
     OWNED = "reskilled.ui.owned" => "Owned";
+    LOCKED = "reskilled.ui.locked" => "Locked";
     GET = "reskilled.ui.get" => "Unlock";
     NEXT_UNLOCKS = "reskilled.ui.next_unlocks" => "Next unlocks";
     UNLOCK = "reskilled.ui.unlock" => "Level %s: %s";
