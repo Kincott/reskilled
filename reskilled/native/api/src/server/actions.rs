@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use horizon_client::mod_api::{Host, Text};
 use skills_core::locks::{Requirements, TargetKind};
-use skills_core::progress::{PlayerState, Request, apply, level};
+use skills_core::progress::{PlayerState, Request, apply_under, level};
 use skills_core::registry::Defs;
 use skills_core::wire::{ToClient, ToServer};
 
@@ -14,8 +14,8 @@ use super::queue::{self, Job};
 use super::state::{self, set_state, state_of};
 use super::uuid_text;
 use crate::text::{
-    FOCUS_ADDED, PERK_BOUGHT, RAISED, UNAVAILABLE, focus_name, number, perk_name, refusal, say,
-    skill_name,
+    FOCUS_ADDED, PERK_BOUGHT, PERK_REFUNDED, PERK_SWITCHED, RAISED, UNAVAILABLE, focus_name,
+    number, perk_name, refusal, say, skill_name,
 };
 use crate::{ACT_CHANNEL, MAX_MESSAGE_BYTES, MSG_CHANNEL};
 
@@ -106,6 +106,8 @@ fn done_line(defs: &Defs, request: &Request, state: &PlayerState) -> Text {
             &[skill_name(defs, skill), number(level(state, defs, skill))],
         ),
         Request::BuyPerk { perk } => say(&PERK_BOUGHT, &[perk_name(defs, perk)]),
+        Request::SwitchPerk { perk } => say(&PERK_SWITCHED, &[perk_name(defs, perk)]),
+        Request::RefundPerk { perk } => say(&PERK_REFUNDED, &[perk_name(defs, perk)]),
         Request::AddFocus { focus } => say(&FOCUS_ADDED, &[focus_name(defs, focus)]),
     }
 }
@@ -143,7 +145,8 @@ pub fn act(
         log::warn!("Reskilled cannot read the state of {player:032x}: {error:?}");
         unavailable()
     })?;
-    let outcome = apply(&data.defs, &state, xp_levels, request)
+    let rules = super::rules::current(host);
+    let outcome = apply_under(&data.defs, &rules, &state, xp_levels, request)
         .map_err(|r| refusal(&data.defs, &r, request))?;
     let cost = i32::try_from(outcome.levels_spent).unwrap_or(i32::MAX);
     if cost > 0 && !change_levels(host, player, -cost) {

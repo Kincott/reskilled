@@ -33,6 +33,10 @@ messages! {
     MISSING_PERK = "reskilled.msg.missing_perk" => "Get %s first.";
     ALREADY_OWNED = "reskilled.msg.already_owned" => "You already have that perk.";
     ALREADY_FOCUSED = "reskilled.msg.already_focused" => "That focus is already active.";
+    NOT_OWNED = "reskilled.msg.not_owned" => "You do not have that perk.";
+    SWITCHES_OFF = "reskilled.msg.switches_off" => "Perks cannot be switched off on this server.";
+    REFUNDS_OFF = "reskilled.msg.refunds_off" => "Perks cannot be refunded on this server.";
+    NEEDED_BY = "reskilled.msg.needed_by" => "%s needs it: refund that first.";
     UNAVAILABLE = "reskilled.msg.unavailable" => "That cannot be done right now.";
     SUMMARY = "reskilled.cmd.summary" => "XP levels: %s. Focus: %s.";
     NO_FOCUS = "reskilled.cmd.no_focus" => "none";
@@ -40,6 +44,8 @@ messages! {
     SKILL_LINE_MAX = "reskilled.cmd.skill_line_max" => "%s %s/%s: at the top, %s perk points.";
     RAISED = "reskilled.cmd.raised" => "%s is now level %s.";
     PERK_BOUGHT = "reskilled.cmd.perk_bought" => "You now have %s.";
+    PERK_SWITCHED = "reskilled.cmd.perk_switched" => "Switched %s.";
+    PERK_REFUNDED = "reskilled.cmd.perk_refunded" => "Refunded %s.";
     FOCUS_ADDED = "reskilled.cmd.focus_added" => "%s is now one of your focus areas.";
     SET_LEVEL = "reskilled.cmd.set" => "Set %s's %s to level %s.";
     SET_POINTS = "reskilled.cmd.points" => "Set %s's bonus points in %s to %s.";
@@ -62,6 +68,10 @@ messages! {
     AT_TOP = "reskilled.ui.at_top" => "Max level";
     PERK_POINTS = "reskilled.ui.perk_points" => "Perk points: %s";
     PERKS = "reskilled.ui.perks" => "Perks";
+    REFUND = "reskilled.ui.refund" => "Refund";
+    REFUND_COST = "reskilled.ui.refund_cost" => "Refund: %s XP levels";
+    REFUND_FREE = "reskilled.ui.refund_free" => "Refund: free";
+    SWITCHED_OFF = "reskilled.ui.switched_off" => "Switched off: it does nothing until switched on.";
     PERK_COST = "reskilled.ui.perk_cost" => "Cost: %s perk points";
     OWNED = "reskilled.ui.owned" => "Owned";
     GET = "reskilled.ui.get" => "Unlock";
@@ -279,6 +289,10 @@ pub fn refusal(defs: &Defs, refusal: &Refusal, request: &Request) -> Text {
         Refusal::MissingPerk { perk } => say(&MISSING_PERK, &[perk_name(defs, perk)]),
         Refusal::AlreadyOwned => say(&ALREADY_OWNED, &[]),
         Refusal::AlreadyFocused => say(&ALREADY_FOCUSED, &[]),
+        Refusal::NotOwned => say(&NOT_OWNED, &[]),
+        Refusal::SwitchesOff => say(&SWITCHES_OFF, &[]),
+        Refusal::RefundsOff => say(&REFUNDS_OFF, &[]),
+        Refusal::NeededBy { perk } => say(&NEEDED_BY, &[perk_name(defs, perk)]),
     }
 }
 

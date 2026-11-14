@@ -23,10 +23,7 @@ static SAVED: AttachmentType<Rules> = AttachmentType {
     namespace: "reskilled",
     name: "rules",
     default: Rules::default,
-    codec: Some(AttachmentCodec {
-        encode,
-        decode,
-    }),
+    codec: Some(AttachmentCodec { encode, decode }),
     copy_on_death: false,
     sync: false,
 };

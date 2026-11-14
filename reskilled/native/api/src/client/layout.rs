@@ -200,8 +200,10 @@ pub struct PerkRow {
     /// The perk's place in the skill's list.
     pub index: usize,
     pub rect: Rect,
-    /// The unlock button, inside the row at its end.
+    /// The unlock button (an owned perk's switch), inside the row at its end.
     pub buy: Rect,
+    /// An owned perk's refund button, just before it.
+    pub refund: Rect,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -239,6 +241,7 @@ pub fn detail(size: [f32; 2], perks: usize, first: usize) -> Detail {
                 index,
                 rect,
                 buy: rect.at(INNER_W - BUY_W - 2.0, 2.0, BUY_W, PERK_H - 4.0),
+                refund: rect.at(INNER_W - 2.0 * BUY_W - 6.0, 2.0, BUY_W, PERK_H - 4.0),
             }
         })
         .collect();
@@ -282,7 +285,9 @@ pub enum Button {
     Back,
     /// The raise button of the skill on show.
     RaiseShown,
+    /// A perk's unlock button, or an owned perk's switch.
     BuyPerk(usize),
+    RefundPerk(usize),
     /// The gear: the settings page.
     Settings,
 }
@@ -313,6 +318,9 @@ pub fn hit_detail(d: &Detail, x: f32, y: f32) -> Option<Button> {
     }
     if d.raise.contains(x, y) {
         return Some(Button::RaiseShown);
+    }
+    if let Some(row) = d.rows.iter().find(|r| r.refund.contains(x, y)) {
+        return Some(Button::RefundPerk(row.index));
     }
     let row = d.rows.iter().find(|r| r.buy.contains(x, y));
     row.map(|r| Button::BuyPerk(r.index))
