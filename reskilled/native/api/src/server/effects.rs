@@ -174,7 +174,7 @@ pub fn player_of_entity(entity: i32) -> Option<u128> {
     lock(&ENTITIES).get(&u32::try_from(entity).ok()?).copied()
 }
 
-fn effects_of(player: u128) -> Option<Arc<ActiveEffects>> {
+pub(crate) fn effects_of(player: u128) -> Option<Arc<ActiveEffects>> {
     lock(&EFFECTS).get(&player).cloned()
 }
 

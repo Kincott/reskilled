@@ -5,14 +5,14 @@ use horizon_client::mod_api::{
     ClientDisconnectingEvent, ContainerOpenedEvent, DestroyBlockEvent, EnchantItemEvent,
     EntityMountEvent, EntityTameEvent, Flow, FurnaceExtractEvent, GuiRenderPostEvent, Hooks, Host,
     InteractEntityEvent, InventoryClickEvent, ItemDecorationsEvent, ItemStack, KeyEvent, LevelHost,
-    LivingEntityUseItemStartEvent, LivingExperienceDropEvent, LivingIncomingDamageEvent,
-    LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent, NetFromServerEvent,
-    OnEquipEvent, PerformCommandEvent, PerformConsoleCommandEvent, PlaceBlockEvent,
-    PlayerCloneEvent, PlayerLoggedInEvent, PlayerLoggedOutEvent, PlayerSwapHandsEvent,
-    PlayerTickEvent, PlayerXpChangeEvent, PrepareAnvilEvent, RegisterCommandsEvent,
-    ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent, ScreenRenderPostEvent,
-    ServerDataLoadedEvent, ServerReloadListenerApplyEvent, ServerStoppedEvent, TickEvent,
-    TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
+    LivingDeathEvent, LivingEntityUseItemStartEvent, LivingExperienceDropEvent,
+    LivingIncomingDamageEvent, LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent,
+    NetFromServerEvent, OnEquipEvent, PerformCommandEvent, PerformConsoleCommandEvent,
+    PlaceBlockEvent, PlayerCloneEvent, PlayerLoggedInEvent, PlayerLoggedOutEvent,
+    PlayerSwapHandsEvent, PlayerTickEvent, PlayerXpChangeEvent, PrepareAnvilEvent,
+    RegisterCommandsEvent, ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent,
+    ScreenRenderPostEvent, ServerDataLoadedEvent, ServerReloadListenerApplyEvent,
+    ServerStoppedEvent, TickEvent, TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
 };
 use skills_core::defs::Action;
 
@@ -156,6 +156,7 @@ impl Hooks for Mod {
             let rewarded = server::focus::rewarded(player.game_mode);
             let placed =
                 server::focus::on_break(host, player.uuid, rewarded, &player.dimension, event.pos);
+            server::mechanics::on_break(host, player.uuid, &player.dimension, event.pos);
             if rewarded && !placed {
                 server::earning::on_break(host, player.uuid, main_hand.as_deref());
             }
@@ -176,9 +177,10 @@ impl Hooks for Mod {
 
     fn living_experience_drop(
         &self,
-        _host: &mut dyn Host,
+        host: &mut dyn Host,
         event: &mut LivingExperienceDropEvent<'_>,
     ) {
+        server::mechanics::on_kill(host, event.entity, event.kind);
         server::focus::kill_xp(event.entity, event.xp);
     }
 
@@ -244,7 +246,8 @@ impl Hooks for Mod {
 
     fn loot_drops(&self, host: &mut dyn Host, event: &mut LootDropsEvent<'_>) {
         let context = event.context;
-        if let (Some(player), Some(_)) = (context.player, context.block) {
+        if let (Some(player), Some((pos, _))) = (context.player, context.block) {
+            server::mechanics::on_drops(player, context.dimension, pos, event.drops);
             server::effects::bonus_drops(
                 host,
                 player,
@@ -315,7 +318,18 @@ impl Hooks for Mod {
             server::rules::run_for(host, player.uuid);
             server::earning::run_for(host, player.uuid);
             server::focus::pay(host, player.uuid);
+            server::mechanics::run_for(
+                host,
+                player.uuid,
+                &player.dimension,
+                player.position,
+                player.health,
+            );
         }
+    }
+
+    fn living_death(&self, host: &mut dyn Host, event: &mut LivingDeathEvent<'_>) -> Flow {
+        server::mechanics::on_death(host, event.entity, event.kind)
     }
 
     fn server_stopped(&self, _host: &mut dyn Host, _event: &mut ServerStoppedEvent) {

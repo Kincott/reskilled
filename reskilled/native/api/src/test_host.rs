@@ -97,6 +97,12 @@ pub struct TestHost {
     pub permissions: HashMap<u128, u8>,
     /// The blocks of the overworld the server sees, by position, each with its properties.
     pub blocks: HashMap<[i32; 3], (String, Properties)>,
+    /// Potion effects given, by player.
+    pub effects_given: Vec<(u128, horizon_client::mod_api::NativeEffect)>,
+    /// Blocks set through `set_block`: dimension, position, state.
+    pub blocks_set: Vec<(String, [i32; 3], horizon_client::mod_api::BlockStateId)>,
+    /// Each block's default state, as `default_state` gives it.
+    pub default_states: HashMap<String, u32>,
 }
 
 /// A block's properties, as pairs of name and value.
@@ -344,6 +350,41 @@ impl Host for TestHost {
             .iter()
             .find(|(k, _)| k == key)
             .map(|(_, value)| value.clone())
+    }
+
+    fn add_effect(&mut self, uuid: u128, effect: &horizon_client::mod_api::NativeEffect) -> bool {
+        self.effects_given.push((uuid, effect.clone()));
+        true
+    }
+
+    fn set_block(
+        &mut self,
+        dimension: &str,
+        pos: [i32; 3],
+        state: horizon_client::mod_api::BlockStateId,
+        _flags: i32,
+    ) -> bool {
+        self.blocks_set.push((dimension.to_string(), pos, state));
+        true
+    }
+
+    fn default_state(&self, block: &str) -> Option<horizon_client::mod_api::BlockStateId> {
+        self.default_states
+            .get(block)
+            .map(|id| horizon_client::mod_api::BlockStateId(*id))
+    }
+
+    fn set_block_property(&mut self, pos: [i32; 3], key: &str, value: &str) -> bool {
+        let Some((_, properties)) = self.blocks.get_mut(&pos) else {
+            return false;
+        };
+        match properties.iter_mut().find(|(k, _)| k == key) {
+            Some((_, old)) if old != value => {
+                *old = value.to_string();
+                true
+            }
+            _ => false,
+        }
     }
 
     fn level_random(&mut self, _dimension: &str) -> Option<&mut LegacyRandom> {

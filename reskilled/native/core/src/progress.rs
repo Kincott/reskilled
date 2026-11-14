@@ -461,6 +461,21 @@ pub fn total_points(level: u32) -> u32 {
     u32::try_from(doubled / 2).unwrap_or(u32::MAX)
 }
 
+/// A player at `level` with `progress` (0 to 1) toward the next pays `points`: their new level, progress and total
+/// points, as the game keeps them; none when they hold fewer.
+pub fn after_points(level: u32, progress: f32, points: u32) -> Option<(u32, f32, u32)> {
+    let past = f64::from(progress.clamp(0.0, 1.0)) * f64::from(points_to_next(level));
+    let held = total_points(level).saturating_add(past.floor() as u32);
+    let left = held.checked_sub(points)?;
+    let new_level = (0..=level)
+        .take_while(|l| total_points(*l) <= left)
+        .last()
+        .unwrap_or(0);
+    let over = left - total_points(new_level);
+    let progress = over as f32 / points_to_next(new_level) as f32;
+    Some((new_level, progress, left))
+}
+
 /// How to take `points` from a player at `level`: whole levels from the top, and the points given back after; none
 /// when they hold fewer.
 pub fn levels_for_points(level: u32, points: u32) -> Option<(u32, u32)> {
@@ -934,6 +949,22 @@ mod tests {
             skill: skill.into(),
             times,
         }
+    }
+
+    #[test]
+    fn paying_points_lands_on_the_right_level_and_progress() {
+        // Given a player at level 5 halfway to 6 (55 + 8.5 = 63.5 points), and one at level 2 with nothing past it
+        // When 20 points are paid from the first, 63 points from it, and 50 from the second (who has 16)
+        let twenty = after_points(5, 0.5, 20);
+        let all_but = after_points(5, 0.5, 63);
+        let short = after_points(2, 0.0, 50);
+
+        // Then 43 points left is level 4 (40) and 3 of 15 toward 5; 0 points left is level 0; the last is refused
+        let (level, progress, total) = twenty.unwrap();
+        assert_eq!((level, total), (4, 43));
+        assert!((progress - 3.0 / 15.0).abs() < 1e-6, "{progress}");
+        assert_eq!(all_but.map(|(l, _, t)| (l, t)), Some((0, 0)));
+        assert_eq!(short, None);
     }
 
     #[test]

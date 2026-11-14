@@ -76,6 +76,7 @@ messages! {
     LEVEL_UP = "reskilled.ui.level_up" => "Level up";
     PROGRESS = "reskilled.ui.progress" => "Progress: %s/%s";
     RAISE_TO = "reskilled.ui.raise_to" => "Raise to level %s";
+    LAST_STAND = "reskilled.msg.last_stand" => "Your last stand kept you alive.";
     RAISE_SHIFT = "reskilled.ui.raise_shift" => "Shift: +5 levels";
     RAISE_CTRL = "reskilled.ui.raise_ctrl" => "Ctrl: all you can pay for";
     RAISE_BY = "reskilled.ui.raise_by" => "Raise to level %s (+%s)";

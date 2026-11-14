@@ -4,7 +4,9 @@ use std::sync::Mutex;
 
 use horizon_client::mod_api::{Host, Text};
 use skills_core::locks::{Requirements, TargetKind};
-use skills_core::progress::{PlayerState, Request, apply_under, level, levels_for_points};
+use skills_core::progress::{
+    Outcome, PlayerState, Request, after_points, apply_under, level, levels_for_points,
+};
 use skills_core::registry::Defs;
 use skills_core::wire::{ToClient, ToServer};
 
@@ -183,6 +185,11 @@ fn act_taking(
     let rules = super::rules::current(host);
     let outcome = apply_under(&data.defs, &rules, &state, xp_levels, request)
         .map_err(|r| refusal(&data.defs, &r, request))?;
+    if outcome.points_spent > 0
+        && let Some(progress) = live_progress(host, player, xp_levels)
+    {
+        return pay_points_exactly(host, player, xp_levels, progress, &state, outcome);
+    }
     let (taken, given_back) = if outcome.points_spent > 0 {
         levels_for_points(xp_levels, outcome.points_spent).ok_or_else(unavailable)?
     } else {
@@ -211,6 +218,47 @@ fn act_taking(
     }
     queue::queue(Job::SyncAttributes(player));
     Ok((outcome.state, taken))
+}
+
+/// The player's progress toward their next level, when they are the acting player and at `xp_levels`: then their
+/// experience can be set exactly.
+fn live_progress(host: &dyn Host, player: u128, xp_levels: u32) -> Option<f32> {
+    let acting = host.acting_player().filter(|p| p.uuid == player)?;
+    (u32::try_from(acting.xp_level).ok() == Some(xp_levels)).then_some(acting.xp_progress)
+}
+
+/// Takes exactly the outcome's XP points by setting the player's experience (no orbs, so Mending and XP perks do
+/// not touch it), after saving the new state; the state goes back if the experience cannot be set.
+fn pay_points_exactly(
+    host: &mut dyn Host,
+    player: u128,
+    xp_levels: u32,
+    progress: f32,
+    before: &PlayerState,
+    outcome: Outcome,
+) -> Result<(PlayerState, u32), Text> {
+    let unavailable = || say(&UNAVAILABLE, &[]);
+    let (level, progress, total) =
+        after_points(xp_levels, progress, outcome.points_spent).ok_or_else(unavailable)?;
+    set_state(host, player, outcome.state.clone()).map_err(|error| {
+        log::warn!("Reskilled could not save the state of {player:032x}: {error:?}");
+        unavailable()
+    })?;
+    let xp = (
+        i32::try_from(level).unwrap_or(i32::MAX),
+        progress,
+        i32::try_from(total).unwrap_or(i32::MAX),
+    );
+    if !host.set_player_status(player, None, None, Some(xp)) {
+        log::warn!("Reskilled could not set the experience of {player:032x}; the raise is undone");
+        if let Err(error) = set_state(host, player, before.clone()) {
+            log::warn!("Reskilled could not undo the raise of {player:032x}: {error:?}");
+        }
+        return Err(unavailable());
+    }
+    super::sharing::record(host, player, &outcome.state);
+    queue::queue(Job::SyncAttributes(player));
+    Ok((outcome.state, xp_levels - level))
 }
 
 /// Gives (or, negative, takes) XP levels. `give_levels` cannot reach a single-player world's owner outside their

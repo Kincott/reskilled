@@ -9,6 +9,7 @@ pub mod earning;
 pub mod effects;
 pub mod enforce;
 pub mod focus;
+pub mod mechanics;
 pub mod queue;
 pub mod rules;
 pub mod sharing;
@@ -41,6 +42,7 @@ pub fn forget_world() {
     effects::reset();
     enforce::reset();
     focus::reset();
+    mechanics::reset();
     queue::reset();
     rules::reset();
     sharing::reset();

@@ -257,6 +257,7 @@
   "reskilled.ui.perks": "Perks",
   "reskilled.ui.progress": "Progress: %s/%s",
   "reskilled.ui.raise_to": "Raise to level %s",
+  "reskilled.msg.last_stand": "Your last stand kept you alive.",
   "reskilled.ui.raise_shift": "Shift: +5 levels",
   "reskilled.ui.raise_ctrl": "Ctrl: all you can pay for",
   "reskilled.ui.raise_by": "Raise to level %s (+%s)",

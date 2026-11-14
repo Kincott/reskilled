@@ -157,6 +157,12 @@ pub fn hurt(victim: i32, causing: i32) {
     }
 }
 
+/// The player who hurt the mob last, if that was recent enough to count its death as theirs.
+pub fn credited(entity: u32) -> Option<u128> {
+    let (player, at) = *lock(&HURT).get(&entity)?;
+    (queue::now() <= at + KILL_TICKS).then_some(player)
+}
+
 /// A mob killed by a player drops `xp` points: the player who hurt it last gets their kill bonus on top.
 pub fn kill_xp(entity: u32, xp: i32) {
     let Some((player, at)) = lock(&HURT).remove(&entity) else {
