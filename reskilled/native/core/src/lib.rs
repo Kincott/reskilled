@@ -3,6 +3,7 @@
 
 pub mod defs;
 pub mod effects;
+pub mod guide;
 pub mod locks;
 pub mod progress;
 pub mod registry;
