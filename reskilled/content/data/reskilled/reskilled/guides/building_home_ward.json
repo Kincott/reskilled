@@ -51,7 +51,7 @@
       {"pos": [5, 2, 3], "block": "minecraft:cobblestone"},
       {"pos": [3, 1, 1], "block": "minecraft:tnt"}
     ]},
-    {"at": 0, "caption": {"key": "reskilled.guide.building_home_ward.1", "text": "TNT goes off within %s of your bed while you are online.", "args": [{"effect": "home_ward", "field": "radius", "as": "blocks"}]}},
+    {"at": 0, "caption": {"key": "reskilled.guide.building_home_ward.1", "text": "TNT goes off within %s of your bed or respawn anchor while you are online.", "args": [{"effect": "home_ward", "field": "radius", "as": "blocks"}]}},
     {"at": 2, "remove": [[3, 1, 1]]},
     {"at": 2, "icon": {"item": "minecraft:gunpowder", "at": [0.5, 0.45]}},
     {"at": 2, "caption": {"key": "reskilled.guide.building_home_ward.2", "text": "The blast breaks no blocks, and your home stays whole."}},

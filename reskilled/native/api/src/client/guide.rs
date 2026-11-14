@@ -4,7 +4,8 @@
 use std::collections::BTreeMap;
 
 use horizon_client::mod_api::{Flow, Host, HudBatch, NativeSceneBlock, NativeSceneView, Text};
-use skills_core::card::{CardChance, CardLine, card_lines, with_modifier};
+use skills_core::card::{CardChance, CardLine, card_lines, player_base, with_modifier};
+use skills_core::defs::MAX_GUIDE_HALF_HEARTS;
 use skills_core::defs::{DamageKind, Direction, GuideDef, Operation, Overlay, PerkDef};
 use skills_core::guide::{Frame, caption_values, frame_at, yaw_at};
 use skills_core::progress::{PlayerState, active_perks};
@@ -29,8 +30,9 @@ const LINE: f32 = 9.0;
 /// Where the title starts after the Back button, and the header text's top.
 const TITLE_GAP: f32 = 6.0;
 const HEADER_TEXT: f32 = 7.0;
-/// The inset of a card's text in the scene box.
+/// The inset of a card's text in the scene box, and the space between its lines and the description under them.
 const CARD_INSET: f32 = 6.0;
+const DESCRIPTION_GAP: f32 = 4.0;
 /// The progress bar's height, and its gap before Replay.
 const PROGRESS_H: f32 = 5.0;
 const PROGRESS_GAP: f32 = 6.0;
@@ -104,13 +106,15 @@ pub fn open_hovered() -> bool {
     })
 }
 
-/// Draws the guide page.
-pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 2]) {
-    host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);
+/// Draws the guide page. False, with the view switched back to the skill page for the caller to draw, when the
+/// page's perk is gone (the data was reloaded with fewer perks, or has not come).
+pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 2]) -> bool {
     with(|cache| {
         let Some((d, perk, count)) = current(cache) else {
-            return;
+            cache.view = View::Skill;
+            return false;
         };
+        host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);
         let p = page(size);
         let over = |r: &Rect| r.contains(mouse[0], mouse[1]);
         let mut tip: Option<Vec<Text>> = None;
@@ -192,14 +196,26 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
                     h: card.h - LINE - 3.0,
                     ..card
                 };
-                draw_lines(host, batch, &below, &lines);
+                let used = draw_lines(host, batch, &below, &lines);
+                // The description says what the numbers are for, and covers effects with no line of their own.
+                if !card_lines(perk).contains(&CardLine::Description) {
+                    let gap = used as f32 * LINE + DESCRIPTION_GAP;
+                    let rest = Rect {
+                        y: below.y + gap,
+                        h: below.h - gap,
+                        ..below
+                    };
+                    let description = [(perk_description(perk).plain(), GRAY)];
+                    draw_lines(host, batch, &rest, &description);
+                }
             }
         }
         draw_footer(host, batch, &p, &footer);
         if let Some(lines) = tip {
             host.gui_tooltip(batch, &lines, mouse);
         }
-    });
+        true
+    })
 }
 
 /// The scene at `seconds`, its overlays, its caption and its progress.
@@ -270,6 +286,8 @@ fn draw_overlays(host: &dyn Host, batch: &mut HudBatch, box_: &Rect, frame: &Fra
         }
     }
     if let Some(half_hearts) = frame.hearts {
+        // A pack's file is refused past the most, but the bar never draws more than fits whatever it is given.
+        let half_hearts = half_hearts.min(MAX_GUIDE_HALF_HEARTS);
         let hearts = half_hearts.div_ceil(2).max(MIN_HEARTS);
         let src = [0.0, 0.0, HEART, HEART];
         for n in 0..hearts {
@@ -300,17 +318,25 @@ fn effect_sprite(effect: &str) -> String {
     }
 }
 
-/// Lines of text, wrapped to the area, as many as fit.
-fn draw_lines(host: &dyn Host, batch: &mut HudBatch, area: &Rect, lines: &[(String, u32)]) {
-    let fit = (area.h / LINE).floor() as usize;
+/// Lines of text, wrapped to the area, as many as fit; how many rows were drawn.
+fn draw_lines(
+    host: &dyn Host,
+    batch: &mut HudBatch,
+    area: &Rect,
+    lines: &[(String, u32)],
+) -> usize {
+    let fit = (area.h.max(0.0) / LINE).floor() as usize;
     let rows = lines.iter().flat_map(|(text, rgb)| {
         paint::wrapped(host, text, area.w)
             .into_iter()
             .map(move |row| (row, *rgb))
     });
+    let mut drawn = 0;
     for (n, (row, rgb)) in rows.take(fit).enumerate() {
         host.text(batch, &row, [area.x, area.y + n as f32 * LINE], rgb, true);
+        drawn = n + 1;
     }
+    drawn
 }
 
 /// Most rows the footer takes; a second comes out of the card lines' room.
@@ -413,14 +439,20 @@ fn card_line(line: &CardLine, attributes: &BTreeMap<String, f64>, owned: bool) -
         } => {
             let name = attribute_name(attribute);
             let change = Text::literal(change(*amount, *operation));
-            match (mount, attributes.get(attribute)) {
-                (true, _) => say(&CARD_MOUNT, &[name, change]),
-                (false, None) => say(&CARD_ATTRIBUTE_CHANGE, &[name, change]),
-                (false, Some(now)) => {
+            // `add_multiplied_base` counts from the player's base, which a held item does not move; with no known
+            // base the line gives the change alone rather than a wrong number.
+            let base = match operation {
+                Operation::AddMultipliedBase => player_base(attribute),
+                Operation::AddValue | Operation::AddMultipliedTotal => Some(0.0),
+            };
+            match (mount, attributes.get(attribute), base) {
+                (true, _, _) => say(&CARD_MOUNT, &[name, change]),
+                (false, None, _) | (false, _, None) => say(&CARD_ATTRIBUTE_CHANGE, &[name, change]),
+                (false, Some(now), Some(base)) => {
                     let (without, with) = if owned {
-                        (without_modifier(*now, *amount, *operation), *now)
+                        (without_modifier(*now, base, *amount, *operation), *now)
                     } else {
-                        (*now, with_modifier(*now, *now, *amount, *operation))
+                        (*now, with_modifier(*now, base, *amount, *operation))
                     };
                     let values = [Text::literal(value(without)), Text::literal(value(with))];
                     let [without, with] = values;
@@ -480,15 +512,14 @@ fn damage_kind(kind: DamageKind) -> &'static Message {
     }
 }
 
-/// An owned perk's attribute without its modifier, from the value with it. The base of `add_multiplied_base` is
-/// taken as the value without the perk.
-fn without_modifier(now: f64, amount: f64, operation: Operation) -> f64 {
+/// An owned perk's attribute without its modifier, from the value with it; `base` is the attribute's base value,
+/// which `add_multiplied_base` counts from.
+fn without_modifier(now: f64, base: f64, amount: f64, operation: Operation) -> f64 {
     match operation {
         Operation::AddValue => now - amount,
-        Operation::AddMultipliedBase | Operation::AddMultipliedTotal if amount > -1.0 => {
-            now / (1.0 + amount)
-        }
-        Operation::AddMultipliedBase | Operation::AddMultipliedTotal => now,
+        Operation::AddMultipliedBase => now - base * amount,
+        Operation::AddMultipliedTotal if amount > -1.0 => now / (1.0 + amount),
+        Operation::AddMultipliedTotal => now,
     }
 }
 
@@ -585,7 +616,7 @@ mod tests {
     use skills_core::registry::Defs;
     use skills_core::wire::ClientDefs;
 
-    use super::{card_line, card_texts, effect_sprite};
+    use super::{card_line, card_texts, draw_overlays, effect_sprite};
     use crate::MOD_ID;
     use crate::client::cache::{View, with};
     use crate::client::layout::{detail, page};
@@ -917,10 +948,129 @@ mod tests {
                 "Movement speed of your mount: +0.5",
                 "Projectile damage dealt x1.08",
                 "25% chance of an extra drop",
-                "Above 3 hearts, a killing blow leaves half a heart; then it rests 300 seconds",
+                "With 3 hearts or more, a killing blow leaves half a heart; then it rests 300 seconds",
                 "+3% damage per enchantment on your weapon, up to 15%",
             ]
         );
+    }
+
+    fn steady_hand_line() -> CardLine {
+        CardLine::Attribute {
+            attribute: "minecraft:attack_speed".into(),
+            amount: 0.1,
+            operation: Operation::AddMultipliedBase,
+            mount: false,
+        }
+    }
+
+    #[test]
+    fn a_multiplied_base_counts_from_the_players_base_not_the_live_value() {
+        // Given Steady Hand's 10% of base attack speed, for a player holding a sword: 1.6 without the perk, and 2.0
+        // with it in effect (the sword's -2.4 on the base of 4.0, plus 0.4)
+        let _serial = exclusive();
+        crate::text::shipped_english::load();
+        let without = [("minecraft:attack_speed".to_string(), 1.6)].into();
+        let with = [("minecraft:attack_speed".to_string(), 2.0)].into();
+
+        // When the card line is put in words, not in effect and in effect
+        let off = card_line(&steady_hand_line(), &without, false).plain();
+        let on = card_line(&steady_hand_line(), &with, true).plain();
+
+        // Then both read the real result, 0.4 more than 1.6
+        assert_eq!(off, "Attack speed: 1.6 -> 2.0 (+10%)");
+        assert_eq!(on, "Attack speed: 1.6 -> 2.0 (+10%)");
+    }
+
+    #[test]
+    fn a_multiplied_base_of_an_unknown_attribute_shows_only_the_change() {
+        // Given 10% of base of an attribute whose player base is not known, with a live value of 3
+        let _serial = exclusive();
+        crate::text::shipped_english::load();
+        let line = CardLine::Attribute {
+            attribute: "minecraft:max_health".into(),
+            amount: 0.1,
+            operation: Operation::AddMultipliedBase,
+            mount: false,
+        };
+        let attributes = [("minecraft:max_health".to_string(), 30.0)].into();
+
+        // When it is put in words
+        let words = card_line(&line, &attributes, false).plain();
+
+        // Then it gives the change alone, no number worked from a guessed base
+        assert!(words.ends_with(": +10%"), "{words}");
+        assert!(!words.contains("->"), "{words}");
+    }
+
+    #[test]
+    fn a_heart_bar_draws_no_more_than_twenty_hearts() {
+        // Given a frame with a heart bar of two billion half hearts
+        let host = TestHost::default();
+        let frame = skills_core::guide::Frame {
+            blocks: Default::default(),
+            caption: None,
+            icons: Vec::new(),
+            hearts: Some(2_000_000_000),
+            progress: 0.0,
+        };
+        let box_ = page(SIZE).scene.shrunk(1.0);
+
+        // When its overlays are drawn
+        draw_overlays(&host, &mut HudBatch::new([427, 240]), &box_, &frame);
+
+        // Then twenty heart containers are drawn, all inside the box
+        let painted = host.painted.borrow();
+        let containers: Vec<[f32; 4]> = painted
+            .iter()
+            .filter_map(|paint| match paint {
+                Paint::Sprite { name, rect } if name.ends_with("container") => Some(*rect),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(containers.len(), 20);
+        assert!(
+            containers
+                .iter()
+                .all(|r| r[0] + r[2] <= box_.x + box_.w && r[1] + r[3] <= box_.y + box_.h),
+            "{containers:?} leave {box_:?}"
+        );
+    }
+
+    #[test]
+    fn a_card_page_shows_the_perks_description_under_its_lines() {
+        // Given Steady Hand's page, a card, with the shipped English
+        let _serial = exclusive();
+        crate::text::shipped_english::load();
+        let mut host = melee_open();
+        press_g_over(&mut host, row(0));
+
+        // When the page is drawn
+        painted(&host);
+
+        // Then its card line and, under it, its description are there
+        let drawn = host.drawn_text();
+        assert!(drawn.iter().any(|t| t.contains("4.0 -> 4.4")), "{drawn:?}");
+        assert!(drawn.iter().any(|t| t == "Swing 10% faster."), "{drawn:?}");
+    }
+
+    #[test]
+    fn a_guide_whose_perk_is_gone_goes_back_to_the_skill_page() {
+        // Given the guide page on a perk index past the skill's perks, as after a data reload
+        let _serial = exclusive();
+        crate::text::shipped_english::load();
+        let host = melee_open();
+        with(|cache| {
+            cache.view = View::Guide;
+            cache.guide_perk = 7;
+        });
+
+        // When the page is drawn
+        painted(&host);
+
+        // Then the view is the skill page again, drawn this frame with its perks
+        assert_eq!(with(|cache| cache.view), View::Skill);
+        let drawn = host.drawn_text();
+        assert!(drawn.iter().any(|t| t.contains("Steady Hand")), "{drawn:?}");
     }
 
     #[test]

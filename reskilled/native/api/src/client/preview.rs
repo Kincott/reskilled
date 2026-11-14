@@ -517,11 +517,12 @@ fn the_guide_fits_the_window() {
                 // When its page is drawn just after each caption appears
                 let ticks = (at * 20.0).round() as u64 + 2;
                 open_guide(perk, ticks);
-                // The attack speed the client would read for Steady Hand's card, with the owned perk's 10% on it.
+                // The attack speed the client would read for Steady Hand's card holding a sword (-2.4), with the
+                // owned perk's 10% of the base of 4 on it.
                 with(|cache| {
                     cache
                         .attributes
-                        .insert("minecraft:attack_speed".into(), 4.4);
+                        .insert("minecraft:attack_speed".into(), 2.0);
                 });
                 host.painted.borrow_mut().clear();
                 draw(&host, &mut HudBatch::new(size), sizef, AWAY);

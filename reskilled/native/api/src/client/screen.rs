@@ -243,7 +243,9 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
     }
     match with(|cache| cache.view) {
         View::Settings => return super::options::draw(host, batch, size, mouse),
-        View::Guide => return super::guide::draw(host, batch, size, mouse),
+        // A guide whose perk is gone switches back to the skill page, drawn below this frame.
+        View::Guide if super::guide::draw(host, batch, size, mouse) => return,
+        View::Guide => {}
         View::Overview | View::Skill => {}
     }
     host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);

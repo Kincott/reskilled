@@ -420,7 +420,10 @@ pub fn parse_file(kind: DefKind, json: &str) -> Result<DefFile, DefError> {
         DefKind::Focus => DefFile::Focus(serde_json::from_value(value).map_err(refused)?),
         DefKind::Lock => DefFile::Lock(serde_json::from_value(value).map_err(refused)?),
         DefKind::Settings => DefFile::Settings(serde_json::from_value(value).map_err(refused)?),
-        DefKind::Guide => DefFile::Guide(serde_json::from_value(value).map_err(refused)?),
+        DefKind::Guide => {
+            check_one_action_per_step(&value).map_err(refused)?;
+            DefFile::Guide(serde_json::from_value(value).map_err(refused)?)
+        }
     };
     file.validate().map_err(refused)?;
     Ok(file)
@@ -431,6 +434,31 @@ fn refused(reason: impl ToString) -> DefError {
         file: String::new(),
         reason: reason.to_string(),
     }
+}
+
+/// Refuses a guide step with more than one key besides `at`: the step reads through serde `flatten`, which would
+/// keep one action and drop the other without a word.
+fn check_one_action_per_step(value: &Value) -> Result<(), String> {
+    let Some(steps) = value.get("steps").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    for (index, step) in steps.iter().enumerate() {
+        let Some(step) = step.as_object() else {
+            continue;
+        };
+        let actions: Vec<&str> = step
+            .keys()
+            .map(String::as_str)
+            .filter(|key| *key != "at")
+            .collect();
+        if actions.len() > 1 {
+            return Err(format!(
+                "step {index}: a step does one thing, found {}; give each its own step",
+                actions.join(" and ")
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Removes the `format` field, refusing a missing or unknown one.
@@ -750,6 +778,9 @@ impl SettingsPatch {
     }
 }
 
+/// The most half hearts a guide's heart bar shows: twenty hearts in one row, which fit the scene box.
+pub const MAX_GUIDE_HALF_HEARTS: u32 = 40;
+
 /// The animated scene that explains a perk in the guide: a timeline of steps over a small diorama of blocks.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -805,7 +836,7 @@ pub enum GuideAction {
     Icon(Overlay),
     /// A potion effect's icon drawn the same way.
     Effect(Overlay),
-    /// A heart bar over the box with this many half hearts.
+    /// A heart bar over the box with this many half hearts, at most [`MAX_GUIDE_HALF_HEARTS`].
     Hearts(u32),
     /// Takes overlays away.
     Clear(ClearWhat),
@@ -902,6 +933,12 @@ impl GuideDef {
                     self.seconds
                 ));
             }
+            if at >= self.seconds {
+                return Err(format!(
+                    "step {index}: at {at} never plays; a step must start before the scene's end at {} seconds",
+                    self.seconds
+                ));
+            }
             if at < last {
                 return Err(format!(
                     "step {index}: at {at} is before the step above it ({last}); steps must be in time order"
@@ -923,6 +960,11 @@ impl GuideAction {
             GuideAction::Caption(caption) => caption.validate(),
             GuideAction::Icon(overlay) => overlay.validate("item"),
             GuideAction::Effect(overlay) => overlay.validate("effect"),
+            GuideAction::Hearts(half_hearts) if *half_hearts > MAX_GUIDE_HALF_HEARTS => {
+                Err(format!(
+                    "hearts {half_hearts} is too many; a heart bar holds at most {MAX_GUIDE_HALF_HEARTS} half hearts"
+                ))
+            }
             GuideAction::Remove(_) | GuideAction::Hearts(_) | GuideAction::Clear(_) => Ok(()),
         }
     }
@@ -1850,6 +1892,62 @@ mod tests {
         for (reason, (_, field)) in reasons.iter().zip(&cases) {
             assert!(reason.contains(field), "{field}: {reason}");
         }
+    }
+
+    #[test]
+    fn a_step_at_the_scenes_end_is_refused() {
+        // Given a scene of 8 seconds whose last step starts at 8, when it would never play
+        let json = REPLANT_GUIDE.replace("{\"at\": 4, \"caption\"", "{\"at\": 8, \"caption\"");
+
+        // When it is parsed
+        let reason = refusal(DefKind::Guide, &json);
+
+        // Then it is refused, naming the step and the scene's end
+        assert!(
+            reason.contains("step 5") && reason.contains("before"),
+            "{reason}"
+        );
+    }
+
+    #[test]
+    fn a_heart_bar_longer_than_twenty_hearts_is_refused() {
+        // Given a scene with a heart bar of 40 half hearts, and one with a typo of two billion
+        let fits = REPLANT_GUIDE.replace(
+            "{\"at\": 3, \"remove\"",
+            "{\"at\": 3, \"hearts\": 40}, {\"at\": 3, \"remove\"",
+        );
+        let typo = REPLANT_GUIDE.replace(
+            "{\"at\": 3, \"remove\"",
+            "{\"at\": 3, \"hearts\": 2000000000}, {\"at\": 3, \"remove\"",
+        );
+
+        // When they are parsed
+        let reason = refusal(DefKind::Guide, &typo);
+
+        // Then the 40 loads, and the typo is refused naming the field
+        parse_ok(DefKind::Guide, &fits);
+        assert!(
+            reason.contains("hearts") && reason.contains("40"),
+            "{reason}"
+        );
+    }
+
+    #[test]
+    fn a_step_with_two_actions_is_refused() {
+        // Given a step that both removes a block and shows hearts
+        let json = REPLANT_GUIDE.replace(
+            "{\"at\": 3, \"remove\": [[0, 1, 0]]}",
+            "{\"at\": 3, \"remove\": [[0, 1, 0]], \"hearts\": 4}",
+        );
+
+        // When it is parsed
+        let reason = refusal(DefKind::Guide, &json);
+
+        // Then it is refused naming the step, not one action kept and the other dropped
+        assert!(
+            reason.contains("step 2") && reason.contains("one"),
+            "{reason}"
+        );
     }
 
     #[test]

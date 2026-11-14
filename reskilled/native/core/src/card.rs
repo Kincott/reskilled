@@ -48,6 +48,25 @@ pub fn card_lines(perk: &PerkDef) -> Vec<CardLine> {
     }
 }
 
+/// Vanilla's player base values of the attributes the shipped perks change with `add_multiplied_base`. A held item's
+/// modifiers move the live value but not the base, so the base cannot be read off the live value.
+const PLAYER_BASES: [(&str, f64); 6] = [
+    ("minecraft:attack_speed", 4.0),
+    ("minecraft:movement_speed", 0.1),
+    ("minecraft:jump_strength", 0.42),
+    ("minecraft:block_break_speed", 1.0),
+    ("minecraft:submerged_mining_speed", 0.2),
+    ("minecraft:sneaking_speed", 0.3),
+];
+
+/// A player's base value of `attribute` in vanilla; `None` for an attribute not in [`PLAYER_BASES`].
+pub fn player_base(attribute: &str) -> Option<f64> {
+    PLAYER_BASES
+        .iter()
+        .find(|(name, _)| *name == attribute)
+        .map(|(_, base)| *base)
+}
+
 /// An attribute's value once a modifier is added to it: `now` is the value now, `base` its base value.
 /// Vanilla's three operations: `add_value` adds `amount`, `add_multiplied_base` adds `base * amount`, and
 /// `add_multiplied_total` multiplies the running total by `1 + amount`.

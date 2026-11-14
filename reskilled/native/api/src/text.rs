@@ -204,10 +204,10 @@ messages! {
     CARD_ENCHANTED_ARMOR = "reskilled.card.enchanted_armor" => "%s less damage taken per enchantment on your armor, up to %s";
     CARD_SHORTER_EFFECTS = "reskilled.card.shorter_effects" => "Harmful effects last %s as long";
     CARD_RUNE_REPAIR = "reskilled.card.rune_repair" => "Enchanted gear mends %s durability every %s seconds";
-    CARD_LAST_STAND = "reskilled.card.last_stand" => "Above %s hearts, a killing blow leaves half a heart; then it rests %s seconds";
-    CARD_HOME_WARD = "reskilled.card.home_ward" => "Explosions break no blocks within %s blocks of your spawn point";
-    CARD_SAFE_HAVEN = "reskilled.card.safe_haven" => "No monsters spawn within %s blocks of your spawn point";
-    CARD_NEAR_HOME = "reskilled.card.near_home" => "Its effect is on within %s blocks of your spawn point";
+    CARD_LAST_STAND = "reskilled.card.last_stand" => "With %s hearts or more, a killing blow leaves half a heart; then it rests %s seconds";
+    CARD_HOME_WARD = "reskilled.card.home_ward" => "Explosions break no blocks within %s blocks of your bed or respawn anchor";
+    CARD_SAFE_HAVEN = "reskilled.card.safe_haven" => "No monsters spawn within %s blocks of your bed or respawn anchor";
+    CARD_NEAR_HOME = "reskilled.card.near_home" => "Its effect is on within %s blocks of your bed or respawn anchor";
     CARD_XP_GAIN = "reskilled.card.xp_gain" => "You get %s of the XP you pick up";
     CARD_ANVIL_COST = "reskilled.card.anvil_cost" => "Anvil work costs %s of its usual levels";
     DAMAGE_MELEE = "reskilled.damage.melee" => "Melee";

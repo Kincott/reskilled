@@ -101,13 +101,7 @@ pub fn load(host: &dyn Host) {
     for problem in drop_unplaceable_guides(host, &mut defs) {
         log::warn!("Reskilled skipped {problem}");
     }
-    log::info!(
-        "Reskilled loaded {} skills, {} perks, {} focus areas and {} lock entries",
-        defs.skills.len(),
-        defs.perks.len(),
-        defs.focus.len(),
-        defs.locks.len()
-    );
+    log::info!("Reskilled loaded {}", loaded_summary(&defs));
     let generation = current().map_or(0, |data| data.generation) + 1;
     let client_defs = client_defs_json(&defs);
     let data = ServerData {
@@ -125,6 +119,18 @@ pub fn load(host: &dyn Host) {
 /// Drops every guide that places a block the game does not know, or a property its default state lacks, and says
 /// why for each. Clients cannot draw such a scene, and only the server's game knows the blocks. Guides that place
 /// nothing are left alone.
+/// What a load holds, for the log: "4 skills, 30 perks, 3 focus areas, 12 lock entries and 12 guides".
+fn loaded_summary(defs: &Defs) -> String {
+    format!(
+        "{} skills, {} perks, {} focus areas, {} lock entries and {} guides",
+        defs.skills.len(),
+        defs.perks.len(),
+        defs.focus.len(),
+        defs.locks.len(),
+        defs.guides.len()
+    )
+}
+
 fn drop_unplaceable_guides(host: &dyn Host, defs: &mut Defs) -> Vec<String> {
     let mut problems = Vec::new();
     defs.guides.retain(|perk, guide| {
@@ -436,6 +442,24 @@ pub(crate) mod tests {
             serde_json::from_str(&data.client_defs).unwrap();
         assert_eq!(client.defs.guides, data.defs.guides);
         assert_eq!(warnings(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn the_load_line_counts_the_guides() {
+        // Given a server that knows wheat
+        let _serial = exclusive();
+        let mut host = host_with_wheat();
+        logged();
+
+        // When data with one guide loads
+        load_guide(&mut host, "minecraft:wheat[age=7]");
+
+        // Then the info line saying what loaded counts it
+        let line = logged()
+            .into_iter()
+            .find(|l| l.contains("Reskilled loaded"))
+            .expect("a load line");
+        assert!(line.contains("and 1 guides"), "{line}");
     }
 
     #[test]

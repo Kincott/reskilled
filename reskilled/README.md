@@ -59,12 +59,17 @@ the perk's effects, so a pack that retunes a perk keeps a true guide. Replant's,
 }
 ```
 
-Steps run in time order and the scene loops at `seconds`. Besides `place`, `remove` and `caption` there are
-`effect` (a potion effect's icon, `{"effect": "minecraft:strength", "at": [x, y]}`), `hearts` (a heart bar of so many
-half hearts) and `clear` (`"icons"` or `"hearts"`). An arg reads `{"effect": "crop_growth", "field": "chance", "as":
-"percent"}`, with `as` one of `number`, `percent`, `seconds`, `blocks` or `hearts`. The server checks every block
-state and arg when it loads the data and drops a bad file with an error. A perk without a guide shows its exact
-values instead.
+`view` sets where the scene is seen from: `center` (the scene point in the middle), `yaw` and `pitch` in degrees,
+`scale` in pixels per block, and `spin` in degrees a second (0 holds still). Steps run in time order, each starting
+before `seconds`, and the scene loops at `seconds`; a step does one thing. Besides `place`, `remove` and `caption`
+there are `icon` (an item, `{"item": "minecraft:wheat_seeds", "at": [x, y]}`), `effect` (a potion effect's icon,
+`{"effect": "minecraft:strength", "at": [x, y]}`), `hearts` (a heart bar of so many half hearts, at most 40) and
+`clear` (`"icons"` or `"hearts"`). An overlay's `at` is fractions of the scene box, 0 to 1 from its top left. An arg
+reads `{"effect": "crop_growth", "field": "chance", "as": "percent"}`, with `as` one of `number`, `percent`,
+`seconds`, `blocks` or `hearts`. When it loads the data the server checks that each placed block and its property
+keys exist and that each arg names a real value of the perk, and drops a bad file with an error. A property value
+the block does not have (`age=9` on wheat) is only warned about in the client log, and that block is left out of the
+scene. A perk without a guide shows its exact values instead, with its description under them.
 
 Other mods can add their own unlockables, including abilities with no item behind them: see
 [INTEGRATION.md](INTEGRATION.md).
