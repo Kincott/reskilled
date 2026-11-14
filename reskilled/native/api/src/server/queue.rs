@@ -63,6 +63,12 @@ pub fn refresh(player: u128) {
     ]);
 }
 
+/// The player's levels or locks changed in a way that may take gear off them: resync their perks' attributes and
+/// check what they wear.
+pub fn recheck(player: u128) {
+    lock(&JOBS).extend([Job::SyncAttributes(player), Job::CheckEquipment(player)]);
+}
+
 /// The queued jobs, emptying the queue.
 pub fn take_queued() -> Vec<Job> {
     std::mem::take(&mut *lock(&JOBS))

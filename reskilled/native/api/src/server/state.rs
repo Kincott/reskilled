@@ -12,7 +12,7 @@ use skills_core::wire::{ToClient, decode_state, encode_state};
 use super::data::current;
 use super::enforce::exempt;
 use super::lock;
-use super::queue::{self, Job};
+use super::queue;
 use crate::MSG_CHANNEL;
 
 /// The one tag the saved state is kept in, as the JSON `encode_state` writes.
@@ -57,7 +57,12 @@ static STATUS_TOLD: Mutex<BTreeMap<u128, (u32, bool)>> = Mutex::new(BTreeMap::ne
 pub fn send_status_changes(players: &[(u128, u32, bool)]) {
     let mut told = lock(&STATUS_TOLD);
     for &(player, levels, exempt) in players {
-        if told.insert(player, (levels, exempt)) != Some((levels, exempt)) {
+        let before = told.insert(player, (levels, exempt));
+        if matches!(before, Some((_, true))) && !exempt {
+            // Locks apply again (leaving creative): gear put on meanwhile may be locked.
+            queue::recheck(player);
+        }
+        if before != Some((levels, exempt)) {
             let message = serde_json::to_vec(&ToClient::Status { levels, exempt })
                 .expect("Status always encodes");
             queue::send(player, MSG_CHANNEL, message);
@@ -150,7 +155,7 @@ pub fn apply_death(host: &mut dyn Host, player: u128) {
     let applied = state_of(host, player)
         .and_then(|state| set_state(host, player, on_death(&data.defs, &state)));
     match applied {
-        Ok(()) => queue::queue(Job::SyncAttributes(player)),
+        Ok(()) => queue::recheck(player),
         Err(error) => {
             log::warn!("Reskilled could not apply the death penalty to {player:032x}: {error:?}")
         }
@@ -188,6 +193,23 @@ mod tests {
             },
         );
         state
+    }
+
+    #[test]
+    fn leaving_creative_rechecks_what_the_player_wears() {
+        // Given a creative player, whose locks are off, told so
+        let _serial = exclusive();
+        send_status_changes(&[(PLAYER, 0, true)]);
+        take_queued();
+
+        // When they turn to survival, then nothing changes for a while
+        send_status_changes(&[(PLAYER, 0, false)]);
+        let after_switch = take_queued();
+        send_status_changes(&[(PLAYER, 0, false)]);
+
+        // Then what they wear is checked once, as gear put on in creative may now be locked
+        assert!(after_switch.contains(&Job::CheckEquipment(PLAYER)));
+        assert!(!take_queued().contains(&Job::CheckEquipment(PLAYER)));
     }
 
     #[test]
@@ -287,7 +309,10 @@ mod tests {
             level(&state_of(&mut host, PLAYER).unwrap(), defs, MINING),
             8
         );
-        assert_eq!(after_run, vec![Job::SyncAttributes(PLAYER)]);
+        assert_eq!(
+            after_run,
+            vec![Job::SyncAttributes(PLAYER), Job::CheckEquipment(PLAYER)]
+        );
         assert_eq!(take_queued(), vec![Job::SyncAttributes(PLAYER)]);
     }
 

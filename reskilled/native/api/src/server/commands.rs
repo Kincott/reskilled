@@ -7,7 +7,7 @@ use skills_core::wire::ToClient;
 
 use super::actions::{Reply, defer};
 use super::data::current;
-use super::queue::{self, Job};
+use super::queue;
 use super::state::{player_named, set_state, state_of};
 use crate::MSG_CHANNEL;
 use crate::text::{
@@ -222,7 +222,7 @@ fn operate(
     };
     let line = change(state, defs, &spelled).and_then(|(state, done)| {
         set_state(host, target, state).map_err(|_| say(&UNAVAILABLE, &[]))?;
-        queue::queue(Job::SyncAttributes(target));
+        queue::recheck(target);
         Ok(done)
     });
     vec![line.unwrap_or_else(|why| why)]
@@ -531,7 +531,10 @@ mod tests {
             host.told_to(BO),
             vec!["You may not do that.", "Set Ann's Mining to level 20."]
         );
-        assert_eq!(take_queued(), vec![Job::SyncAttributes(ANN)]);
+        assert_eq!(
+            take_queued(),
+            vec![Job::SyncAttributes(ANN), Job::CheckEquipment(ANN)]
+        );
     }
 
     #[test]
