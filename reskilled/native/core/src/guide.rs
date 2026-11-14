@@ -3,7 +3,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::defs::{Caption, ClearWhat, GuideAction, GuideDef, Overlay};
+use crate::defs::{
+    Caption, ClearWhat, GuideAction, GuideDef, Overlay, PerkDef, ShownAs, effect_field,
+};
 
 /// Everything the scene shows at one moment.
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +68,32 @@ pub fn frame_at(guide: &GuideDef, seconds_since_start: f32) -> Frame {
 /// The yaw the scene is looked at from. The time is not looped, so the turn stays smooth across loops.
 pub fn yaw_at(guide: &GuideDef, seconds_since_start: f32) -> f32 {
     guide.view.yaw + guide.view.spin * seconds_since_start
+}
+
+/// The text each of a caption's args fills its `%s` with, read from the perk's own effects so the scene never states
+/// a number the perk data does not. A value the perk lacks reads `?`.
+pub fn caption_values(perk: &PerkDef, caption: &Caption) -> Vec<String> {
+    caption
+        .args
+        .iter()
+        .map(|arg| match effect_field(perk, &arg.effect, &arg.field) {
+            None => "?".to_string(),
+            Some(value) => match arg.shown_as {
+                ShownAs::Number => number(value),
+                ShownAs::Percent => format!("{}%", number(value * 100.0)),
+                ShownAs::Seconds => format!("{} s", number(value)),
+                ShownAs::Blocks => format!("{} blocks", number(value)),
+                ShownAs::Hearts => format!("{} hearts", number(value / 2.0)),
+            },
+        })
+        .collect()
+}
+
+/// A number with the fewest decimals that keep it, at most two: 5, 0.5, 2.25.
+fn number(value: f64) -> String {
+    let text = format!("{value:.2}");
+    let text = text.trim_end_matches('0').trim_end_matches('.');
+    if text == "-0" { "0" } else { text }.to_string()
 }
 
 #[cfg(test)]
@@ -238,5 +266,74 @@ mod tests {
         assert_eq!(yaw_at(&replant, 0.0), 35.0);
         assert_eq!(yaw_at(&replant, 2.0), 51.0);
         assert_eq!(yaw_at(&replant, 10.0), 115.0);
+    }
+
+    fn caption_of(args: &str) -> Caption {
+        let json = format!(r#"{{"key": "k", "text": "t", "args": {args}}}"#);
+        serde_json::from_str(&json).unwrap()
+    }
+
+    fn perk(file: &str) -> PerkDef {
+        match parse_file(DefKind::Perk, file) {
+            Ok(DefFile::Perk(perk)) => perk,
+            other => panic!("expected a perk, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn caption_values_fill_from_the_perk() {
+        // Given Green Aura and Last Breath, as shipped
+        let aura = perk(include_str!(
+            "../../../content/data/reskilled/reskilled/perks/gathering_foragers_pace.json"
+        ));
+        let breath = perk(include_str!(
+            "../../../content/data/reskilled/reskilled/perks/defense_braced_stance.json"
+        ));
+
+        // When a caption names Green Aura's radius, chance and interval
+        let caption = caption_of(
+            r#"[{"effect": "crop_growth", "field": "radius", "as": "blocks"},
+                {"effect": "crop_growth", "field": "chance", "as": "percent"},
+                {"effect": "crop_growth", "field": "interval_seconds", "as": "seconds"}]"#,
+        );
+
+        // Then each is shown as it was asked
+        assert_eq!(caption_values(&aura, &caption), ["5 blocks", "25%", "10 s"]);
+
+        // When a caption names Last Breath's threshold as hearts
+        let caption = caption_of(r#"[{"effect": "last_stand", "field": "above", "as": "hearts"}]"#);
+
+        // Then the health points are halved
+        assert_eq!(caption_values(&breath, &caption), ["3 hearts"]);
+    }
+
+    #[test]
+    fn caption_values_format_numbers_and_flag_missing_values() {
+        // Given Green Aura
+        let aura = perk(include_str!(
+            "../../../content/data/reskilled/reskilled/perks/gathering_foragers_pace.json"
+        ));
+
+        // When the chance is shown as a plain number, a halved radius as hearts, and a missing field
+        let caption = caption_of(
+            r#"[{"effect": "crop_growth", "field": "chance", "as": "number"},
+                {"effect": "crop_growth", "field": "radius", "as": "number"},
+                {"effect": "crop_growth", "field": "radius", "as": "hearts"},
+                {"effect": "crop_growth", "field": "speed", "as": "number"},
+                {"effect": "replant", "field": "radius", "as": "blocks"}]"#,
+        );
+
+        // Then whole numbers have no decimals, others at most two, and missing ones read ?
+        assert_eq!(
+            caption_values(&aura, &caption),
+            ["0.25", "5", "2.5 hearts", "?", "?"]
+        );
+        assert_eq!(number(2.25), "2.25");
+        assert_eq!(number(0.5), "0.5");
+        assert_eq!(number(1.0 / 3.0), "0.33");
+
+        // When a caption has no args
+        // Then it has no values
+        assert!(caption_values(&aura, &caption_of("[]")).is_empty());
     }
 }
