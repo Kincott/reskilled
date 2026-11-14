@@ -169,6 +169,9 @@ impl Hooks for Mod {
     fn place_block(&self, host: &mut dyn Host, event: &mut PlaceBlockEvent<'_>) {
         if let Some(player) = host.acting_player() {
             server::focus::on_place(&player.dimension, event.pos);
+            if server::focus::rewarded(player.game_mode) {
+                server::earning::on_place(player.uuid, &player.dimension, event.pos);
+            }
         }
     }
 
@@ -193,14 +196,12 @@ impl Hooks for Mod {
     fn entity_tame(&self, host: &mut dyn Host, event: &mut EntityTameEvent<'_>) {
         if let Some(owner) = event.owner {
             server::focus::on_tame(host, owner);
-            server::earning::on_tame(owner);
         }
     }
 
     fn baby_entity_spawn(&self, host: &mut dyn Host, event: &mut BabyEntitySpawnEvent<'_>) -> Flow {
         if event.player != 0 {
             server::focus::on_breed(host, event.player);
-            server::earning::on_breed(event.player);
         }
         Flow::Continue
     }

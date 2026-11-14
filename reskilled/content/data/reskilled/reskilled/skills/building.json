@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "reskilled:building",
+  "name": "reskilled.skill.building",
+  "icon": "minecraft:bricks",
+  "icon_levels": {
+    "4": "minecraft:scaffolding",
+    "8": "minecraft:piston",
+    "16": "minecraft:beacon",
+    "24": "minecraft:conduit"
+  }
+}

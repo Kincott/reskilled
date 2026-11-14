@@ -388,7 +388,7 @@
         "use"
       ],
       "requires": {
-        "reskilled:taming": 4
+        "reskilled:agility": 4
       },
       "label": "reskilled.lock.copper_mount_armor"
     },
@@ -574,7 +574,7 @@
         "use"
       ],
       "requires": {
-        "reskilled:taming": 8
+        "reskilled:agility": 8
       },
       "label": "reskilled.lock.iron_mount_armor"
     },
@@ -760,7 +760,7 @@
         "use"
       ],
       "requires": {
-        "reskilled:taming": 16
+        "reskilled:agility": 16
       },
       "label": "reskilled.lock.diamond_mount_armor"
     },
@@ -946,7 +946,7 @@
         "use"
       ],
       "requires": {
-        "reskilled:taming": 24
+        "reskilled:agility": 24
       },
       "label": "reskilled.lock.netherite_mount_armor"
     }

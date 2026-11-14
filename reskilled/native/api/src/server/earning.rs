@@ -2,7 +2,7 @@
 //! with the skill's tools, blows, projectile hits, hits taken, distance, enchanting, taming and breeding), and the
 //! player's own tick turns it into progress, at the rule's pace, climbing levels as it fills.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Mutex;
 
 use horizon_client::mod_api::Host;
@@ -25,12 +25,12 @@ const RANGED: &str = "reskilled:ranged";
 const DEFENSE: &str = "reskilled:defense";
 const AGILITY: &str = "reskilled:agility";
 const ARCANE: &str = "reskilled:arcane";
-const TAMING: &str = "reskilled:taming";
-/// What work is worth, in actions: a block, a blow or a hit is one; enchanting is five, taming ten, breeding three;
-/// each block travelled a twentieth.
+const BUILDING: &str = "reskilled:building";
+/// What work is worth, in actions: a block broken or placed, a blow or a hit is one; enchanting is five; each block
+/// travelled a twentieth.
 const ENCHANTING: f64 = 5.0;
-const TAMING_ONE: f64 = 10.0;
-const BREEDING: f64 = 3.0;
+/// The spots blocks were placed at that already counted, oldest first; at most this many are kept.
+const BUILT_KEPT: usize = 65_536;
 const PER_BLOCK: f64 = 0.05;
 const HUNDREDTHS: f64 = 100.0;
 const PERCENT: u64 = 100;
@@ -109,12 +109,29 @@ pub fn on_enchant(player: u128) {
     note(player, ARCANE, ENCHANTING);
 }
 
-pub fn on_tame(player: u128) {
-    note(player, TAMING, TAMING_ONE);
-}
+/// Spots where a placed block already counted, so placing and breaking at one spot grows nothing.
+/// A dimension and a block position.
+type Spot = (String, [i32; 3]);
 
-pub fn on_breed(player: u128) {
-    note(player, TAMING, BREEDING);
+static BUILT: Mutex<(BTreeSet<Spot>, VecDeque<Spot>)> =
+    Mutex::new((BTreeSet::new(), VecDeque::new()));
+
+/// A player placed a block at `pos`: Building grows, once for each spot.
+pub fn on_place(player: u128, dimension: &str, pos: [i32; 3]) {
+    let spot = (dimension.to_string(), pos);
+    {
+        let mut built = lock(&BUILT);
+        if !built.0.insert(spot.clone()) {
+            return;
+        }
+        built.1.push_back(spot);
+        while built.1.len() > BUILT_KEPT {
+            if let Some(old) = built.1.pop_front() {
+                built.0.remove(&old);
+            }
+        }
+    }
+    note(player, BUILDING, 1.0);
 }
 
 /// A hit: a projectile a player shot grows their Ranged, and a hit a player takes from something grows their
@@ -189,6 +206,7 @@ pub fn forget(player: u128) {
 /// Forgets what this module keeps for the running world, as the server stops.
 pub(crate) fn reset() {
     lock(&PENDING).clear();
+    *lock(&BUILT) = (BTreeSet::new(), VecDeque::new());
 }
 
 #[cfg(test)]
@@ -222,7 +240,7 @@ mod tests {
             "defense",
             "agility",
             "arcane",
-            "taming",
+            "building",
         ]
         .iter()
         .map(|s| {
@@ -357,7 +375,7 @@ mod tests {
         let _serial = exclusive();
         let mut host = world(Progression::Earn, 100);
 
-        // When the player strikes ten blows, enchants twice, tames an animal, walks 200 blocks, lands ten
+        // When the player strikes ten blows, enchants twice, places ten blocks, walks 200 blocks, lands ten
         // projectile hits and takes ten hits, and their tick runs
         for _ in 0..10 {
             on_attack(PLAYER, "minecraft:zombie");
@@ -366,13 +384,33 @@ mod tests {
         }
         on_enchant(PLAYER);
         on_enchant(PLAYER);
-        on_tame(PLAYER);
+        for x in 0..10 {
+            on_place(PLAYER, "minecraft:overworld", [x, 64, 0]);
+        }
         on_travel(PLAYER, 200.0);
         run_for(&mut host, PLAYER);
 
         // Then each skill climbs a level
-        for skill in ["melee", "ranged", "defense", "arcane", "taming", "agility"] {
+        for skill in [
+            "melee", "ranged", "defense", "arcane", "building", "agility",
+        ] {
             assert_eq!(at(&mut host, skill), 2, "{skill}");
         }
+    }
+
+    #[test]
+    fn placing_at_the_same_spot_again_grows_nothing() {
+        // Given skills growing by doing, Building at 1 (ten actions to climb)
+        let _serial = exclusive();
+        let mut host = world(Progression::Earn, 100);
+
+        // When the player places and breaks a block at one spot twenty times, and their tick runs
+        for _ in 0..20 {
+            on_place(PLAYER, "minecraft:overworld", [0, 64, 0]);
+        }
+        run_for(&mut host, PLAYER);
+
+        // Then Building is still at 1
+        assert_eq!(at(&mut host, "building"), 1);
     }
 }

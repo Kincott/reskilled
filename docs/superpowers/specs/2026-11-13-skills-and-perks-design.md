@@ -278,6 +278,13 @@ world (`Holder::Level`), sent to every player, and changed only by operators (ch
   player, replanting ripe crops, and ender pearl damage rules. Five weak perks became Last Breath, Bloodrush, Pearl
   Step, Green Aura and Replant (same ids, so owners keep their points); XP gain, capstones and taming were retuned.
   Each skill keeps the 2, 2, 2, 4, 6 price ladder, so a maxed skill buys all its perks.
+- Building replaces Taming (2026-11-14, after play: mount boosts mattered too little). Building locks placing
+  advanced blocks (scaffolding 4; pistons, hoppers, dispensers, brewing stands 8; anvils, enchanting tables,
+  observers, comparators 12; beacons, conduits, lodestones, respawn anchors 16), grows by placing blocks (each spot
+  once), joins the Roaming focus, and its perks act around the player's home (their respawn point): Salvage, Restful
+  Sleep, Hearth, Home Ward, Safe Haven. Taming's mount, lead and animal armor locks moved to Agility at the same
+  levels. Arcane became magic and enchanted gear: Spellward, Runeblade, Warding Runes, Antidote, Living Runes; no
+  shipped perk raises XP gain any more. The table and mock-ups above still show Taming as first designed.
 - Skill strip: a display setting showing the player's skills and levels beside the inventory and crafting table.
 
 ## 8. Data

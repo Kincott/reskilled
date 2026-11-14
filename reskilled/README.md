@@ -3,7 +3,7 @@
 Skills, perks and gear locks for Minecraft Horizon (26.3). Fills the role of Reskillable and Level Up! Reloaded on
 Horizon (not affiliated).
 
-Players raise eight skills (Melee, Ranged, Defense, Mining, Gathering, Agility, Arcane, Taming) with XP, unlock
+Players raise eight skills (Melee, Ranged, Defense, Mining, Gathering, Agility, Arcane, Building) with XP, unlock
 perks with the points the levels earn, and need levels to use gear: iron at 8, diamond at 16, netherite at 24, and
 more. Everything is data, and the server's rules change in game.
 

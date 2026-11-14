@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "id": "reskilled:building_salvage",
+  "skill": "reskilled:building",
+  "name": "reskilled.perk.building_salvage",
+  "description": "reskilled.perk.building_salvage.desc",
+  "cost": 2,
+  "min_level": 4,
+  "requires": [],
+  "effects": [
+    {
+      "type": "salvage"
+    }
+  ]
+}

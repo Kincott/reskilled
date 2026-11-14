@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:building_safe_haven",
+  "skill": "reskilled:building",
+  "name": "reskilled.perk.building_safe_haven",
+  "description": "reskilled.perk.building_safe_haven.desc",
+  "cost": 6,
+  "min_level": 24,
+  "requires": [
+    "reskilled:building_home_ward"
+  ],
+  "effects": [
+    {
+      "type": "safe_haven",
+      "radius": 32
+    }
+  ]
+}

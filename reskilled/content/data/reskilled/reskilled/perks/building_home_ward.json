@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "id": "reskilled:building_home_ward",
+  "skill": "reskilled:building",
+  "name": "reskilled.perk.building_home_ward",
+  "description": "reskilled.perk.building_home_ward.desc",
+  "cost": 4,
+  "min_level": 16,
+  "requires": [],
+  "effects": [
+    {
+      "type": "home_ward",
+      "radius": 24
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "format": 1,
+  "entries": [
+    {
+      "target": {
+        "block": {
+          "any_of": [
+            {
+              "id": "minecraft:scaffolding"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "place"
+      ],
+      "requires": {
+        "reskilled:building": 4
+      },
+      "label": "reskilled.lock.building_scaffolding"
+    },
+    {
+      "target": {
+        "block": {
+          "any_of": [
+            {
+              "id": "minecraft:piston"
+            },
+            {
+              "id": "minecraft:sticky_piston"
+            },
+            {
+              "id": "minecraft:hopper"
+            },
+            {
+              "id": "minecraft:dispenser"
+            },
+            {
+              "id": "minecraft:dropper"
+            },
+            {
+              "id": "minecraft:brewing_stand"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "place"
+      ],
+      "requires": {
+        "reskilled:building": 8
+      },
+      "label": "reskilled.lock.building_machines"
+    },
+    {
+      "target": {
+        "block": {
+          "any_of": [
+            {
+              "id": "minecraft:anvil"
+            },
+            {
+              "id": "minecraft:chipped_anvil"
+            },
+            {
+              "id": "minecraft:damaged_anvil"
+            },
+            {
+              "id": "minecraft:enchanting_table"
+            },
+            {
+              "id": "minecraft:observer"
+            },
+            {
+              "id": "minecraft:comparator"
+            },
+            {
+              "id": "minecraft:crafter"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "place"
+      ],
+      "requires": {
+        "reskilled:building": 12
+      },
+      "label": "reskilled.lock.building_workshops"
+    },
+    {
+      "target": {
+        "block": {
+          "any_of": [
+            {
+              "id": "minecraft:beacon"
+            },
+            {
+              "id": "minecraft:conduit"
+            },
+            {
+              "id": "minecraft:lodestone"
+            },
+            {
+              "id": "minecraft:respawn_anchor"
+            }
+          ]
+        }
+      },
+      "actions": [
+        "place"
+      ],
+      "requires": {
+        "reskilled:building": 16
+      },
+      "label": "reskilled.lock.building_wonders"
+    }
+  ]
+}

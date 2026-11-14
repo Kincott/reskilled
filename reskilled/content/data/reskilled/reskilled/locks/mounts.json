@@ -11,7 +11,7 @@
         "mount"
       ],
       "requires": {
-        "reskilled:taming": 12
+        "reskilled:agility": 12
       },
       "label": "reskilled.lock.happy_ghast"
     },
@@ -65,7 +65,7 @@
         "mount"
       ],
       "requires": {
-        "reskilled:taming": 4
+        "reskilled:agility": 4
       },
       "label": "reskilled.lock.mounts"
     }

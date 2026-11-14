@@ -97,7 +97,7 @@
         "use"
       ],
       "requires": {
-        "reskilled:taming": 6
+        "reskilled:agility": 6
       },
       "label": "reskilled.lock.wolf_armor"
     },
@@ -168,7 +168,7 @@
         "use"
       ],
       "requires": {
-        "reskilled:taming": 4
+        "reskilled:agility": 4
       },
       "label": "reskilled.lock.lead"
     }

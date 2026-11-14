@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:building_hearth",
+  "skill": "reskilled:building",
+  "name": "reskilled.perk.building_hearth",
+  "description": "reskilled.perk.building_hearth.desc",
+  "cost": 2,
+  "min_level": 12,
+  "requires": [],
+  "effects": [
+    {
+      "type": "near_home",
+      "radius": 16,
+      "effect": "minecraft:regeneration",
+      "amplifier": 0
+    }
+  ]
+}

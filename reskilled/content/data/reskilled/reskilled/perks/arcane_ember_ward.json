@@ -9,16 +9,9 @@
   "requires": [],
   "effects": [
     {
-      "type": "attribute",
-      "attribute": "minecraft:burning_time",
-      "amount": -0.25,
-      "operation": "add_multiplied_base"
-    },
-    {
-      "type": "damage",
-      "direction": "taken",
-      "kind": "fire",
-      "multiplier": 0.85
+      "type": "enchanted_armor",
+      "per_enchantment": 0.01,
+      "max": 0.08
     }
   ]
 }

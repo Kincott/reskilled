@@ -11,8 +11,9 @@
   ],
   "effects": [
     {
-      "type": "anvil_cost",
-      "multiplier": 0.75
+      "type": "rune_repair",
+      "interval_seconds": 30,
+      "points": 10
     }
   ]
 }

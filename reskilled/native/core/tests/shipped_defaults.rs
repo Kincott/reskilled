@@ -26,7 +26,7 @@ const MINING: &str = "reskilled:mining";
 const GATHERING: &str = "reskilled:gathering";
 const AGILITY: &str = "reskilled:agility";
 const ARCANE: &str = "reskilled:arcane";
-const TAMING: &str = "reskilled:taming";
+const BUILDING: &str = "reskilled:building";
 
 fn content() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(CONTENT)
@@ -225,7 +225,7 @@ fn eight_skills_with_spec_ids() {
         (GATHERING, "minecraft:wooden_axe"),
         (AGILITY, "minecraft:feather"),
         (ARCANE, "minecraft:book"),
-        (TAMING, "minecraft:lead"),
+        (BUILDING, "minecraft:bricks"),
     ]
     .into();
     assert_eq!(icons, expected);
@@ -341,7 +341,7 @@ fn three_focus_areas_cover_all_skills_once() {
     let expected: BTreeMap<&str, BTreeSet<&str>> = [
         ("reskilled:fighting", [MELEE, RANGED, DEFENSE].into()),
         ("reskilled:working", [MINING, GATHERING, ARCANE].into()),
-        ("reskilled:roaming", [AGILITY, TAMING].into()),
+        ("reskilled:roaming", [AGILITY, BUILDING].into()),
     ]
     .into();
     assert_eq!(areas, expected);
@@ -431,7 +431,7 @@ fn skill_icons_climb_the_gear_tiers() {
     assert_eq!(icon(RANGED, 16), "minecraft:trident");
     assert_eq!(icon(AGILITY, 16), "minecraft:elytra");
     for skill in [
-        MELEE, RANGED, DEFENSE, MINING, GATHERING, AGILITY, ARCANE, TAMING,
+        MELEE, RANGED, DEFENSE, MINING, GATHERING, AGILITY, ARCANE, BUILDING,
     ] {
         assert_ne!(icon(skill, 1), icon(skill, 32), "{skill} never improves");
     }
@@ -626,13 +626,38 @@ fn strong_enchantments_need_their_skill() {
 }
 
 #[test]
+fn advanced_blocks_need_building_to_place_and_arcane_to_use() {
+    // Given the shipped data
+    let defs = defaults();
+    let place = |id: &str| needed(&defs, TargetKind::Block, id, Action::Place, BUILDING);
+
+    // When advanced blocks are placed and the anvil is opened
+    let opened = needed(
+        &defs,
+        TargetKind::Block,
+        "minecraft:anvil",
+        Action::Open,
+        ARCANE,
+    );
+
+    // Then each tier needs its Building level, and using the anvil still needs Arcane 12
+    assert_eq!(place("minecraft:scaffolding"), 4);
+    assert_eq!(place("minecraft:piston"), 8);
+    assert_eq!(place("minecraft:brewing_stand"), 8);
+    assert_eq!(place("minecraft:anvil"), 12);
+    assert_eq!(place("minecraft:enchanting_table"), 12);
+    assert_eq!(place("minecraft:beacon"), 16);
+    assert_eq!(opened, 12);
+}
+
+#[test]
 fn specials_match_spec() {
     // Given the shipped data
     let defs = defaults();
     let item =
         |id: &str, action: Action, skill: &str| needed(&defs, TargetKind::Item, id, action, skill);
     let block = |id: &str| needed(&defs, TargetKind::Block, id, Action::Open, ARCANE);
-    let mount = |id: &str| needed(&defs, TargetKind::Entity, id, Action::Mount, TAMING);
+    let mount = |id: &str| needed(&defs, TargetKind::Entity, id, Action::Mount, AGILITY);
 
     // When every special item, block and mount is checked
     // Then each needs the spec's level
@@ -649,8 +674,8 @@ fn specials_match_spec() {
     assert_eq!(item("minecraft:ender_pearl", Action::Use, ARCANE), 8);
     assert_eq!(item("minecraft:ender_eye", Action::Use, ARCANE), 16);
     assert_eq!(item("minecraft:firework_rocket", Action::Use, AGILITY), 4);
-    assert_eq!(item("minecraft:lead", Action::Use, TAMING), 4);
-    assert_eq!(item("minecraft:wolf_armor", Action::Use, TAMING), 6);
+    assert_eq!(item("minecraft:lead", Action::Use, AGILITY), 4);
+    assert_eq!(item("minecraft:wolf_armor", Action::Use, AGILITY), 6);
     assert_eq!(mount("minecraft:happy_ghast"), 12);
     for other in [
         "minecraft:horse",

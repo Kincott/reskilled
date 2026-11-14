@@ -9,8 +9,9 @@
   "requires": [],
   "effects": [
     {
-      "type": "anvil_cost",
-      "multiplier": 0.85
+      "type": "enchanted_weapon",
+      "per_enchantment": 0.03,
+      "max": 0.15
     }
   ]
 }

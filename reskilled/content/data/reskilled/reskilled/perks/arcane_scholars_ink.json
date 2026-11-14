@@ -9,8 +9,10 @@
   "requires": [],
   "effects": [
     {
-      "type": "xp_gain",
-      "multiplier": 1.05
+      "type": "damage",
+      "direction": "taken",
+      "kind": "magic",
+      "multiplier": 0.7
     }
   ]
 }
