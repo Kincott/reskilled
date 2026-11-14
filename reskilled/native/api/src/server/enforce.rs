@@ -102,7 +102,11 @@ pub fn rider(host: &dyn Host, entity: u32, kind: &str) -> Option<Actor> {
 }
 
 /// The first check the player fails cancels the action, with the "Needs" line; exempt players pass all.
-fn guard(host: &mut dyn Host, actor: &Actor, checks: &[(TargetKind, &str, Action)]) -> Flow {
+pub(crate) fn guard(
+    host: &mut dyn Host,
+    actor: &Actor,
+    checks: &[(TargetKind, &str, Action)],
+) -> Flow {
     guard_enchanted(host, actor, checks, &[])
 }
 

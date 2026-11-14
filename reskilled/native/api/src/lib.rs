@@ -17,6 +17,8 @@ use horizon_client::mod_api::{
 use skills_core::defs::Action;
 
 mod client;
+pub mod integration;
+pub use integration::{has_perk, may_use_ability, skill_level};
 mod server;
 #[cfg(test)]
 mod test_host;

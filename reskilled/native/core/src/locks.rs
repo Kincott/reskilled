@@ -45,7 +45,7 @@ pub fn matches(m: &Matcher, kind: TargetKind, id: &str, facts: &dyn Facts) -> bo
             match kind {
                 TargetKind::Item => facts.item_in_tag(id, tag),
                 TargetKind::Block => facts.block_in_tag(id, tag),
-                TargetKind::Entity | TargetKind::Enchantment => false,
+                TargetKind::Entity | TargetKind::Enchantment | TargetKind::Ability => false,
             }
         }
         Matcher::Repairable(material) => facts.item_repairable(id).as_deref() == Some(material),
@@ -708,5 +708,64 @@ mod tests {
             Some(&[("reskilled:arcane".to_string(), 16)].into())
         );
         assert!(item.by_action.is_empty());
+    }
+
+    fn ability_locks() -> Defs {
+        let json = r#"{"format": 1, "entries": [
+            {"target": {"ability": {"id": "dashmod:dash"}}, "actions": ["use"],
+             "requires": {"reskilled:agility": 10}, "label": "dashmod.lock.dash"},
+            {"target": {"ability": {"pattern": "jumpmod:*_jump"}}, "actions": ["use"],
+             "requires": {"reskilled:agility": 16}}]}"#;
+        let crate::defs::DefFile::Lock(file) =
+            crate::defs::parse_file(crate::defs::DefKind::Lock, json).unwrap()
+        else {
+            panic!("a lock file");
+        };
+        Defs {
+            locks: file.entries,
+            ..Defs::default()
+        }
+    }
+
+    #[test]
+    fn ability_requirements_are_matched_by_id_and_pattern() {
+        // Given a dash at Agility 10 and every jumpmod "*_jump" at Agility 16
+        let defs = ability_locks();
+        let use_of = |id: &str| {
+            requirements_for(&defs, TargetKind::Ability, id, &TestFacts::default())
+                .by_action
+                .get(&Action::Use)
+                .and_then(|levels| levels.get("reskilled:agility"))
+                .copied()
+        };
+
+        // When the dash, a double jump, another mod's dash and an item named like the dash are checked
+        let item = requirements_for(
+            &defs,
+            TargetKind::Item,
+            "dashmod:dash",
+            &TestFacts::default(),
+        );
+
+        // Then the id and the pattern match their abilities only, and no item is locked by them
+        assert_eq!(use_of("dashmod:dash"), Some(10));
+        assert_eq!(use_of("jumpmod:double_jump"), Some(16));
+        assert_eq!(use_of("othermod:dash"), None);
+        assert!(item.by_action.is_empty());
+    }
+
+    #[test]
+    fn ability_labels_join_the_preview() {
+        // Given the dash's labelled lock at Agility 10
+        let defs = ability_locks();
+
+        // When Agility's unlock preview is built
+        let labels = labels_by_level(&defs, "reskilled:agility");
+
+        // Then the dash shows at level 10
+        assert_eq!(
+            labels.get(&10),
+            Some(&vec!["dashmod.lock.dash".to_string()])
+        );
     }
 }

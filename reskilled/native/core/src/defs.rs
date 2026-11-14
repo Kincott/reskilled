@@ -209,6 +209,8 @@ pub enum TargetKind {
     Entity,
     /// An enchantment on the item in use: it adds its locks to the item's own.
     Enchantment,
+    /// Something another mod lets players do with no item, block or entity behind it (a dash), by that mod's id.
+    Ability,
 }
 
 impl fmt::Display for TargetKind {
@@ -218,6 +220,7 @@ impl fmt::Display for TargetKind {
             TargetKind::Block => "block",
             TargetKind::Entity => "entity",
             TargetKind::Enchantment => "enchantment",
+            TargetKind::Ability => "ability",
         })
     }
 }
@@ -230,6 +233,7 @@ pub enum Target {
     Block(Matcher),
     Entity(Matcher),
     Enchantment(Matcher),
+    Ability(Matcher),
 }
 
 /// Picks item, block or entity ids. Tags and repair materials are written with a leading `#` when they name a tag.
@@ -517,6 +521,7 @@ impl Target {
             Target::Block(matcher) => (TargetKind::Block, matcher),
             Target::Entity(matcher) => (TargetKind::Entity, matcher),
             Target::Enchantment(matcher) => (TargetKind::Enchantment, matcher),
+            Target::Ability(matcher) => (TargetKind::Ability, matcher),
         }
     }
 
@@ -529,6 +534,7 @@ impl Target {
             ),
             Target::Block(_) => matches!(action, Action::Open | Action::Place),
             Target::Entity(_) => matches!(action, Action::Mount | Action::Interact),
+            Target::Ability(_) => action == Action::Use,
         }
     }
 }
@@ -538,7 +544,12 @@ impl Matcher {
     fn validate(&self, kind: TargetKind) -> Result<(), String> {
         match self {
             Matcher::Id(id) => check_id("id", id),
-            Matcher::Tag(_) if matches!(kind, TargetKind::Entity | TargetKind::Enchantment) => {
+            Matcher::Tag(_)
+                if matches!(
+                    kind,
+                    TargetKind::Entity | TargetKind::Enchantment | TargetKind::Ability
+                ) =>
+            {
                 Err(format!("tag matchers do not work on an {kind} target"))
             }
             Matcher::Tag(tag) => check_tag("tag", tag),
@@ -1104,6 +1115,40 @@ mod tests {
                 lock_message_cooldown_ticks: 20,
             }
         );
+    }
+
+    #[test]
+    fn parses_an_ability_lock() {
+        // Given a lock on another mod's dash
+        let json = r#"{"format": 1, "entries": [{"target": {"ability": {"id": "dashmod:dash"}},
+            "actions": ["use"], "requires": {"reskilled:agility": 10}}]}"#;
+
+        // When it is parsed
+        let DefFile::Lock(file) = parse_ok(DefKind::Lock, json) else {
+            panic!("a lock file");
+        };
+
+        // Then its target is the ability
+        assert_eq!(
+            file.entries[0].target,
+            Target::Ability(Matcher::Id("dashmod:dash".into()))
+        );
+    }
+
+    #[test]
+    fn ability_locks_allow_only_use_and_no_tags() {
+        // Given an ability lock that equips, and one by tag
+        let equip = r#"{"format": 1, "entries": [{"target": {"ability": {"id": "dashmod:dash"}},
+            "actions": ["equip"], "requires": {"reskilled:agility": 10}}]}"#;
+        let tag = r##"{"format": 1, "entries": [{"target": {"ability": {"tag": "#dashmod:moves"}},
+            "actions": ["use"], "requires": {"reskilled:agility": 10}}]}"##;
+
+        // When they are parsed
+        let (equip, tag) = (refusal(DefKind::Lock, equip), refusal(DefKind::Lock, tag));
+
+        // Then both are refused and say why
+        assert!(equip.contains("equip"), "{equip}");
+        assert!(tag.contains("tag"), "{tag}");
     }
 
     #[test]
