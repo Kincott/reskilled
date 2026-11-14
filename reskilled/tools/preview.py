@@ -5,7 +5,7 @@
     python3 -I tools/preview.py /some/dir <vanilla assets>/assets/minecraft
 
 The second argument is a Minecraft resource folder (the one holding `font/` and `textures/`), used for the game's
-font and item pictures; nothing from it is copied anywhere but into the pictures. Needs Pillow.
+font, item pictures and GUI sprites; nothing from it is copied anywhere but into the pictures. Needs Pillow.
 """
 import json
 import pathlib
@@ -104,6 +104,40 @@ def tooltip(canvas, font, spans, at):
             left += font.width(text)
 
 
+def nine_slice(canvas, assets, name, rect):
+    """A GUI atlas sprite (`gui/sprites/widget/button`) over `rect` as the game draws it: corners at their size,
+    edges and middle tiled. A name the game's atlas would not find stops the preview, as the game would draw
+    nothing."""
+    file = assets / "textures" / f"{name}.png"
+    if not name.startswith("gui/sprites/") or not file.exists():
+        raise SystemExit(f"no sprite {name!r} in the game's GUI atlas ({file})")
+    picture = Image.open(file).convert("RGBA")
+    meta = file.with_name(file.name + ".mcmeta")
+    border = 0
+    if meta.exists():
+        scaling = json.loads(meta.read_text()).get("gui", {}).get("scaling", {})
+        border = scaling.get("border", 0) if scaling.get("type") == "nine_slice" else 0
+    x, y, w, h = (round(v) for v in rect)
+    if not border:
+        canvas.alpha_composite(picture.resize((w, h), Image.NEAREST), (x, y))
+        return
+    if isinstance(border, int):
+        border = {"left": border, "top": border, "right": border, "bottom": border}
+    sw, sh = picture.width, picture.height
+    left, top, right, bottom = (border.get(k, 0) for k in ("left", "top", "right", "bottom"))
+    columns = [(0, left, 0, left), (left, sw - right, left, w - right), (sw - right, sw, w - right, w)]
+    rows = [(0, top, 0, top), (top, sh - bottom, top, h - bottom), (sh - bottom, sh, h - bottom, h)]
+    for sx0, sx1, dx0, dx1 in columns:
+        for sy0, sy1, dy0, dy1 in rows:
+            if sx1 <= sx0 or sy1 <= sy0 or dx1 <= dx0 or dy1 <= dy0:
+                continue
+            piece = picture.crop((sx0, sy0, sx1, sy1))
+            for tx in range(dx0, dx1, max(sx1 - sx0, 1)):
+                for ty in range(dy0, dy1, max(sy1 - sy0, 1)):
+                    part = piece.crop((0, 0, min(piece.width, dx1 - tx), min(piece.height, dy1 - ty)))
+                    canvas.alpha_composite(part, (x + tx, y + ty))
+
+
 def world(size):
     """A stand-in for the game behind the screen: sky, hills, and where the hotbar and hearts sit."""
     w, h = size
@@ -137,12 +171,7 @@ def render(scene, font, assets):
         elif kind == "background":
             fill(canvas, paint["rect"], 0xC0101010)
         elif kind == "sprite":
-            name, (x, y, w, h) = paint["name"], paint["rect"]
-            face = {"widget/button_highlighted": 0xFF8A8A8A, "widget/button_disabled": 0xFF3C3C3C,
-                    "widget/tab_selected": 0xFF8F8F8F, "widget/tab_highlighted": 0xFF7A7A7A}.get(name, 0xFF6F6F6F)
-            fill(canvas, [x, y, w, h], 0xFF000000)
-            fill(canvas, [x + 1, y + 1, w - 2, h - 2], face)
-            fill(canvas, [x + 1, y + 1, w - 2, 1], 0xFFAAAAAA if "disabled" not in name else 0xFF4C4C4C)
+            nine_slice(canvas, assets, paint["name"], paint["rect"])
         elif kind == "tooltip":
             tooltip(canvas, font, paint["spans"], paint["at"])
     return canvas.resize((canvas.width * SCALE, canvas.height * SCALE), Image.NEAREST)

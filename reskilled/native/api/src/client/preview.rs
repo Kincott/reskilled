@@ -290,6 +290,39 @@ fn hovering_shows_one_tooltip() {
 }
 
 #[test]
+fn the_skill_strip_sits_beside_the_inventory() {
+    // Given the shipped mod, a player a few hours in, and the inventory's panel on a usual screen
+    let _serial = exclusive();
+    let host = player(USUAL);
+    let inventory = [125.0, 37.0, 176.0, 166.0];
+
+    // When the inventory is drawn (a bare panel stands in for it) with the strip, plain and with Mining hovered
+    for (name, mouse) in [("strip", AWAY), ("strip_hover", [107.0, 100.0])] {
+        host.painted.borrow_mut().clear();
+        let mut batch = HudBatch::new(USUAL);
+        let [x, y, w, h] = inventory;
+        super::paint::container_panel(&host, &mut batch, &super::layout::Rect { x, y, w, h });
+        super::strip::draw_beside(&host, &mut batch, "inventory", None, inventory, mouse);
+        let painted = save(&host, name, USUAL);
+
+        // Then every skill is there, clear of the inventory and of the screen's edge
+        let icons: Vec<[f32; 2]> = painted
+            .iter()
+            .filter_map(|p| match p {
+                Paint::Item { at, .. } => Some(*at),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(icons.len(), 8);
+        assert!(
+            icons
+                .iter()
+                .all(|at| at[0] > 0.0 && at[0] + 16.0 < inventory[0])
+        );
+    }
+}
+
+#[test]
 fn the_warning_the_badge_and_the_item_tooltip_draw() {
     // Given the shipped mod, a refused chestplate, and the requirements of a few items
     let _serial = exclusive();

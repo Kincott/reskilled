@@ -6,18 +6,20 @@ use skills_core::progress::level;
 
 use super::cache::with;
 use super::layout::Rect;
-use super::paint::{self, GOLD, GRAY, WHITE};
+use super::paint::{self, CONTAINER_SLOT, GOLD, GRAY, WHITE};
 use crate::text::{LEVEL_OF, number, say, skill_name};
 
 /// The windows that get the strip: the player's own inventory (no menu) and the crafting table.
 const CRAFTING: &str = "minecraft:crafting";
-const SLOT: f32 = 20.0;
-const STEP: f32 = 21.0;
-const GAP: f32 = 3.0;
+/// Between the strip's panel and the window's, as the recipe book leaves.
+const GAP: f32 = 2.0;
+/// From the panel's edge to its slots.
+const PAD: f32 = 4.0;
 const ICON: f32 = 16.0;
 
 /// Draws the strip left of the window's panel when the screen is the inventory or a crafting table, the player
-/// has it on, and there is room.
+/// has it on, and there is room: a small panel in the window's own style, one slot per skill with its icon, and
+/// the level where a stack's count goes.
 pub fn draw_beside(
     host: &dyn Host,
     batch: &mut HudBatch,
@@ -29,7 +31,8 @@ pub fn draw_beside(
     if screen != "inventory" || !matches!(menu, None | Some(CRAFTING)) {
         return;
     }
-    let x = panel[0] - SLOT - GAP;
+    let width = CONTAINER_SLOT + 2.0 * PAD;
+    let x = panel[0] - GAP - width;
     if x < GAP {
         return;
     }
@@ -38,28 +41,44 @@ pub fn draw_beside(
             return;
         };
         let d = &defs.defs;
-        let fits = ((panel[3] + GAP) / STEP).floor().max(0.0) as usize;
+        let fits = ((panel[3] - 2.0 * PAD) / CONTAINER_SLOT).floor().max(0.0) as usize;
+        let shown = d.skills.len().min(fits);
+        if shown == 0 {
+            return;
+        }
+        let back = Rect {
+            x,
+            y: panel[1],
+            w: width,
+            h: shown as f32 * CONTAINER_SLOT + 2.0 * PAD,
+        };
+        paint::container_panel(host, batch, &back);
         let mut tip = None;
-        for (n, (id, skill)) in d.skills.iter().take(fits).enumerate() {
-            let at = Rect {
-                x,
-                y: panel[1] + n as f32 * STEP,
-                w: SLOT,
-                h: SLOT,
+        for (n, (id, skill)) in d.skills.iter().take(shown).enumerate() {
+            let at = [x + PAD, back.y + PAD + n as f32 * CONTAINER_SLOT];
+            let slot = Rect {
+                x: at[0],
+                y: at[1],
+                w: CONTAINER_SLOT,
+                h: CONTAINER_SLOT,
             };
-            paint::slot(host, batch, &at);
+            let hovered = slot.contains(mouse[0], mouse[1]);
             let now = level(&cache.state, d, id);
-            host.item(batch, skill.icon_at(now), [at.x + 2.0, at.y + 2.0], ICON);
             let most = d.max_level(id);
+            paint::container_slot(host, batch, at);
+            host.item(batch, skill.icon_at(now), [at[0] + 1.0, at[1] + 1.0], ICON);
+            if hovered {
+                paint::container_slot_highlight(host, batch, at);
+            }
             paint::text_right(
                 host,
                 batch,
                 &now.to_string(),
-                at.x + at.w,
-                at.y + at.h - 7.0,
+                at[0] + CONTAINER_SLOT,
+                at[1] + CONTAINER_SLOT - 8.0,
                 if now >= most { GOLD } else { WHITE },
             );
-            if at.contains(mouse[0], mouse[1]) {
+            if hovered {
                 tip = Some(vec![
                     skill_name(d, id).with_color(GOLD),
                     say(&LEVEL_OF, &[number(now), number(most)]).with_color(GRAY),
@@ -166,6 +185,33 @@ mod tests {
         assert!(items.iter().all(|(_, at)| at[0] + 16.0 < PANEL[0]));
         assert!(items[1].1[1] > items[0].1[1]);
         assert_eq!(host.drawn_text(), vec!["3", "12"]);
+    }
+
+    #[test]
+    fn the_strip_is_drawn_like_the_inventory_beside_it() {
+        // Given a player at Mining 12 and Melee 3
+        let _serial = exclusive();
+        let host = TestHost::default();
+        known();
+
+        // When their inventory is drawn
+        let painted = painted(&host, None, PANEL, [0.0, 0.0]);
+
+        // Then a panel of the inventory's grey sits left of it, top aligned, and the icons sit in slots 18 apart
+        let grey = painted.iter().find_map(|p| match p {
+            Paint::Fill { rect, argb } if *argb == paint::CONTAINER => Some(*rect),
+            _ => None,
+        });
+        let grey = grey.expect("an inventory-grey panel");
+        assert!(grey[0] + grey[2] < PANEL[0] && grey[1] > PANEL[1] - 1.0);
+        let ys: Vec<f32> = painted
+            .iter()
+            .filter_map(|p| match p {
+                Paint::Item { at, .. } => Some(at[1]),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(ys[1] - ys[0], 18.0);
     }
 
     #[test]

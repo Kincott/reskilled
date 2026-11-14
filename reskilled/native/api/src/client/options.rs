@@ -15,14 +15,16 @@ use crate::text::{
     CLICK_TO_CHANGE, DONE, NAMED_VALUE, ONLY_OPS, OPTIONS_TITLE, RESET, TAB_DISPLAY, TAB_RULES, say,
 };
 
-/// The game's button and tab sprites.
-const BUTTON: &str = "widget/button";
-const BUTTON_HOVER: &str = "widget/button_highlighted";
-const BUTTON_OFF: &str = "widget/button_disabled";
-const TAB: &str = "widget/tab";
-const TAB_HOVER: &str = "widget/tab_highlighted";
-const TAB_SELECTED: &str = "widget/tab_selected";
+/// The game's button and tab sprites, by their names in Horizon's GUI atlas.
+const BUTTON: &str = "gui/sprites/widget/button";
+const BUTTON_HOVER: &str = "gui/sprites/widget/button_highlighted";
+const BUTTON_OFF: &str = "gui/sprites/widget/button_disabled";
+const TAB: &str = "gui/sprites/widget/tab";
+const TAB_HOVER: &str = "gui/sprites/widget/tab_highlighted";
+const TAB_SELECTED: &str = "gui/sprites/widget/tab_selected";
 const UNTINTED: u32 = 0xFFFF_FFFF;
+/// Dark over the world and the HUD, as the game's in-world menus are, under the menu background.
+const BACKDROP: u32 = 0xD010_1014;
 const WHITE: u32 = 0xFF_FFFF;
 const GRAY: u32 = 0xA0_A0A0;
 /// Vanilla's options layout: 150 by 20 buttons in two columns 10 apart, a row every 24 pixels.
@@ -132,6 +134,7 @@ fn button(
 
 /// Draws the options over the whole screen.
 pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 2]) {
+    host.fill(batch, [0.0, 0.0, size[0], size[1]], BACKDROP);
     host.draw_menu_background(batch, [0.0, 0.0, size[0], size[1]], true);
     let over = |r: &Rect| r.contains(mouse[0], mouse[1]);
     with(|cache| {
@@ -375,10 +378,15 @@ mod tests {
         }
         let buttons = painted
             .iter()
-            .filter(|p| matches!(p, Paint::Sprite { name, .. } if name == "widget/button"))
+            .filter(
+                |p| matches!(p, Paint::Sprite { name, .. } if name == "gui/sprites/widget/button"),
+            )
             .count();
         assert_eq!(buttons, 13);
-        assert!(matches!(painted.first(), Some(Paint::Background { .. })));
+        assert!(
+            matches!(painted.first(), Some(Paint::Fill { rect, .. }) if *rect == [0.0, 0.0, SIZE[0], SIZE[1]])
+        );
+        assert!(matches!(painted.get(1), Some(Paint::Background { .. })));
     }
 
     #[test]
@@ -455,7 +463,7 @@ mod tests {
         assert!(texts(&painted).iter().any(|t| t == "Perk refunds: Paid"));
         let greyed = painted
             .iter()
-            .filter(|p| matches!(p, Paint::Sprite { name, .. } if name == "widget/button_disabled"))
+            .filter(|p| matches!(p, Paint::Sprite { name, .. } if name == "gui/sprites/widget/button_disabled"))
             .count();
         assert_eq!(greyed, 10);
         assert_eq!(

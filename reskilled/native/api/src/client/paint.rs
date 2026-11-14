@@ -97,6 +97,67 @@ pub fn slot(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
     bevel(host, batch, r, OUTLINE, CARD_EDGE);
 }
 
+/// The game's container windows (the inventory, a chest): their face, bevel and outline.
+pub const CONTAINER: u32 = 0xFFC6_C6C6;
+const CONTAINER_LIGHT: u32 = 0xFFFF_FFFF;
+const CONTAINER_SHADOW: u32 = 0xFF55_5555;
+const CONTAINER_OUTLINE: u32 = 0xFF00_0000;
+/// The game's item slot: dark top and left, light bottom and right, mid grey inside.
+const SLOT_DARK: u32 = 0xFF37_3737;
+const SLOT_FACE: u32 = 0xFF8B_8B8B;
+/// The game's hovered slot: white at half strength over the slot.
+const SLOT_HOVER: u32 = 0x80FF_FFFF;
+/// A container slot's side, its border included.
+pub const CONTAINER_SLOT: f32 = 18.0;
+
+/// A panel drawn as the game's container windows are: light grey, a black outline with cut corners, a white bevel
+/// at the top and left and a dark one at the bottom and right.
+pub fn container_panel(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
+    let Rect { x, y, w, h } = *r;
+    for (rect, argb) in [
+        ([x + 1.0, y, w - 2.0, 1.0], CONTAINER_OUTLINE),
+        ([x + 1.0, y + h - 1.0, w - 2.0, 1.0], CONTAINER_OUTLINE),
+        ([x, y + 1.0, 1.0, h - 2.0], CONTAINER_OUTLINE),
+        ([x + w - 1.0, y + 1.0, 1.0, h - 2.0], CONTAINER_OUTLINE),
+        ([x + 1.0, y + 1.0, w - 2.0, h - 2.0], CONTAINER),
+        ([x + 1.0, y + 1.0, w - 4.0, 2.0], CONTAINER_LIGHT),
+        ([x + 1.0, y + 1.0, 2.0, h - 4.0], CONTAINER_LIGHT),
+        ([x + 3.0, y + h - 3.0, w - 4.0, 2.0], CONTAINER_SHADOW),
+        ([x + w - 3.0, y + 3.0, 2.0, h - 4.0], CONTAINER_SHADOW),
+    ] {
+        host.fill(batch, rect, argb);
+    }
+}
+
+/// An 18 by 18 item slot as the game draws one at `at`.
+pub fn container_slot(host: &dyn Host, batch: &mut HudBatch, at: [f32; 2]) {
+    let [x, y] = at;
+    let side = CONTAINER_SLOT;
+    host.fill(batch, [x, y, side - 1.0, 1.0], SLOT_DARK);
+    host.fill(batch, [x, y, 1.0, side - 1.0], SLOT_DARK);
+    host.fill(
+        batch,
+        [x + 1.0, y + side - 1.0, side - 1.0, 1.0],
+        CONTAINER_LIGHT,
+    );
+    host.fill(
+        batch,
+        [x + side - 1.0, y + 1.0, 1.0, side - 1.0],
+        CONTAINER_LIGHT,
+    );
+    host.fill(batch, [x + 1.0, y + 1.0, side - 2.0, side - 2.0], SLOT_FACE);
+}
+
+/// The game's light over a hovered slot at `at`, drawn over its item.
+pub fn container_slot_highlight(host: &dyn Host, batch: &mut HudBatch, at: [f32; 2]) {
+    let side = CONTAINER_SLOT;
+    host.fill(
+        batch,
+        [at[0] + 1.0, at[1] + 1.0, side - 2.0, side - 2.0],
+        SLOT_HOVER,
+    );
+}
+
 /// A progress bar filled to `part` of `whole`, gold once full.
 pub fn bar(host: &dyn Host, batch: &mut HudBatch, r: &Rect, part: u32, whole: u32) {
     fill(host, batch, r, OUTLINE);
