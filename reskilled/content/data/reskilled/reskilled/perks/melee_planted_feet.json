@@ -9,10 +9,125 @@
   "requires": [],
   "effects": [
     {
-      "type": "attribute",
-      "attribute": "minecraft:knockback_resistance",
-      "amount": 0.2,
-      "operation": "add_value"
+      "type": "effect_on_kill",
+      "effect": "minecraft:strength",
+      "seconds": 5,
+      "amplifier": 0,
+      "mobs": {
+        "any_of": [
+          {
+            "id": "minecraft:zombie"
+          },
+          {
+            "id": "minecraft:husk"
+          },
+          {
+            "id": "minecraft:drowned"
+          },
+          {
+            "id": "minecraft:zombie_villager"
+          },
+          {
+            "id": "minecraft:skeleton"
+          },
+          {
+            "id": "minecraft:stray"
+          },
+          {
+            "id": "minecraft:bogged"
+          },
+          {
+            "id": "minecraft:wither_skeleton"
+          },
+          {
+            "id": "minecraft:creeper"
+          },
+          {
+            "id": "minecraft:spider"
+          },
+          {
+            "id": "minecraft:cave_spider"
+          },
+          {
+            "id": "minecraft:enderman"
+          },
+          {
+            "id": "minecraft:endermite"
+          },
+          {
+            "id": "minecraft:silverfish"
+          },
+          {
+            "id": "minecraft:witch"
+          },
+          {
+            "id": "minecraft:slime"
+          },
+          {
+            "id": "minecraft:magma_cube"
+          },
+          {
+            "id": "minecraft:blaze"
+          },
+          {
+            "id": "minecraft:ghast"
+          },
+          {
+            "id": "minecraft:phantom"
+          },
+          {
+            "id": "minecraft:pillager"
+          },
+          {
+            "id": "minecraft:vindicator"
+          },
+          {
+            "id": "minecraft:evoker"
+          },
+          {
+            "id": "minecraft:ravager"
+          },
+          {
+            "id": "minecraft:vex"
+          },
+          {
+            "id": "minecraft:guardian"
+          },
+          {
+            "id": "minecraft:elder_guardian"
+          },
+          {
+            "id": "minecraft:piglin_brute"
+          },
+          {
+            "id": "minecraft:hoglin"
+          },
+          {
+            "id": "minecraft:zoglin"
+          },
+          {
+            "id": "minecraft:shulker"
+          },
+          {
+            "id": "minecraft:breeze"
+          },
+          {
+            "id": "minecraft:creaking"
+          },
+          {
+            "id": "minecraft:warden"
+          },
+          {
+            "id": "minecraft:wither"
+          },
+          {
+            "id": "minecraft:ender_dragon"
+          }
+        ]
+      }
     }
-  ]
+  ],
+  "also_needs": {
+    "reskilled:defense": 8
+  }
 }

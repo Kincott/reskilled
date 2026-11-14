@@ -11,10 +11,10 @@
   ],
   "effects": [
     {
-      "type": "attribute",
-      "attribute": "minecraft:luck",
-      "amount": 1.0,
-      "operation": "add_value"
+      "type": "damage",
+      "direction": "taken",
+      "kind": "projectile",
+      "multiplier": 0.8
     }
   ]
 }

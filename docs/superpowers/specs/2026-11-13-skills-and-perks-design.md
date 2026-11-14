@@ -273,6 +273,11 @@ world (`Holder::Level`), sent to every player, and changed only by operators (ch
   sharing is turned off (so levels cannot be carried out of a party). Raising, earning, perk points and perks use
   the own level; a death lowers the own level, and the group's shared level with it when that member was best.
 - Skills grow by: buying, doing (work noted per skill, level L takes ten actions times L at 100% pace), or both.
+- Perks (revised 2026-11-14 after play): a perk may also need levels in other skills (`also_needs`, own levels).
+  Besides number effects, perks may carry mechanics: a last stand, a potion effect for kills, crop growth around the
+  player, replanting ripe crops, and ender pearl damage rules. Five weak perks became Last Breath, Bloodrush, Pearl
+  Step, Green Aura and Replant (same ids, so owners keep their points); XP gain, capstones and taming were retuned.
+  Each skill keeps the 2, 2, 2, 4, 6 price ladder, so a maxed skill buys all its perks.
 - Skill strip: a display setting showing the player's skills and levels beside the inventory and crafting table.
 
 ## 8. Data

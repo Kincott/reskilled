@@ -6,16 +6,40 @@
   "description": "reskilled.perk.gathering_sapling_keeper.desc",
   "cost": 4,
   "min_level": 16,
-  "requires": [
-    "reskilled:gathering_timber_sense"
-  ],
+  "requires": [],
   "effects": [
     {
-      "type": "drop_bonus",
-      "target": {
-        "tag": "#minecraft:leaves"
-      },
-      "chance": 0.25
+      "type": "replant",
+      "crops": [
+        {
+          "block": "minecraft:wheat",
+          "seed": "minecraft:wheat_seeds",
+          "ripe_age": 7
+        },
+        {
+          "block": "minecraft:carrots",
+          "seed": "minecraft:carrot",
+          "ripe_age": 7
+        },
+        {
+          "block": "minecraft:potatoes",
+          "seed": "minecraft:potato",
+          "ripe_age": 7
+        },
+        {
+          "block": "minecraft:beetroots",
+          "seed": "minecraft:beetroot_seeds",
+          "ripe_age": 3
+        },
+        {
+          "block": "minecraft:nether_wart",
+          "seed": "minecraft:nether_wart",
+          "ripe_age": 3
+        }
+      ]
     }
-  ]
+  ],
+  "also_needs": {
+    "reskilled:agility": 8
+  }
 }

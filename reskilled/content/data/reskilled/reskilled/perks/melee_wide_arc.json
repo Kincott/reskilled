@@ -15,6 +15,12 @@
       "attribute": "minecraft:sweeping_damage_ratio",
       "amount": 0.25,
       "operation": "add_value"
+    },
+    {
+      "type": "attribute",
+      "attribute": "minecraft:entity_interaction_range",
+      "amount": 0.5,
+      "operation": "add_value"
     }
   ]
 }

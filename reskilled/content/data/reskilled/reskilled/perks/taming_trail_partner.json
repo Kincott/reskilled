@@ -11,7 +11,7 @@
     {
       "type": "mount_attribute",
       "attribute": "minecraft:max_health",
-      "amount": 4.0,
+      "amount": 6.0,
       "operation": "add_value"
     }
   ]

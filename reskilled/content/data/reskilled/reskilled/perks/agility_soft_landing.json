@@ -9,10 +9,13 @@
   "requires": [],
   "effects": [
     {
-      "type": "attribute",
-      "attribute": "minecraft:safe_fall_distance",
-      "amount": 2.0,
-      "operation": "add_value"
+      "type": "damage",
+      "direction": "taken",
+      "kind": "ender_pearl",
+      "multiplier": 0.0
     }
-  ]
+  ],
+  "also_needs": {
+    "reskilled:arcane": 8
+  }
 }

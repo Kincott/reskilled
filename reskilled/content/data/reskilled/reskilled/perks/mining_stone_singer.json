@@ -13,7 +13,7 @@
     {
       "type": "attribute",
       "attribute": "minecraft:mining_efficiency",
-      "amount": 5.0,
+      "amount": 3.0,
       "operation": "add_value"
     },
     {

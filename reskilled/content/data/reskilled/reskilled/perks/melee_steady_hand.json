@@ -11,7 +11,7 @@
     {
       "type": "attribute",
       "attribute": "minecraft:attack_speed",
-      "amount": 0.05,
+      "amount": 0.1,
       "operation": "add_multiplied_base"
     }
   ]

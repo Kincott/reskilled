@@ -13,10 +13,6 @@
     {
       "type": "anvil_cost",
       "multiplier": 0.75
-    },
-    {
-      "type": "xp_gain",
-      "multiplier": 1.1
     }
   ]
 }

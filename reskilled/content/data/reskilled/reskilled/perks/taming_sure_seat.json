@@ -11,7 +11,7 @@
     {
       "type": "mount_attribute",
       "attribute": "minecraft:jump_strength",
-      "amount": 0.1,
+      "amount": 0.2,
       "operation": "add_multiplied_base"
     }
   ]

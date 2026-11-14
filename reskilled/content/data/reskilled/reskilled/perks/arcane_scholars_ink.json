@@ -10,7 +10,7 @@
   "effects": [
     {
       "type": "xp_gain",
-      "multiplier": 1.1
+      "multiplier": 1.05
     }
   ]
 }

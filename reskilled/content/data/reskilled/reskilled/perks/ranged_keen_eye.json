@@ -12,7 +12,7 @@
       "type": "damage",
       "direction": "dealt",
       "kind": "projectile",
-      "multiplier": 1.05
+      "multiplier": 1.08
     }
   ]
 }

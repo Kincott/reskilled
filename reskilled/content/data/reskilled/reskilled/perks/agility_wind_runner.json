@@ -7,20 +7,20 @@
   "cost": 6,
   "min_level": 24,
   "requires": [
-    "reskilled:agility_soft_landing"
+    "reskilled:agility_spring_heels"
   ],
   "effects": [
     {
       "type": "attribute",
       "attribute": "minecraft:movement_speed",
-      "amount": 0.1,
+      "amount": 0.05,
       "operation": "add_multiplied_base"
     },
     {
       "type": "damage",
       "direction": "taken",
       "kind": "fall",
-      "multiplier": 0.5
+      "multiplier": 0.7
     }
   ]
 }
