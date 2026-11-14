@@ -571,6 +571,7 @@ pub fn exclusive() -> MutexGuard<'static, ()> {
     crate::server::focus::reset();
     crate::server::actions::reset();
     crate::server::rules::reset();
+    crate::server::sharing::reset();
     crate::client::cache::reset();
     crate::text::shipped_english::reset();
     logged();

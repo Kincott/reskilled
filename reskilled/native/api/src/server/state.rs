@@ -246,6 +246,7 @@ mod tests {
             vec![
                 Job::SendDefs(PLAYER),
                 Job::SendRules(PLAYER),
+                Job::LiftShared(PLAYER),
                 Job::SyncAttributes(PLAYER),
                 Job::CheckEquipment(PLAYER)
             ]

@@ -167,6 +167,7 @@ pub fn act(
         }
         return Err(unavailable());
     }
+    super::sharing::record(host, player, &outcome.state);
     if given_back > 0 && !host.give_experience(player, given_back) {
         log::warn!("Reskilled could not give {player:032x} back {given_back} XP points of a raise");
     }

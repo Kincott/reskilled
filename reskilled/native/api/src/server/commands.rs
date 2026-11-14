@@ -22,12 +22,17 @@ const DEFAULT_NAMESPACE: &str = "reskilled";
 /// Vanilla's level for commands that change other players (`/gamemode`, `/xp`).
 const OPERATOR_LEVEL: u8 = 2;
 const CONSOLE_LEVEL: u8 = 4;
-const PLAYER_USAGES: [&str; 5] = [
+const PLAYER_USAGES: [&str; 10] = [
     "skills",
     "skills raise <skill:word>",
     "skills perk <perk:word>",
     "skills focus <area:word>",
     "skills open",
+    "skills party",
+    "skills party create",
+    "skills party invite <player:player>",
+    "skills party join <player:player>",
+    "skills party leave",
 ];
 const OPERATOR_USAGES: [&str; 3] = [
     "skills set <player:player> <skill:word> <level:integer>",
@@ -150,6 +155,10 @@ fn for_player(
                 focus: full_id(area),
             },
         ),
+        ["party", rest @ ..] => match super::sharing::party(host, player, rest) {
+            lines if lines.is_empty() => vec![say(&USAGE, &[])],
+            lines => lines,
+        },
         _ => vec![say(&USAGE, &[])],
     }
 }
@@ -399,6 +408,11 @@ mod tests {
                 ("skills perk <perk:word>", 0),
                 ("skills focus <area:word>", 0),
                 ("skills open", 0),
+                ("skills party", 0),
+                ("skills party create", 0),
+                ("skills party invite <player:player>", 0),
+                ("skills party join <player:player>", 0),
+                ("skills party leave", 0),
                 ("skills set <player:player> <skill:word> <level:integer>", 2),
                 (
                     "skills points <player:player> <skill:word> <points:integer>",
@@ -634,7 +648,7 @@ mod tests {
         assert!(!other && wrong);
         assert_eq!(
             host.told_to(ANN),
-            vec!["Usage: /skills [raise <skill> | perk <perk> | focus <area> | open]"]
+            vec!["Usage: /skills [raise <skill> | perk <perk> | focus <area> | party | open]"]
         );
     }
 }
