@@ -9,6 +9,7 @@ pub mod effects;
 pub mod enforce;
 pub mod focus;
 pub mod queue;
+pub mod rules;
 pub mod state;
 
 /// Locks a mutex, going on with the data a panicking holder left: the game keeps running after a hook panics.

@@ -4,6 +4,7 @@ pub mod badge;
 pub mod cache;
 pub mod keys;
 pub mod layout;
+pub mod options;
 pub mod paint;
 #[cfg(test)]
 mod preview;

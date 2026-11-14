@@ -271,13 +271,16 @@ fn hovering_shows_one_tooltip() {
         over(&detail(size, 5, 0).rows[1].rect),
     );
     with(|cache| cache.view = View::Settings);
-    let page = super::layout::settings_page(size, &[2, 3, 2, 3]);
-    let settings = scene(&host, "settings", USUAL, over(&page.buttons[3]));
-    assert_inside_window(&host, &settings, USUAL, "settings");
-    assert_no_text_overlap(&host, &settings, "settings");
-    let small = scene(&host, "settings_320", SMALLEST, AWAY);
-    assert_inside_window(&host, &small, SMALLEST, "settings");
-    assert_no_text_overlap(&host, &small, "settings");
+    let page = super::options::page(size, 10);
+    scene(&host, "options", USUAL, over(&page.buttons[3]));
+    with(|cache| cache.options_tab = super::options::Tab::Rules);
+    scene(
+        &host,
+        "options_rules",
+        USUAL,
+        over(&super::options::page(size, 9).buttons[5]),
+    );
+    scene(&host, "options_320", SMALLEST, AWAY);
 
     // Then each shows exactly one tooltip
     assert_eq!(

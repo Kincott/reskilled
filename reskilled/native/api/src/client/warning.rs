@@ -188,7 +188,10 @@ mod tests {
                 Paint::Fill { rect, .. } => (rect[0], rect[1], rect[2], rect[3]),
                 Paint::Text { text, at, .. } => (at[0], at[1], host.text_width(text), 8.0),
                 Paint::Item { at, size, .. } => (at[0], at[1], *size, *size),
-                Paint::Tooltip { .. } | Paint::Quad { .. } => panic!("{paint:?}"),
+                Paint::Tooltip { .. }
+                | Paint::Quad { .. }
+                | Paint::Sprite { .. }
+                | Paint::Background { .. } => panic!("{paint:?}"),
             };
             let fits = px >= x && py >= y && px + pw <= x + w && py + ph <= y + h;
             assert!(fits, "{paint:?} leaves the panel");

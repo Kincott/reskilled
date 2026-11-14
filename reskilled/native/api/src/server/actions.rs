@@ -45,6 +45,7 @@ pub fn handle(host: &mut dyn Host, player: u128, message: ToServer) {
         }
         ToServer::Need { items } => answer_need(host, player, items),
         ToServer::Hello => {}
+        ToServer::SetRules(rules) => super::rules::request(player, rules),
     }
 }
 

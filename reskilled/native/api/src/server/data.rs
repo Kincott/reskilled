@@ -348,14 +348,16 @@ pub(crate) mod tests {
         // When the data reloads
         load(&mut host, &[("skills", vec![(MINING, skill(MINING))])]);
 
-        // Then each gets the definitions, an attribute sync and an equipment check
+        // Then each gets the definitions, the rules, an attribute sync and an equipment check
         assert_eq!(
             take_queued(),
             vec![
                 Job::SendDefs(1),
+                Job::SendRules(1),
                 Job::SyncAttributes(1),
                 Job::CheckEquipment(1),
                 Job::SendDefs(2),
+                Job::SendRules(2),
                 Job::SyncAttributes(2),
                 Job::CheckEquipment(2),
             ]

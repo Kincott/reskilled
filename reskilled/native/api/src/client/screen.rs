@@ -9,21 +9,19 @@ use skills_core::progress::{
 use skills_core::registry::Defs;
 use skills_core::wire::{ClientDefs, ToServer};
 
-use super::cache::{CLICK_SOUND, ClientCache, ClientSettings, View, with};
+use super::cache::{CLICK_SOUND, ClientCache, View, with};
 use super::layout::{
     Button, Card, Detail, GEAR_ROOM, HEADER_H, PerkRow, Rect, Scroll, detail, hit_detail,
-    hit_overview, hit_settings, last_first_perk, last_first_row, overview, panel, settings_page,
+    hit_overview, last_first_perk, last_first_row, overview, panel,
 };
 use super::paint::{self, DIM, GOLD, GRAY, GREEN, Look, RED, WHITE};
-use super::settings::{SECTIONS, choices};
 use crate::MOD_ID;
 use crate::text::{
-    ALL_UNLOCKED, AT_TOP, BACK, CLICK_TO_CHANGE, COST, FOCUS, FOCUS_ACTIVE, FOCUS_ADD,
-    FOCUS_ADD_FREE, FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS,
-    NEXT_UNLOCKS, NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, RAISE_TO,
-    RESET, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
-    REWARD_TRAVEL, SETTINGS, TITLE, UNLOCK, WAITING, XP, focus_name, label_name, number,
-    perk_description, perk_name, say, skill_name,
+    ALL_UNLOCKED, AT_TOP, BACK, COST, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE, FOCUS_GIVES,
+    GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS, NOT_ENOUGH_POINTS,
+    OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, RAISE_TO, REWARD_BLOCK_XP, REWARD_BREAK,
+    REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, TITLE, UNLOCK,
+    WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -197,6 +195,10 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
     if host.mod_screen() != Some(MOD_ID) {
         return;
     }
+    if with(|cache| cache.view) == View::Settings {
+        super::options::draw(host, batch, size, mouse);
+        return;
+    }
     host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);
     with(|cache| {
         let Some(defs) = &cache.defs else {
@@ -227,7 +229,7 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
         match cache.view {
             View::Overview => draw_overview(&mut pen, size, cache, &shown),
             View::Skill => draw_skill(&mut pen, size, cache, defs, &shown),
-            View::Settings => draw_settings(&mut pen, size, &cache.settings),
+            View::Settings => {}
         }
         if let Some(lines) = pen.tip.take() {
             host.gui_tooltip(pen.batch, &lines, mouse);
@@ -649,46 +651,6 @@ fn draw_preview(pen: &mut Pen<'_>, defs: &ClientDefs, now: u32, skill: &str, vie
     }
 }
 
-/// The settings page: each group's heading and its settings, a value button each, and the reset button.
-fn draw_settings(pen: &mut Pen<'_>, size: [f32; 2], settings: &ClientSettings) {
-    let page = settings_page(size, &section_sizes());
-    pen.window(
-        &page.panel,
-        &say(&SETTINGS, &[]).plain(),
-        NAME_AFTER_BACK,
-        0.0,
-    );
-    pen.button(&page.back, "<", Look::Plain);
-    if pen.over(&page.back) {
-        pen.tip = Some(vec![say(&BACK, &[]).with_color(WHITE)]);
-    }
-    for ((heading, _), at) in SECTIONS.iter().zip(&page.headings) {
-        pen.text(&say(heading, &[]).plain(), at.x, at.y + 1.0, GOLD);
-    }
-    for ((choice, row), button) in choices().into_iter().zip(&page.rows).zip(&page.buttons) {
-        pen.text(
-            &say(choice.name(), &[]).plain(),
-            row.x + 2.0,
-            row.y + 3.0,
-            WHITE,
-        );
-        pen.button(button, &choice.value(settings).plain(), Look::Plain);
-        if pen.over(button) {
-            pen.tip = Some(vec![
-                say(choice.name(), &[]).with_color(GOLD),
-                say(choice.help(), &[]).with_color(GRAY),
-                say(&CLICK_TO_CHANGE, &[]).with_color(DIM),
-            ]);
-        }
-    }
-    pen.button(&page.reset, &say(&RESET, &[]).plain(), Look::Plain);
-}
-
-/// How many settings each group of the page has.
-fn section_sizes() -> Vec<usize> {
-    SECTIONS.iter().map(|(_, choices)| choices.len()).collect()
-}
-
 /// What a click on the screen leads to.
 enum Outcome {
     Nothing,
@@ -696,8 +658,6 @@ enum Outcome {
     Open(usize),
     Back,
     OpenSettings,
-    Change(usize),
-    Reset,
 }
 
 /// A click on the screen: opens a skill, goes back, or queues a raise, perk or focus request the player can pay
@@ -705,6 +665,9 @@ enum Outcome {
 pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow {
     if host.mod_screen() != Some(MOD_ID) {
         return Flow::Continue;
+    }
+    if with(|cache| cache.view) == View::Settings {
+        return super::options::click(host, size, at, button);
     }
     with(|cache| {
         let outcome = match &cache.defs {
@@ -722,16 +685,6 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
             }
             Outcome::Back => cache.view = View::Overview,
             Outcome::OpenSettings => cache.view = View::Settings,
-            Outcome::Change(index) => {
-                if let Some(choice) = choices().get(index) {
-                    choice.next(&mut cache.settings);
-                    cache.settings.save(host);
-                }
-            }
-            Outcome::Reset => {
-                cache.settings = ClientSettings::default();
-                cache.settings.save(host);
-            }
         }
         if clicked && cache.settings.click_sounds {
             cache.sounds.push(CLICK_SOUND);
@@ -756,10 +709,7 @@ fn outcome(
         _ => Outcome::Nothing,
     };
     let hit = match (cache.view, button) {
-        (View::Skill | View::Settings, RIGHT_BUTTON) => Some(Button::Back),
-        (View::Settings, LEFT_BUTTON) => {
-            hit_settings(&settings_page(size, &section_sizes()), at[0], at[1])
-        }
+        (View::Skill, RIGHT_BUTTON) => Some(Button::Back),
         (View::Overview, LEFT_BUTTON) => {
             let o = overview(size, shown.skills.len(), cache.first_row, shown.focus.len());
             hit_overview(&o, at[0], at[1])
@@ -774,8 +724,6 @@ fn outcome(
         Some(Button::Open(skill)) => Outcome::Open(skill),
         Some(Button::Back) => Outcome::Back,
         Some(Button::Settings) => Outcome::OpenSettings,
-        Some(Button::Choice(index)) => Outcome::Change(index),
-        Some(Button::Reset) => Outcome::Reset,
         Some(Button::Raise(skill)) => raise(shown.skills.get(skill)),
         Some(Button::RaiseShown) => raise(shown.skills.get(shown.selected)),
         Some(Button::SetFocus(focus)) => match shown.focus.get(focus) {
@@ -837,7 +785,7 @@ mod tests {
     use skills_core::wire::{ClientDefs, ToServer};
 
     use super::*;
-    use crate::client::cache::{ClientSettings, Corner, WarningPlace, with};
+    use crate::client::cache::with;
     use crate::test_host::{Paint, TestHost, exclusive, mods};
     use crate::{ACT_CHANNEL, MOD_ID};
 
@@ -1509,119 +1457,22 @@ mod tests {
         assert_eq!(sent, vec![raise.clone(), raise]);
     }
 
-    /// The screen on its settings page, saving to a fresh config folder it gives back.
-    fn settings_open(name: &str) -> (TestHost, std::path::PathBuf) {
-        let mut host = screen_open();
-        let dir = std::env::temp_dir().join(format!("reskilled_{name}_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        host.config = Some(dir.clone());
+    #[test]
+    fn the_gear_opens_the_options() {
+        // Given the overview
+        let _serial = exclusive();
+        let host = screen_open();
+
+        // When the gear is clicked
         click(
             &host,
             SIZE,
             inside(&overview(SIZE, 2, 0, 2).gear),
             LEFT_BUTTON,
         );
-        (host, dir)
-    }
 
-    #[test]
-    fn the_gear_opens_the_settings_page_with_every_choice() {
-        // Given the overview
-        let _serial = exclusive();
-        let (host, dir) = settings_open("gear");
-
-        // When the page is drawn
-        let drawn = drawn(&host, AWAY);
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        // Then it shows the four groups, each setting and its value
+        // Then the options take over the screen
         assert_eq!(with(|cache| cache.view), View::Settings);
-        contains(
-            &drawn,
-            &[
-                "Settings",
-                "Warning panel",
-                "Position",
-                "Above hotbar",
-                "Shown for",
-                "3 s",
-                "Lock icon",
-                "Corner",
-                "Bottom left",
-                "Tooltips",
-                "Your level",
-                "Sounds",
-                "Refusals",
-                "Reset to defaults",
-            ],
-        );
-    }
-
-    #[test]
-    fn clicking_a_value_changes_it_and_keeps_it() {
-        // Given the settings page
-        let _serial = exclusive();
-        let (host, dir) = settings_open("change");
-        let page = settings_page(SIZE, &[2, 3, 2, 3]);
-
-        // When the warning's place is clicked twice and the padlock's corner once
-        click(&host, SIZE, inside(&page.buttons[0]), LEFT_BUTTON);
-        click(&host, SIZE, inside(&page.buttons[0]), LEFT_BUTTON);
-        click(&host, SIZE, inside(&page.buttons[3]), LEFT_BUTTON);
-        let saved = ClientSettings::load(&host);
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        // Then the warning is off and the padlock top left, in the cache and in the file
-        let now = with(|cache| cache.settings.clone());
-        assert_eq!(now.warning, WarningPlace::Off);
-        assert_eq!(now.lock_corner, Corner::TopLeft);
-        assert_eq!(saved, now);
-    }
-
-    #[test]
-    fn hovering_a_setting_says_what_it_does() {
-        // Given the settings page
-        let _serial = exclusive();
-        let (host, dir) = settings_open("hover");
-        let page = settings_page(SIZE, &[2, 3, 2, 3]);
-
-        // When the mouse is over the refusal sound's button
-        drawn(&host, inside(&page.buttons[9]));
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        // Then the tooltip names it, says what it does and how to change it
-        assert_eq!(
-            tooltip(&host),
-            vec![
-                "Refusals",
-                "The low note when a lock stops you.",
-                "Click to change."
-            ]
-        );
-    }
-
-    #[test]
-    fn reset_brings_back_the_defaults_and_back_leaves_the_page() {
-        // Given the settings page with clicks turned off
-        let _serial = exclusive();
-        let (mut host, dir) = settings_open("reset");
-        let page = settings_page(SIZE, &[2, 3, 2, 3]);
-        click(&host, SIZE, inside(&page.buttons[7]), LEFT_BUTTON);
-        let off = with(|cache| cache.settings.click_sounds);
-
-        // When reset is clicked, then back
-        click(&host, SIZE, inside(&page.reset), LEFT_BUTTON);
-        let after_reset = with(|cache| cache.settings.clone());
-        click(&host, SIZE, inside(&page.back), LEFT_BUTTON);
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        // Then clicks were off, the defaults came back, and the overview is up again; the click that turned the
-        // sounds off played none
-        assert!(!off);
-        assert_eq!(after_reset, ClientSettings::default());
-        assert_eq!(with(|cache| cache.view), View::Overview);
-        host.eye = Some([0.0, 0.0, 0.0]);
-        let _ = &host;
     }
 
     #[test]

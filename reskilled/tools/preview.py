@@ -134,6 +134,15 @@ def render(scene, font, assets):
             argb = paint["argb"]
             ImageDraw.Draw(layer).polygon([tuple(p) for p in paint["points"]], fill=(*rgb_of(argb), argb >> 24))
             canvas.alpha_composite(layer)
+        elif kind == "background":
+            fill(canvas, paint["rect"], 0xC0101010)
+        elif kind == "sprite":
+            name, (x, y, w, h) = paint["name"], paint["rect"]
+            face = {"widget/button_highlighted": 0xFF8A8A8A, "widget/button_disabled": 0xFF3C3C3C,
+                    "widget/tab_selected": 0xFF8F8F8F, "widget/tab_highlighted": 0xFF7A7A7A}.get(name, 0xFF6F6F6F)
+            fill(canvas, [x, y, w, h], 0xFF000000)
+            fill(canvas, [x + 1, y + 1, w - 2, h - 2], face)
+            fill(canvas, [x + 1, y + 1, w - 2, 1], 0xFFAAAAAA if "disabled" not in name else 0xFF4C4C4C)
         elif kind == "tooltip":
             tooltip(canvas, font, paint["spans"], paint["at"])
     return canvas.resize((canvas.width * SCALE, canvas.height * SCALE), Image.NEAREST)

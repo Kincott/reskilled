@@ -90,6 +90,8 @@ pub struct TestHost {
     pub gui_size: [f32; 2],
     /// Whether a screen other than the world is up, for `client_state`.
     pub screen_up: bool,
+    /// Each player's operator level; 0 when not listed.
+    pub permissions: HashMap<u128, u8>,
     /// The blocks of the overworld the server sees, by position, each with its properties.
     pub blocks: HashMap<[i32; 3], (String, Properties)>,
 }
@@ -119,6 +121,15 @@ pub enum Paint {
     Quad {
         points: [[f32; 2]; 4],
         argb: u32,
+    },
+    /// One of the game's GUI sprites stretched over `rect` (a button, a tab).
+    Sprite {
+        name: String,
+        rect: [f32; 4],
+    },
+    /// The game's menu background over `rect`.
+    Background {
+        rect: [f32; 4],
     },
     Tooltip {
         lines: Vec<String>,
@@ -180,6 +191,10 @@ impl Host for TestHost {
 
     fn block_name_in_tag(&self, block: &str, tag: &str) -> Result<bool, NativeBlockReadError> {
         Ok(self.block_tags.iter().any(|(b, t)| b == block && t == tag))
+    }
+
+    fn player_permission(&self, player: u128) -> Option<u8> {
+        Some(self.permissions.get(&player).copied().unwrap_or(0))
     }
 
     fn give_experience(&mut self, uuid: u128, points: u32) -> bool {
@@ -432,6 +447,17 @@ impl Host for TestHost {
         true
     }
 
+    fn gui_nine_slice(&self, _batch: &mut HudBatch, sprite: &str, rect: [f32; 4], _color: u32) {
+        self.painted.borrow_mut().push(Paint::Sprite {
+            name: sprite.to_string(),
+            rect,
+        });
+    }
+
+    fn draw_menu_background(&self, _batch: &mut HudBatch, rect: [f32; 4], _in_world: bool) {
+        self.painted.borrow_mut().push(Paint::Background { rect });
+    }
+
     fn quad(&self, _batch: &mut HudBatch, points: [[f32; 2]; 4], argb: u32) {
         self.painted.borrow_mut().push(Paint::Quad { points, argb });
     }
@@ -544,6 +570,7 @@ pub fn exclusive() -> MutexGuard<'static, ()> {
     crate::server::state::reset();
     crate::server::focus::reset();
     crate::server::actions::reset();
+    crate::server::rules::reset();
     crate::client::cache::reset();
     crate::text::shipped_english::reset();
     logged();

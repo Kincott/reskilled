@@ -270,57 +270,6 @@ fn gear(panel: &Rect) -> Rect {
 /// How far from the window's right edge the header's XP text ends when the gear is there.
 pub const GEAR_ROOM: f32 = SMALL_BUTTON + 6.0;
 
-/// The settings page: groups of rows, half the groups in each column, and a reset button under them.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SettingsPage {
-    pub panel: Rect,
-    pub back: Rect,
-    /// Where each group's heading goes.
-    pub headings: Vec<Rect>,
-    /// Each setting's row, all groups in order, and its value button at the row's end.
-    pub rows: Vec<Rect>,
-    pub buttons: Vec<Rect>,
-    pub reset: Rect,
-}
-
-const SETTINGS_TOP: f32 = 28.0;
-const HEADING_H: f32 = 10.0;
-const SETTING_H: f32 = 14.0;
-const SETTING_STEP: f32 = 16.0;
-const GROUP_GAP: f32 = 6.0;
-const VALUE_W: f32 = 74.0;
-const RESET_W: f32 = 110.0;
-const RESET_H: f32 = 18.0;
-
-/// The settings page for a screen of `size`, with groups of `sections[i]` settings each.
-pub fn settings_page(size: [f32; 2], sections: &[usize]) -> SettingsPage {
-    let panel = panel(size);
-    let left_groups = sections.len().div_ceil(2);
-    let (mut headings, mut rows, mut buttons) = (Vec::new(), Vec::new(), Vec::new());
-    let mut y = [SETTINGS_TOP; 2];
-    for (group, count) in sections.iter().enumerate() {
-        let column = usize::from(group >= left_groups);
-        let x = PAD + column as f32 * (CARD_W + CARD_GAP_X);
-        headings.push(panel.at(x, y[column], CARD_W, HEADING_H));
-        y[column] += HEADING_H + 2.0;
-        for _ in 0..*count {
-            let row = panel.at(x, y[column], CARD_W, SETTING_H);
-            buttons.push(row.at(CARD_W - VALUE_W, 0.0, VALUE_W, SETTING_H));
-            rows.push(row);
-            y[column] += SETTING_STEP;
-        }
-        y[column] += GROUP_GAP;
-    }
-    SettingsPage {
-        back: panel.at(6.0, 4.0, SMALL_BUTTON, SMALL_BUTTON),
-        reset: panel.at((PANEL_W - RESET_W) / 2.0, FOCUS_TOP, RESET_W, RESET_H),
-        panel,
-        headings,
-        rows,
-        buttons,
-    }
-}
-
 /// What a click asks for. Skills and perks are named by their place in the lists the screen shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Button {
@@ -336,23 +285,6 @@ pub enum Button {
     BuyPerk(usize),
     /// The gear: the settings page.
     Settings,
-    /// A setting's value button, by its place on the page.
-    Choice(usize),
-    Reset,
-}
-
-/// The settings page's button under the point, if any.
-pub fn hit_settings(page: &SettingsPage, x: f32, y: f32) -> Option<Button> {
-    if page.back.contains(x, y) {
-        return Some(Button::Back);
-    }
-    if page.reset.contains(x, y) {
-        return Some(Button::Reset);
-    }
-    page.buttons
-        .iter()
-        .position(|r| r.contains(x, y))
-        .map(Button::Choice)
 }
 
 /// The overview's button under the point, if any; a raise button wins over the card it sits in.
@@ -515,56 +447,15 @@ mod tests {
     }
 
     #[test]
-    fn the_settings_page_puts_two_groups_in_each_column_inside_the_window() {
-        // Given the page's four groups of 2, 3, 2 and 3 settings, on the smallest screen
-        // When it is laid out
-        let page = settings_page(SMALLEST, &[2, 3, 2, 3]);
-
-        // Then every part is inside the window and apart from the others, the first two groups on the left and
-        // the last two on the right, and each value button sits at its row's end
-        let body = page.panel.shrunk(3.0);
-        let parts: Vec<&Rect> = page
-            .headings
-            .iter()
-            .chain(&page.rows)
-            .chain([&page.reset, &page.back])
-            .collect();
-        for (n, part) in parts.iter().enumerate() {
-            assert!(inside(&body, part), "{part:?}");
-            assert!(
-                parts[n + 1..].iter().all(|other| apart(part, other)),
-                "{part:?}"
-            );
-        }
-        assert_eq!(page.rows.len(), 10);
-        assert!(page.rows[4].x < page.rows[5].x);
-        assert_eq!(page.headings[0].y, page.headings[2].y);
-        for (row, button) in page.rows.iter().zip(&page.buttons) {
-            assert!(inside(row, button) && button.x + button.w == row.x + row.w);
-        }
-    }
-
-    #[test]
-    fn settings_clicks_land_on_their_buttons_and_the_gear_opens_the_page() {
-        // Given the page and the overview
-        let page = settings_page(USUAL, &[2, 3, 2, 3]);
+    fn the_gear_sits_in_the_overviews_header() {
+        // Given the overview
+        // When it is laid out and its gear clicked
         let o = overview(USUAL, 8, 0, 3);
-        let at = |r: &Rect| (r.x + 1.0, r.y + 1.0);
+        let hit = hit_overview(&o, o.gear.x + 1.0, o.gear.y + 1.0);
 
-        // When the third value, reset, back, a setting's name and the gear are clicked
-        let (vx, vy) = at(&page.buttons[2]);
-        let (rx, ry) = at(&page.reset);
-        let (bx, by) = at(&page.back);
-        let (nx, ny) = at(&page.rows[2]);
-        let (gx, gy) = at(&o.gear);
-
-        // Then each lands on its button, and the name is not one
-        assert_eq!(hit_settings(&page, vx, vy), Some(Button::Choice(2)));
-        assert_eq!(hit_settings(&page, rx, ry), Some(Button::Reset));
-        assert_eq!(hit_settings(&page, bx, by), Some(Button::Back));
-        assert_eq!(hit_settings(&page, nx, ny), None);
-        assert_eq!(hit_overview(&o, gx, gy), Some(Button::Settings));
-        assert!(inside(&o.panel, &o.gear));
+        // Then the gear is inside the window, in the header, and answers
+        assert!(inside(&o.panel, &o.gear) && o.gear.y + o.gear.h <= o.panel.y + HEADER_H);
+        assert_eq!(hit, Some(Button::Settings));
     }
 
     #[test]

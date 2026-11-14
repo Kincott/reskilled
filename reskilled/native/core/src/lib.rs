@@ -6,4 +6,5 @@ pub mod effects;
 pub mod locks;
 pub mod progress;
 pub mod registry;
+pub mod rules;
 pub mod wire;

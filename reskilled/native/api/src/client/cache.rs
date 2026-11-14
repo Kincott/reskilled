@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use skills_core::defs::Action;
 use skills_core::locks::Requirements;
 use skills_core::progress::{PlayerState, level, mastered};
+use skills_core::rules::Rules;
 use skills_core::wire::{ClientDefs, DefsChunk, Reassembler, ToClient, ToServer};
 
 use crate::server::lock;
@@ -173,6 +174,11 @@ pub struct ClientCache {
     pub outgoing: Vec<ToServer>,
     /// The lock warning on show, if one is.
     pub warning: Option<Warning>,
+    /// The options' tab on show.
+    pub options_tab: super::options::Tab,
+    /// The server's rules, and whether this player may change them.
+    pub rules: Rules,
+    pub rules_editable: bool,
     /// Sounds to play on the next tick (the screen's hooks cannot play them), each with its volume.
     pub sounds: Vec<(&'static str, f32)>,
     /// Ticks left in which new progress is taken for the answer to a request made here, and so chimes.
@@ -319,6 +325,10 @@ pub fn on_message(host: &mut dyn Host, channel: &str, data: &[u8]) {
         Ok(ToClient::Status { levels, exempt }) => with(|cache| {
             cache.xp_levels = Some(levels);
             cache.exempt = exempt;
+        }),
+        Ok(ToClient::Rules { rules, editable }) => with(|cache| {
+            cache.rules = rules;
+            cache.rules_editable = editable;
         }),
         Err(error) => log::warn!("Reskilled got a message it cannot read: {error}"),
     }
@@ -686,6 +696,32 @@ mod tests {
 
         // Then nothing plays
         assert!(host.sounds.is_empty());
+    }
+
+    #[test]
+    fn the_client_keeps_the_servers_rules_and_whether_it_may_change_them() {
+        // Given a client
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        let rules = skills_core::rules::Rules {
+            respec: skills_core::rules::Respec::Free,
+            ..Default::default()
+        };
+
+        // When the server sends its rules to an operator
+        send_msg(
+            &mut host,
+            &ToClient::Rules {
+                rules: rules.clone(),
+                editable: true,
+            },
+        );
+
+        // Then the client holds them and knows it may change them
+        assert_eq!(
+            with(|cache| (cache.rules.clone(), cache.rules_editable)),
+            (rules, true)
+        );
     }
 
     #[test]

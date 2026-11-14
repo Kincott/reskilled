@@ -12,6 +12,7 @@ use crate::defs::{Action, DefError};
 use crate::locks::{Requirements, labels_by_level};
 use crate::progress::{PlayerState, Request, STATE_FORMAT};
 use crate::registry::Defs;
+use crate::rules::Rules;
 
 /// Names a bad saved state in a [`DefError`].
 const STATE_SOURCE: &str = "player state";
@@ -32,6 +33,8 @@ pub enum ToServer {
     },
     /// This client runs the mod: it draws lock warnings itself, so the server leaves out the action-bar line.
     Hello,
+    /// An operator changed the server's rules on the options screen.
+    SetRules(Rules),
 }
 
 /// Server to client, apart from definition chunks.
@@ -54,6 +57,8 @@ pub enum ToClient {
     /// The player's XP level, and whether locks are off for them (creative or spectator, by the settings): the
     /// client has no other way to read either. Sent when one changes.
     Status { levels: u32, exempt: bool },
+    /// The server's rules, and whether this player may change them (an operator).
+    Rules { rules: Rules, editable: bool },
 }
 
 /// What clients get of the definitions: no lock matchers (only the server can test tags), and the lock labels per
@@ -309,6 +314,7 @@ mod tests {
                 items: vec!["minecraft:diamond_pickaxe".into()],
             },
             ToServer::Hello,
+            ToServer::SetRules(Rules::default()),
         ];
         let to_client = vec![
             ToClient::Reqs {
@@ -326,6 +332,10 @@ mod tests {
             ToClient::Status {
                 levels: 31,
                 exempt: true,
+            },
+            ToClient::Rules {
+                rules: Rules::default(),
+                editable: true,
             },
         ];
 

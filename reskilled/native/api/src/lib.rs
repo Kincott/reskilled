@@ -292,6 +292,7 @@ impl Hooks for Mod {
     fn player_tick(&self, host: &mut dyn Host, _event: &mut PlayerTickEvent) {
         if let Some(player) = host.acting_player() {
             server::actions::run_pending_for(host, player.uuid);
+            server::rules::run_for(host, player.uuid);
             server::focus::pay(host, player.uuid);
         }
     }

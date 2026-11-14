@@ -1,16 +1,21 @@
-//! The settings page's choices: each one's name, value in words, what it does, and the next value a click picks.
-//! Shown in four groups, two to a column.
+//! The options' choices: the player's display settings and the server's rules, each with its name, value in words,
+//! what it does, and the next value a click picks.
 
 use horizon_client::mod_api::Text;
 
+use skills_core::rules::{CostUnit, Progression, Respec, Rules, Sharing};
+
 use super::cache::{ClientSettings, Corner, WarningPlace};
 use crate::text::{
-    HELP_CHIMES, HELP_CLICKS, HELP_CORNER, HELP_DIM, HELP_HIDE_MET, HELP_OWN, HELP_PLACE,
-    HELP_REFUSAL, HELP_SHOW, HELP_TIME, Message, OPT_CHIMES, OPT_CLICKS, OPT_CORNER, OPT_DIM,
-    OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL, OPT_SHOW, OPT_TIME, SECTION_LOCK,
-    SECTION_SOUNDS, SECTION_TOOLTIPS, SECTION_WARNING, VAL_ABOVE, VAL_BOTTOM_LEFT,
-    VAL_BOTTOM_RIGHT, VAL_OFF, VAL_ON, VAL_SECONDS, VAL_TOP, VAL_TOP_LEFT, VAL_TOP_RIGHT, number,
-    say,
+    HELP_CHIMES, HELP_CLICKS, HELP_CORNER, HELP_COST, HELP_DIM, HELP_EARN_RATE, HELP_ENCHANT,
+    HELP_HIDE_MET, HELP_OWN, HELP_PLACE, HELP_POINTS, HELP_PROGRESSION, HELP_REFUSAL, HELP_RESPEC,
+    HELP_RESPEC_COST, HELP_SHARING, HELP_SHOW, HELP_SWITCHES, HELP_TIME, Message, OPT_CHIMES,
+    OPT_CLICKS, OPT_CORNER, OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL, OPT_SHOW,
+    OPT_TIME, RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS, RULE_PROGRESSION, RULE_RESPEC,
+    RULE_RESPEC_COST, RULE_SHARING, RULE_SWITCHES, VAL_ABOVE, VAL_BOTH, VAL_BOTTOM_LEFT,
+    VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN, VAL_EVERYONE, VAL_FREE, VAL_LEVELS, VAL_N_LEVELS, VAL_OFF,
+    VAL_ON, VAL_PAID, VAL_PARTY, VAL_POINTS, VAL_SECONDS, VAL_TOP, VAL_TOP_LEFT, VAL_TOP_RIGHT,
+    number, say,
 };
 
 /// The warning's lengths a click goes through, in seconds.
@@ -31,34 +36,19 @@ pub enum Choice {
     RefusalSound,
 }
 
-/// The page's groups, in order: a heading and its choices.
-pub const SECTIONS: [(&Message, &[Choice]); 4] = [
-    (
-        &SECTION_WARNING,
-        &[Choice::WarningPlace, Choice::WarningSeconds],
-    ),
-    (
-        &SECTION_LOCK,
-        &[Choice::LockIcon, Choice::LockCorner, Choice::DimLocked],
-    ),
-    (&SECTION_TOOLTIPS, &[Choice::HideMet, Choice::OwnLevel]),
-    (
-        &SECTION_SOUNDS,
-        &[
-            Choice::ClickSounds,
-            Choice::ProgressSounds,
-            Choice::RefusalSound,
-        ],
-    ),
+/// The display settings, in the options' first tab's order.
+pub const CHOICES: [Choice; 10] = [
+    Choice::WarningPlace,
+    Choice::WarningSeconds,
+    Choice::LockIcon,
+    Choice::LockCorner,
+    Choice::DimLocked,
+    Choice::HideMet,
+    Choice::OwnLevel,
+    Choice::ClickSounds,
+    Choice::ProgressSounds,
+    Choice::RefusalSound,
 ];
-
-/// Every choice, in the page's order.
-pub fn choices() -> Vec<Choice> {
-    SECTIONS
-        .iter()
-        .flat_map(|(_, c)| c.iter().copied())
-        .collect()
-}
 
 fn on_off(on: bool) -> Text {
     say(if on { &VAL_ON } else { &VAL_OFF }, &[])
@@ -161,6 +151,155 @@ impl Choice {
     }
 }
 
+/// One of the server's rules the options' second tab shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuleChoice {
+    Cost,
+    PointsPerLevel,
+    Progression,
+    EarnRate,
+    PerkSwitches,
+    Respec,
+    RespecCost,
+    EnchantmentLocks,
+    Sharing,
+}
+
+/// The rules, in the tab's order.
+pub const RULES: [RuleChoice; 9] = [
+    RuleChoice::Cost,
+    RuleChoice::PointsPerLevel,
+    RuleChoice::Progression,
+    RuleChoice::EarnRate,
+    RuleChoice::PerkSwitches,
+    RuleChoice::Respec,
+    RuleChoice::RespecCost,
+    RuleChoice::EnchantmentLocks,
+    RuleChoice::Sharing,
+];
+
+const POINTS_PER_LEVEL: [u32; 3] = [10, 20, 50];
+const EARN_RATES: [u32; 3] = [50, 100, 200];
+const RESPEC_COSTS: [u32; 3] = [1, 5, 10];
+
+/// The value after `now` in `values`, round to the first.
+fn after(values: &[u32], now: u32) -> u32 {
+    let at = values.iter().position(|v| *v == now);
+    values[at.map_or(0, |i| (i + 1) % values.len())]
+}
+
+impl RuleChoice {
+    pub fn name(self) -> &'static Message {
+        match self {
+            RuleChoice::Cost => &RULE_COST,
+            RuleChoice::PointsPerLevel => &RULE_POINTS,
+            RuleChoice::Progression => &RULE_PROGRESSION,
+            RuleChoice::EarnRate => &RULE_EARN_RATE,
+            RuleChoice::PerkSwitches => &RULE_SWITCHES,
+            RuleChoice::Respec => &RULE_RESPEC,
+            RuleChoice::RespecCost => &RULE_RESPEC_COST,
+            RuleChoice::EnchantmentLocks => &RULE_ENCHANT,
+            RuleChoice::Sharing => &RULE_SHARING,
+        }
+    }
+
+    pub fn help(self) -> &'static Message {
+        match self {
+            RuleChoice::Cost => &HELP_COST,
+            RuleChoice::PointsPerLevel => &HELP_POINTS,
+            RuleChoice::Progression => &HELP_PROGRESSION,
+            RuleChoice::EarnRate => &HELP_EARN_RATE,
+            RuleChoice::PerkSwitches => &HELP_SWITCHES,
+            RuleChoice::Respec => &HELP_RESPEC,
+            RuleChoice::RespecCost => &HELP_RESPEC_COST,
+            RuleChoice::EnchantmentLocks => &HELP_ENCHANT,
+            RuleChoice::Sharing => &HELP_SHARING,
+        }
+    }
+
+    pub fn value(self, r: &Rules) -> Text {
+        let percent = |p: u32| Text::literal(format!("{p}%"));
+        match self {
+            RuleChoice::Cost => say(
+                match r.cost_unit {
+                    CostUnit::Levels => &VAL_LEVELS,
+                    CostUnit::Points => &VAL_POINTS,
+                },
+                &[],
+            ),
+            RuleChoice::PointsPerLevel => number(r.points_per_level),
+            RuleChoice::Progression => say(
+                match r.progression {
+                    Progression::Buy => &VAL_BUY,
+                    Progression::Earn => &VAL_EARN,
+                    Progression::Both => &VAL_BOTH,
+                },
+                &[],
+            ),
+            RuleChoice::EarnRate => percent(r.earn_rate),
+            RuleChoice::PerkSwitches => on_off(r.perk_switches),
+            RuleChoice::Respec => say(
+                match r.respec {
+                    Respec::Off => &VAL_OFF,
+                    Respec::Free => &VAL_FREE,
+                    Respec::Paid => &VAL_PAID,
+                },
+                &[],
+            ),
+            RuleChoice::RespecCost => say(&VAL_N_LEVELS, &[number(r.respec_cost)]),
+            RuleChoice::EnchantmentLocks => on_off(r.enchantment_locks),
+            RuleChoice::Sharing => say(
+                match r.sharing {
+                    Sharing::Off => &VAL_OFF,
+                    Sharing::Party => &VAL_PARTY,
+                    Sharing::Server => &VAL_EVERYONE,
+                },
+                &[],
+            ),
+        }
+    }
+
+    /// Moves the rule to its next value, round to the first after the last.
+    pub fn next(self, r: &mut Rules) {
+        match self {
+            RuleChoice::Cost => {
+                r.cost_unit = match r.cost_unit {
+                    CostUnit::Levels => CostUnit::Points,
+                    CostUnit::Points => CostUnit::Levels,
+                }
+            }
+            RuleChoice::PointsPerLevel => {
+                r.points_per_level = after(&POINTS_PER_LEVEL, r.points_per_level)
+            }
+            RuleChoice::Progression => {
+                r.progression = match r.progression {
+                    Progression::Buy => Progression::Earn,
+                    Progression::Earn => Progression::Both,
+                    Progression::Both => Progression::Buy,
+                }
+            }
+            RuleChoice::EarnRate => r.earn_rate = after(&EARN_RATES, r.earn_rate),
+            RuleChoice::PerkSwitches => r.perk_switches = !r.perk_switches,
+            RuleChoice::Respec => {
+                r.respec = match r.respec {
+                    Respec::Off => Respec::Free,
+                    Respec::Free => Respec::Paid,
+                    Respec::Paid => Respec::Off,
+                }
+            }
+            RuleChoice::RespecCost => r.respec_cost = after(&RESPEC_COSTS, r.respec_cost),
+            RuleChoice::EnchantmentLocks => r.enchantment_locks = !r.enchantment_locks,
+            RuleChoice::Sharing => {
+                r.sharing = match r.sharing {
+                    Sharing::Off => Sharing::Party,
+                    Sharing::Party => Sharing::Server,
+                    Sharing::Server => Sharing::Off,
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,7 +311,7 @@ mod tests {
         // Given the default settings
         let start = ClientSettings::default();
 
-        for choice in choices() {
+        for choice in CHOICES {
             // When the choice is clicked until it repeats
             let mut s = start.clone();
             let mut seen = vec![choice.value(&s).plain()];
@@ -191,6 +330,30 @@ mod tests {
 
             // Then it went through at least two values and changed nothing else
             assert!(seen.len() >= 2, "{choice:?}");
+        }
+    }
+
+    #[test]
+    fn every_rule_comes_back_round_to_where_it_started() {
+        // Given the default rules
+        let start = Rules::default();
+
+        for rule in RULES {
+            // When the rule is clicked until it repeats
+            let mut r = start.clone();
+            let mut seen = vec![rule.value(&r).plain()];
+            loop {
+                rule.next(&mut r);
+                if r == start {
+                    break;
+                }
+                let value = rule.value(&r).plain();
+                assert!(!seen.contains(&value), "{rule:?} repeats {value}");
+                seen.push(value);
+            }
+
+            // Then it went through at least two values
+            assert!(seen.len() >= 2, "{rule:?}");
         }
     }
 

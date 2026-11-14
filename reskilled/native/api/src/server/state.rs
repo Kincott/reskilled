@@ -245,6 +245,7 @@ mod tests {
             take_queued(),
             vec![
                 Job::SendDefs(PLAYER),
+                Job::SendRules(PLAYER),
                 Job::SyncAttributes(PLAYER),
                 Job::CheckEquipment(PLAYER)
             ]
