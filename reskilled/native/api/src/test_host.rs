@@ -485,6 +485,10 @@ impl Host for TestHost {
     fn server_players(&self) -> Vec<horizon_client::mod_api::NativeServerPlayer> {
         Vec::new()
     }
+
+    fn acting_player(&self) -> Option<horizon_client::mod_api::NativeServerPlayer> {
+        None
+    }
 }
 
 /// `NativeInventoryKind::Player`'s size, and its main part.

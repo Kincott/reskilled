@@ -57,6 +57,9 @@ pub enum Reply {
     Chat,
 }
 
+/// Requests one player may have waiting for their tick; more are dropped (no click rate comes near it).
+pub(crate) const MAX_PENDING: usize = 16;
+
 /// Requests waiting for the server tick: who asked, their XP level then, what, and where to answer.
 static PENDING: Mutex<Vec<(u128, u32, Request, Reply)>> = Mutex::new(Vec::new());
 
@@ -64,11 +67,17 @@ static PENDING: Mutex<Vec<(u128, u32, Request, Reply)>> = Mutex::new(Vec::new())
 /// `give_levels` reaches them there. Elsewhere it does not reach a single-player world's owner, whose id Horizon
 /// takes for the server thread's own (absent) player, and `/xp` from the console fails the same way.
 pub fn defer(player: u128, xp_levels: u32, request: Request, reply: Reply) {
-    lock(&PENDING).push((player, xp_levels, request, reply));
+    let mut pending = lock(&PENDING);
+    if pending.iter().filter(|(p, ..)| *p == player).count() >= MAX_PENDING {
+        log::debug!("Reskilled dropped a request from {player:032x}: too many waiting");
+        return;
+    }
+    pending.push((player, xp_levels, request, reply));
 }
 
-/// The player's own tick: their waiting requests, in order, judged against their XP level now (the one they had
-/// when asking if the server no longer lists them).
+/// The player's own tick: their waiting requests, in order, judged against their XP level now (Horizon's acting
+/// player, else the server's list, else the level they asked with), less what the requests granted before them
+/// took, so requests sent together cannot each spend the same levels.
 pub fn run_pending_for(host: &mut dyn Host, player: u128) {
     let pending: Vec<(u128, u32, Request, Reply)> = {
         let mut all = lock(&PENDING);
@@ -78,9 +87,14 @@ pub fn run_pending_for(host: &mut dyn Host, player: u128) {
         *all = others;
         theirs
     };
+    let mut taken_so_far = 0u32;
     for (player, asked_with, request, reply) in pending {
-        let xp_levels = xp_levels(host, player).unwrap_or(asked_with);
-        let outcome = act(host, player, xp_levels, &request);
+        let now = live_xp_levels(host, player).unwrap_or(asked_with);
+        let xp_levels = now.saturating_sub(taken_so_far);
+        let outcome = act_taking(host, player, xp_levels, &request).map(|(state, taken)| {
+            taken_so_far = taken_so_far.saturating_add(taken);
+            state
+        });
         match (outcome, reply) {
             (Ok(state), Reply::Chat) => {
                 if let Some(line) = current().map(|data| done_line(&data.defs, &request, &state)) {
@@ -122,6 +136,15 @@ pub(crate) fn reset() {
     lock(&PENDING).clear();
 }
 
+/// The player's XP level as their own hook sees it: Horizon's acting player when it is them, else the server's
+/// player list.
+fn live_xp_levels(host: &dyn Host, player: u128) -> Option<u32> {
+    match host.acting_player() {
+        Some(acting) if acting.uuid == player => Some(u32::try_from(acting.xp_level).unwrap_or(0)),
+        _ => xp_levels(host, player),
+    }
+}
+
 /// The player's XP level, from the server's player list.
 fn xp_levels(host: &dyn Host, player: u128) -> Option<u32> {
     let listed = host
@@ -133,12 +156,24 @@ fn xp_levels(host: &dyn Host, player: u128) -> Option<u32> {
 
 /// Grants the request if the rules allow it, taking its XP levels, and returns the new state; otherwise the line
 /// saying why not.
+#[cfg(test)]
 pub fn act(
     host: &mut dyn Host,
     player: u128,
     xp_levels: u32,
     request: &Request,
 ) -> Result<PlayerState, Text> {
+    act_taking(host, player, xp_levels, request).map(|(state, _)| state)
+}
+
+/// Grants the request if the rules allow it, taking its XP levels, and returns the new state and the whole levels
+/// taken; otherwise the line saying why not.
+fn act_taking(
+    host: &mut dyn Host,
+    player: u128,
+    xp_levels: u32,
+    request: &Request,
+) -> Result<(PlayerState, u32), Text> {
     let unavailable = || say(&UNAVAILABLE, &[]);
     let data = current().ok_or_else(unavailable)?;
     let state = state_of(host, player).map_err(|error| {
@@ -172,7 +207,7 @@ pub fn act(
         log::warn!("Reskilled could not give {player:032x} back {given_back} XP points of a raise");
     }
     queue::queue(Job::SyncAttributes(player));
-    Ok(outcome.state)
+    Ok((outcome.state, taken))
 }
 
 /// Gives (or, negative, takes) XP levels. `give_levels` cannot reach a single-player world's owner outside their
@@ -353,6 +388,47 @@ mod tests {
         );
         run_pending_for(&mut host, PLAYER);
         assert_eq!(host.levels_given.get(&PLAYER), Some(&-1));
+    }
+
+    #[test]
+    fn requests_in_one_tick_share_the_levels_the_player_has() {
+        // Given a player with 2 XP levels who sends two Mining raises before their tick (they cost 1, then 2)
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        with_mining(&mut host);
+        defer(PLAYER, 2, raise(), Reply::ActionBar);
+        defer(PLAYER, 2, raise(), Reply::ActionBar);
+
+        // When their tick runs
+        run_pending_for(&mut host, PLAYER);
+
+        // Then the first is granted with the 1 level it takes, and the second finds 1 level left and is refused
+        let defs = &current().unwrap().defs;
+        assert_eq!(host.levels_given.get(&PLAYER), Some(&-1));
+        assert_eq!(
+            level(&state_of(&mut host, PLAYER).unwrap(), defs, MINING),
+            2
+        );
+        assert_eq!(host.action_bars_of(PLAYER), vec!["Needs 2 XP levels."]);
+    }
+
+    #[test]
+    fn a_player_cannot_queue_endless_requests() {
+        // Given a player with plenty of XP who sends far more requests than any click rate allows
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        with_mining(&mut host);
+        for _ in 0..(MAX_PENDING + 10) {
+            defer(PLAYER, 1000, raise(), Reply::ActionBar);
+        }
+
+        // When their tick runs
+        run_pending_for(&mut host, PLAYER);
+
+        // Then only the first MAX_PENDING are carried out
+        let defs = &current().unwrap().defs;
+        let mining = level(&state_of(&mut host, PLAYER).unwrap(), defs, MINING);
+        assert_eq!(mining, 1 + MAX_PENDING as u32);
     }
 
     #[test]
