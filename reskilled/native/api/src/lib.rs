@@ -352,6 +352,15 @@ impl Hooks for Mod {
     fn screen_render_post(&self, host: &dyn Host, event: &mut ScreenRenderPostEvent<'_>) {
         let size = [event.batch.width, event.batch.height];
         client::screen::draw(host, event.batch, size, event.screen.mouse);
+        let screen = event.screen;
+        client::strip::draw_beside(
+            host,
+            event.batch,
+            screen.id,
+            screen.menu,
+            screen.rect,
+            screen.mouse,
+        );
     }
 
     fn screen_mouse_button_pressed_pre(

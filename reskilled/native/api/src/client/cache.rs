@@ -50,6 +50,8 @@ pub struct ClientSettings {
     pub hide_met_requirements: bool,
     /// Tooltips show the player's own level beside a requirement they miss.
     pub show_own_level: bool,
+    /// The skill strip beside the inventory and the crafting table.
+    pub skill_strip: bool,
     /// The screen's button clicks.
     pub click_sounds: bool,
     /// The sounds of raising a skill and unlocking a perk.
@@ -68,6 +70,7 @@ impl Default for ClientSettings {
             dim_locked: true,
             hide_met_requirements: false,
             show_own_level: true,
+            skill_strip: true,
             click_sounds: true,
             progress_sounds: true,
             refusal_sound: true,

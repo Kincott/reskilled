@@ -271,7 +271,7 @@ fn hovering_shows_one_tooltip() {
         over(&detail(size, 5, 0).rows[1].rect),
     );
     with(|cache| cache.view = View::Settings);
-    let page = super::options::page(size, 10);
+    let page = super::options::page(size, 11);
     scene(&host, "options", USUAL, over(&page.buttons[3]));
     with(|cache| cache.options_tab = super::options::Tab::Rules);
     scene(

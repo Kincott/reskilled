@@ -140,6 +140,7 @@ messages! {
     OPT_DIM = "reskilled.ui.opt.dim" => "Dim locked";
     OPT_HIDE_MET = "reskilled.ui.opt.hide_met" => "Hide met";
     OPT_OWN = "reskilled.ui.opt.own" => "Your level";
+    OPT_STRIP = "reskilled.ui.opt.strip" => "Skill strip";
     OPT_CLICKS = "reskilled.ui.opt.clicks" => "Click sounds";
     OPT_CHIMES = "reskilled.ui.opt.chimes" => "Level-up sounds";
     OPT_REFUSAL = "reskilled.ui.opt.refusal" => "Refusal sound";
@@ -159,6 +160,7 @@ messages! {
     HELP_DIM = "reskilled.ui.help.dim" => "Darken locked items behind the padlock.";
     HELP_HIDE_MET = "reskilled.ui.help.hide_met" => "Leave out requirements you already meet.";
     HELP_OWN = "reskilled.ui.help.own" => "Show your level next to a requirement you miss.";
+    HELP_STRIP = "reskilled.ui.help.strip" => "Your skills and levels beside the inventory and the crafting table.";
     HELP_CLICKS = "reskilled.ui.help.clicks" => "The tick of this screen's buttons.";
     HELP_CHIMES = "reskilled.ui.help.chimes" => "The sounds of raising a skill and unlocking a perk.";
     HELP_REFUSAL = "reskilled.ui.help.refusal" => "The low note when a lock stops you.";

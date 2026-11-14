@@ -377,7 +377,7 @@ mod tests {
             .iter()
             .filter(|p| matches!(p, Paint::Sprite { name, .. } if name == "widget/button"))
             .count();
-        assert_eq!(buttons, 12);
+        assert_eq!(buttons, 13);
         assert!(matches!(painted.first(), Some(Paint::Background { .. })));
     }
 
@@ -386,7 +386,7 @@ mod tests {
         // Given the options open
         let _serial = exclusive();
         let (host, dir) = open("change");
-        let p = page(SIZE, 10);
+        let p = page(SIZE, 11);
 
         // When the warning is clicked twice and the lock corner once
         click(&host, SIZE, inside(&p.buttons[0]), LEFT_BUTTON);
@@ -475,7 +475,7 @@ mod tests {
         let (host, dir) = open("done");
 
         // When done is clicked, the options are opened again and the right button pressed
-        click(&host, SIZE, inside(&page(SIZE, 10).done), LEFT_BUTTON);
+        click(&host, SIZE, inside(&page(SIZE, 11).done), LEFT_BUTTON);
         let after_done = with(|cache| cache.view);
         with(|cache| cache.view = View::Settings);
         click(&host, SIZE, AWAY, RIGHT_BUTTON);
@@ -500,7 +500,7 @@ mod tests {
             // When the tab is drawn
             with(|cache| cache.options_tab = tab);
             let painted = drawn(&host, AWAY);
-            let count = if tab == Tab::Display { 10 } else { 9 };
+            let count = if tab == Tab::Display { 11 } else { 9 };
 
             // Then no label is cut short with an ellipsis
             let cut: Vec<String> = texts(&painted)

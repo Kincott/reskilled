@@ -9,13 +9,13 @@ use super::cache::{ClientSettings, Corner, WarningPlace};
 use crate::text::{
     HELP_CHIMES, HELP_CLICKS, HELP_CORNER, HELP_COST, HELP_DIM, HELP_EARN_RATE, HELP_ENCHANT,
     HELP_HIDE_MET, HELP_OWN, HELP_PLACE, HELP_POINTS, HELP_PROGRESSION, HELP_REFUSAL, HELP_RESPEC,
-    HELP_RESPEC_COST, HELP_SHARING, HELP_SHOW, HELP_SWITCHES, HELP_TIME, Message, OPT_CHIMES,
-    OPT_CLICKS, OPT_CORNER, OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL, OPT_SHOW,
-    OPT_TIME, RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS, RULE_PROGRESSION, RULE_RESPEC,
-    RULE_RESPEC_COST, RULE_SHARING, RULE_SWITCHES, VAL_ABOVE, VAL_BOTH, VAL_BOTTOM_LEFT,
-    VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN, VAL_EVERYONE, VAL_FREE, VAL_LEVELS, VAL_N_LEVELS, VAL_OFF,
-    VAL_ON, VAL_PAID, VAL_PARTY, VAL_POINTS, VAL_SECONDS, VAL_TOP, VAL_TOP_LEFT, VAL_TOP_RIGHT,
-    number, say,
+    HELP_RESPEC_COST, HELP_SHARING, HELP_SHOW, HELP_STRIP, HELP_SWITCHES, HELP_TIME, Message,
+    OPT_CHIMES, OPT_CLICKS, OPT_CORNER, OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL,
+    OPT_SHOW, OPT_STRIP, OPT_TIME, RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS,
+    RULE_PROGRESSION, RULE_RESPEC, RULE_RESPEC_COST, RULE_SHARING, RULE_SWITCHES, VAL_ABOVE,
+    VAL_BOTH, VAL_BOTTOM_LEFT, VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN, VAL_EVERYONE, VAL_FREE,
+    VAL_LEVELS, VAL_N_LEVELS, VAL_OFF, VAL_ON, VAL_PAID, VAL_PARTY, VAL_POINTS, VAL_SECONDS,
+    VAL_TOP, VAL_TOP_LEFT, VAL_TOP_RIGHT, number, say,
 };
 
 /// The warning's lengths a click goes through, in seconds.
@@ -31,13 +31,14 @@ pub enum Choice {
     DimLocked,
     HideMet,
     OwnLevel,
+    SkillStrip,
     ClickSounds,
     ProgressSounds,
     RefusalSound,
 }
 
 /// The display settings, in the options' first tab's order.
-pub const CHOICES: [Choice; 10] = [
+pub const CHOICES: [Choice; 11] = [
     Choice::WarningPlace,
     Choice::WarningSeconds,
     Choice::LockIcon,
@@ -45,6 +46,7 @@ pub const CHOICES: [Choice; 10] = [
     Choice::DimLocked,
     Choice::HideMet,
     Choice::OwnLevel,
+    Choice::SkillStrip,
     Choice::ClickSounds,
     Choice::ProgressSounds,
     Choice::RefusalSound,
@@ -64,6 +66,7 @@ impl Choice {
             Choice::DimLocked => &OPT_DIM,
             Choice::HideMet => &OPT_HIDE_MET,
             Choice::OwnLevel => &OPT_OWN,
+            Choice::SkillStrip => &OPT_STRIP,
             Choice::ClickSounds => &OPT_CLICKS,
             Choice::ProgressSounds => &OPT_CHIMES,
             Choice::RefusalSound => &OPT_REFUSAL,
@@ -80,6 +83,7 @@ impl Choice {
             Choice::DimLocked => &HELP_DIM,
             Choice::HideMet => &HELP_HIDE_MET,
             Choice::OwnLevel => &HELP_OWN,
+            Choice::SkillStrip => &HELP_STRIP,
             Choice::ClickSounds => &HELP_CLICKS,
             Choice::ProgressSounds => &HELP_CHIMES,
             Choice::RefusalSound => &HELP_REFUSAL,
@@ -111,6 +115,7 @@ impl Choice {
             Choice::DimLocked => on_off(s.dim_locked),
             Choice::HideMet => on_off(s.hide_met_requirements),
             Choice::OwnLevel => on_off(s.show_own_level),
+            Choice::SkillStrip => on_off(s.skill_strip),
             Choice::ClickSounds => on_off(s.click_sounds),
             Choice::ProgressSounds => on_off(s.progress_sounds),
             Choice::RefusalSound => on_off(s.refusal_sound),
@@ -144,6 +149,7 @@ impl Choice {
             Choice::DimLocked => s.dim_locked = !s.dim_locked,
             Choice::HideMet => s.hide_met_requirements = !s.hide_met_requirements,
             Choice::OwnLevel => s.show_own_level = !s.show_own_level,
+            Choice::SkillStrip => s.skill_strip = !s.skill_strip,
             Choice::ClickSounds => s.click_sounds = !s.click_sounds,
             Choice::ProgressSounds => s.progress_sounds = !s.progress_sounds,
             Choice::RefusalSound => s.refusal_sound = !s.refusal_sound,
