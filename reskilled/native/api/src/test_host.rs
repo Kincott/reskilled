@@ -99,6 +99,8 @@ pub struct TestHost {
     pub blocks: HashMap<[i32; 3], (String, Properties)>,
     /// Potion effects given, by player.
     pub effects_given: Vec<(u128, horizon_client::mod_api::NativeEffect)>,
+    /// The effects the player has now, as `effects` reads them.
+    pub active_effects: Vec<horizon_client::mod_api::NativeEffect>,
     /// Blocks set through `set_block`: dimension, position, state.
     pub blocks_set: Vec<(String, [i32; 3], horizon_client::mod_api::BlockStateId)>,
     /// Each block's default state, as `default_state` gives it.
@@ -354,7 +356,19 @@ impl Host for TestHost {
 
     fn add_effect(&mut self, uuid: u128, effect: &horizon_client::mod_api::NativeEffect) -> bool {
         self.effects_given.push((uuid, effect.clone()));
+        self.active_effects.retain(|e| e.id != effect.id);
+        self.active_effects.push(effect.clone());
         true
+    }
+
+    fn effects(&self, _uuid: u128) -> Option<Vec<horizon_client::mod_api::NativeEffect>> {
+        Some(self.active_effects.clone())
+    }
+
+    fn remove_effect(&mut self, _uuid: u128, id: &str) -> bool {
+        let before = self.active_effects.len();
+        self.active_effects.retain(|e| e.id != id);
+        before != self.active_effects.len()
     }
 
     fn set_block(

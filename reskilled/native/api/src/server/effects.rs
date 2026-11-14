@@ -279,6 +279,8 @@ pub fn on_damage(victim: i32, damage_type: &str, causing: i32, amount: &mut f32)
         effects_of_entity(causing).map_or(1.0, |e| damage_multiplier(&e, Direction::Dealt, &kinds));
     let taken =
         effects_of_entity(victim).map_or(1.0, |e| damage_multiplier(&e, Direction::Taken, &kinds));
+    let ward = player_of_entity(victim).map_or(1.0, super::mechanics::armor_ward);
+    let taken = taken * ward;
     let multiplier = dealt * taken;
     if multiplier != 1.0 {
         *amount = (f64::from(*amount) * multiplier) as f32;

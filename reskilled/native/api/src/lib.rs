@@ -6,13 +6,14 @@ use horizon_client::mod_api::{
     EntityMountEvent, EntityTameEvent, Flow, FurnaceExtractEvent, GuiRenderPostEvent, Hooks, Host,
     InteractEntityEvent, InventoryClickEvent, ItemDecorationsEvent, ItemStack, KeyEvent, LevelHost,
     LivingDeathEvent, LivingEntityUseItemStartEvent, LivingExperienceDropEvent,
-    LivingIncomingDamageEvent, LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent,
-    NetFromServerEvent, OnEquipEvent, PerformCommandEvent, PerformConsoleCommandEvent,
-    PlaceBlockEvent, PlayerCloneEvent, PlayerLoggedInEvent, PlayerLoggedOutEvent,
-    PlayerSwapHandsEvent, PlayerTickEvent, PlayerXpChangeEvent, PrepareAnvilEvent,
-    RegisterCommandsEvent, ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent,
-    ScreenRenderPostEvent, ServerDataLoadedEvent, ServerReloadListenerApplyEvent,
-    ServerStoppedEvent, TickEvent, TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
+    LivingIncomingDamageEvent, LivingIncomingDamageV2Event, LootDropsEvent,
+    ModifyDefaultComponentsEvent, NetFromClientEvent, NetFromServerEvent, OnEquipEvent,
+    PerformCommandEvent, PerformConsoleCommandEvent, PlaceBlockEvent, PlayerCloneEvent,
+    PlayerLoggedInEvent, PlayerLoggedOutEvent, PlayerSwapHandsEvent, PlayerTickEvent,
+    PlayerXpChangeEvent, PrepareAnvilEvent, RegisterCommandsEvent,
+    ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent, ScreenRenderPostEvent,
+    ServerDataLoadedEvent, ServerReloadListenerApplyEvent, ServerStoppedEvent, TickEvent,
+    TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
 };
 use skills_core::defs::Action;
 
@@ -324,8 +325,18 @@ impl Hooks for Mod {
                 &player.dimension,
                 player.position,
                 player.health,
+                usize::from(player.selected_slot),
             );
         }
+    }
+
+    fn living_incoming_damage_v2(
+        &self,
+        _host: &mut dyn Host,
+        event: &mut LivingIncomingDamageV2Event<'_>,
+    ) -> Flow {
+        server::mechanics::on_weapon_hit(event.causing, event.weapon, &mut event.amount);
+        Flow::Continue
     }
 
     fn living_death(&self, host: &mut dyn Host, event: &mut LivingDeathEvent<'_>) -> Flow {
