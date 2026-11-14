@@ -595,6 +595,37 @@ fn golden_tools_need_their_skill_at_2_and_arcane_at_4() {
 }
 
 #[test]
+fn strong_enchantments_need_their_skill() {
+    // Given the shipped data
+    let defs = defaults();
+    let need = |enchantment: &str, level: u32, action: Action, skill: &str| {
+        let reqs = skills_core::locks::enchantment_requirements(
+            &defs.locks,
+            &[(enchantment.to_string(), level)],
+        );
+        reqs.by_action
+            .get(&action)
+            .and_then(|l| l.get(skill))
+            .copied()
+            .unwrap_or(0)
+    };
+
+    // When enchantments are checked at their levels
+    // Then the low levels are free and the strong ones need the skill they serve
+    assert_eq!(need("minecraft:sharpness", 2, Action::Attack, MELEE), 0);
+    assert_eq!(need("minecraft:sharpness", 3, Action::Attack, MELEE), 12);
+    assert_eq!(need("minecraft:sharpness", 5, Action::Attack, MELEE), 20);
+    assert_eq!(need("minecraft:power", 5, Action::Use, RANGED), 20);
+    assert_eq!(
+        need("minecraft:blast_protection", 4, Action::Equip, DEFENSE),
+        20
+    );
+    assert_eq!(need("minecraft:fortune", 3, Action::Break, MINING), 20);
+    assert_eq!(need("minecraft:mending", 1, Action::Equip, ARCANE), 16);
+    assert_eq!(need("minecraft:unbreaking", 3, Action::Break, ARCANE), 8);
+}
+
+#[test]
 fn specials_match_spec() {
     // Given the shipped data
     let defs = defaults();

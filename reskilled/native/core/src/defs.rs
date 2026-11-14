@@ -196,6 +196,9 @@ pub struct LockEntry {
     /// Drops earlier entries for an equal target.
     #[serde(default)]
     pub replace: bool,
+    /// For an enchantment target: the enchantment level the lock starts at (1 when absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enchantment_level: Option<u32>,
 }
 
 /// The three kinds of thing a lock can target.
@@ -204,6 +207,8 @@ pub enum TargetKind {
     Item,
     Block,
     Entity,
+    /// An enchantment on the item in use: it adds its locks to the item's own.
+    Enchantment,
 }
 
 impl fmt::Display for TargetKind {
@@ -212,6 +217,7 @@ impl fmt::Display for TargetKind {
             TargetKind::Item => "item",
             TargetKind::Block => "block",
             TargetKind::Entity => "entity",
+            TargetKind::Enchantment => "enchantment",
         })
     }
 }
@@ -223,6 +229,7 @@ pub enum Target {
     Item(Matcher),
     Block(Matcher),
     Entity(Matcher),
+    Enchantment(Matcher),
 }
 
 /// Picks item, block or entity ids. Tags and repair materials are written with a leading `#` when they name a tag.
@@ -483,6 +490,9 @@ impl LockEntry {
     fn validate(&self) -> Result<(), String> {
         let (kind, matcher) = self.target.parts();
         matcher.validate(kind)?;
+        if self.enchantment_level.is_some() && kind != TargetKind::Enchantment {
+            return Err("enchantment_level only fits an enchantment target".into());
+        }
         if self.actions.is_empty() {
             return Err("actions must not be empty".into());
         }
@@ -506,13 +516,14 @@ impl Target {
             Target::Item(matcher) => (TargetKind::Item, matcher),
             Target::Block(matcher) => (TargetKind::Block, matcher),
             Target::Entity(matcher) => (TargetKind::Entity, matcher),
+            Target::Enchantment(matcher) => (TargetKind::Enchantment, matcher),
         }
     }
 
     /// Items are used, swung, dug with and worn; blocks are opened and placed; entities are ridden and used.
     fn allows(&self, action: Action) -> bool {
         match self {
-            Target::Item(_) => matches!(
+            Target::Item(_) | Target::Enchantment(_) => matches!(
                 action,
                 Action::Use | Action::Attack | Action::Break | Action::Equip
             ),
@@ -527,8 +538,8 @@ impl Matcher {
     fn validate(&self, kind: TargetKind) -> Result<(), String> {
         match self {
             Matcher::Id(id) => check_id("id", id),
-            Matcher::Tag(_) if kind == TargetKind::Entity => {
-                Err("tag matchers do not work on an entity target".into())
+            Matcher::Tag(_) if matches!(kind, TargetKind::Entity | TargetKind::Enchantment) => {
+                Err(format!("tag matchers do not work on an {kind} target"))
             }
             Matcher::Tag(tag) => check_tag("tag", tag),
             Matcher::Repairable(_) if kind != TargetKind::Item => Err(format!(
@@ -768,6 +779,7 @@ mod tests {
                         requires: [("reskilled:mining".to_string(), 16)].into(),
                         label: Some("reskilled.lock.diamond_pickaxe".into()),
                         replace: false,
+                        enchantment_level: None,
                     },
                     LockEntry {
                         target: Target::Block(Matcher::AnyOf(vec![
@@ -778,6 +790,7 @@ mod tests {
                         requires: [("reskilled:arcane".to_string(), 6)].into(),
                         label: None,
                         replace: true,
+                        enchantment_level: None,
                     },
                     LockEntry {
                         target: Target::Entity(Matcher::Id("minecraft:horse".into())),
@@ -785,6 +798,7 @@ mod tests {
                         requires: [("reskilled:taming".to_string(), 4)].into(),
                         label: None,
                         replace: false,
+                        enchantment_level: None,
                     },
                 ],
             })
@@ -1090,6 +1104,42 @@ mod tests {
                 lock_message_cooldown_ticks: 20,
             }
         );
+    }
+
+    #[test]
+    fn refuses_enchantment_locks_that_make_no_sense() {
+        // Given an enchantment lock by tag, one that opens blocks, and an item lock naming an enchantment level
+        let entry = |target: &str, actions: &str, extra: &str| {
+            format!(
+                r#"{{"format": 1, "entries": [{{"target": {target}, "actions": [{actions}], {extra}
+                    "requires": {{"reskilled:melee": 4}}}}]}}"#
+            )
+        };
+        let cases = [
+            entry(
+                r##"{"enchantment": {"tag": "#minecraft:curse"}}"##,
+                r#""attack""#,
+                "",
+            ),
+            entry(
+                r#"{"enchantment": {"id": "minecraft:sharpness"}}"#,
+                r#""open""#,
+                "",
+            ),
+            entry(
+                r#"{"item": {"id": "minecraft:stick"}}"#,
+                r#""use""#,
+                r#""enchantment_level": 2,"#,
+            ),
+        ];
+
+        // When they are parsed
+        let reasons = cases.map(|json| refusal(DefKind::Lock, &json));
+
+        // Then each is refused and says why
+        assert!(reasons[0].contains("tag"), "{}", reasons[0]);
+        assert!(reasons[1].contains("open"), "{}", reasons[1]);
+        assert!(reasons[2].contains("enchantment_level"), "{}", reasons[2]);
     }
 
     #[test]

@@ -4,10 +4,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{LazyLock, Mutex};
 
-use horizon_client::mod_api::{Holder, Host};
+use horizon_client::mod_api::{Holder, Host, ItemStack};
 use serde::{Deserialize, Serialize};
 use skills_core::defs::Action;
-use skills_core::locks::Requirements;
+use skills_core::locks::{Requirements, enchantment_requirements};
 use skills_core::progress::{PlayerState, level, mastered};
 use skills_core::rules::Rules;
 use skills_core::wire::{ClientDefs, DefsChunk, Reassembler, ToClient, ToServer};
@@ -205,6 +205,28 @@ impl ClientCache {
         }
     }
 
+    /// What the stack needs: its item's requirements, as the server answered, and those of its enchantments while
+    /// the server's rules lock them. None until the server has answered for the item (it is asked for then).
+    pub fn requirements_of(&mut self, stack: &ItemStack) -> Option<Requirements> {
+        let defs = self.defs.as_ref()?;
+        let Some(reqs) = self.reqs.get(&*stack.item) else {
+            self.missed(&stack.item);
+            return None;
+        };
+        if !self.rules.enchantment_locks || stack.enchantments().is_empty() {
+            return Some(reqs.clone());
+        }
+        let enchanted: Vec<(String, u32)> = stack
+            .enchantments()
+            .iter()
+            .map(|(id, level)| (id.to_string(), *level))
+            .collect();
+        Some(
+            reqs.clone()
+                .merged(&enchantment_requirements(&defs.defs.locks, &enchanted)),
+        )
+    }
+
     /// The screen asks the server for something: it goes out on the next tick, and the progress it brings chimes.
     pub fn asked_for(&mut self, request: ToServer) {
         self.outgoing.push(request);
@@ -241,15 +263,11 @@ impl ClientCache {
     /// Whether the player lacks a level the item needs for one of the actions `counts` picks. An item the server
     /// has not answered for is asked about and counts as free until then; so does every item while locks are off
     /// for this player.
-    pub fn lacks(&mut self, item: &str, counts: impl Fn(Action) -> bool) -> bool {
-        if self.exempt || self.defs.is_none() {
+    pub fn lacks(&mut self, stack: &ItemStack, counts: impl Fn(Action) -> bool) -> bool {
+        if self.exempt {
             return false;
         }
-        if !self.reqs.contains_key(item) {
-            self.missed(item);
-            return false;
-        }
-        let (Some(defs), Some(reqs)) = (&self.defs, self.reqs.get(item)) else {
+        let (Some(reqs), Some(defs)) = (self.requirements_of(stack), &self.defs) else {
             return false;
         };
         reqs.by_action

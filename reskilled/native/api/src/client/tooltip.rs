@@ -2,7 +2,7 @@
 //! cross, red while unmet (with the player's own level) and green once met. A locked item's tooltip also gets a red
 //! border.
 
-use horizon_client::mod_api::Text;
+use horizon_client::mod_api::{ItemStack, Text};
 use skills_core::defs::Action;
 use skills_core::progress::level;
 
@@ -27,18 +27,15 @@ const LOCKED_BORDER: [u32; 2] = [0xFFE0_5A4A, 0xFF7A_2018];
 
 /// The lines to add under the item's tooltip; none until the server has answered for it (it is asked for then),
 /// and none for an item nothing locks.
-pub fn requirement_lines(item: &str) -> Vec<(Text, u32)> {
+pub fn requirement_lines(stack: &ItemStack) -> Vec<(Text, u32)> {
     with(|cache| {
-        if cache.defs.is_none() {
-            return Vec::new();
-        }
-        if !cache.reqs.contains_key(item) {
-            cache.missed(item);
-            return Vec::new();
-        }
-        let (Some(defs), Some(reqs)) = (&cache.defs, cache.reqs.get(item)) else {
+        let Some(reqs) = cache.requirements_of(stack) else {
             return Vec::new();
         };
+        let Some(defs) = &cache.defs else {
+            return Vec::new();
+        };
+        let reqs = &reqs;
         let mut lines = Vec::new();
         for (action, skills) in &reqs.by_action {
             for (skill, needed) in skills {
@@ -71,8 +68,8 @@ pub fn requirement_lines(item: &str) -> Vec<(Text, u32)> {
 }
 
 /// The border colours, top and bottom, of the tooltip of an item the player cannot fully use yet.
-pub fn locked_border(item: &str) -> Option<[u32; 2]> {
-    with(|cache| cache.lacks(item, |_| true)).then_some(LOCKED_BORDER)
+pub fn locked_border(stack: &ItemStack) -> Option<[u32; 2]> {
+    with(|cache| cache.lacks(stack, |_| true)).then_some(LOCKED_BORDER)
 }
 
 pub(super) fn action_name(action: Action) -> &'static Message {
@@ -281,6 +278,56 @@ mod tests {
             lines.last().map(String::as_str),
             Some("\u{2718} Break: Mining 16")
         );
+    }
+
+    #[test]
+    fn an_enchantment_adds_its_requirement_to_the_tooltip() {
+        // Given Sharpness III and up locked for attacking at Melee 12, a player at Melee 10, and a wooden sword (no
+        // lock of its own) with Sharpness III
+        let _serial = exclusive();
+        let host = TestHost::default();
+        known();
+        with(|cache| {
+            cache
+                .reqs
+                .insert("minecraft:wooden_sword".into(), Requirements::default());
+            let sharpness = skills_core::defs::LockEntry {
+                target: skills_core::defs::Target::Enchantment(skills_core::defs::Matcher::Id(
+                    "minecraft:sharpness".into(),
+                )),
+                actions: vec![Action::Attack],
+                requires: [(MELEE.to_string(), 12)].into(),
+                label: None,
+                replace: false,
+                enchantment_level: Some(3),
+            };
+            cache.defs.as_mut().unwrap().defs.locks.push(sharpness);
+        });
+        let mut sword = ItemStack {
+            item: "minecraft:wooden_sword".into(),
+            count: 1,
+            damage: 0,
+            extra: None,
+        };
+        sword
+            .data_mut()
+            .enchantments
+            .push(("minecraft:sharpness".into(), 3));
+
+        // When its tooltip is drawn, then with enchantment locks turned off by the server's rules
+        let mut lines: Vec<(Text, u32)> = vec![(Text::literal("Wooden Sword"), WHITE)];
+        dispatch_tooltip(&host, &mods(), &sword, &mut lines);
+        with(|cache| cache.rules.enchantment_locks = false);
+        let mut off: Vec<(Text, u32)> = vec![(Text::literal("Wooden Sword"), WHITE)];
+        dispatch_tooltip(&host, &mods(), &sword, &mut off);
+
+        // Then it lists the attack requirement Sharpness brings, and nothing once the rule is off
+        let text: Vec<String> = lines.iter().map(|(t, _)| t.plain()).collect();
+        assert_eq!(
+            text.last().map(String::as_str),
+            Some("\u{2718} Attack: Melee 12 (you: 10)")
+        );
+        assert_eq!(off.len(), 1);
     }
 
     #[test]

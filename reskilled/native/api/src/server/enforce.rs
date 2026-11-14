@@ -12,7 +12,7 @@ use horizon_client::mod_api::{
     NativeServerPlayer, Tag,
 };
 use skills_core::defs::{Action, Settings};
-use skills_core::locks::{Facts, TargetKind, Unmet, check};
+use skills_core::locks::{Facts, TargetKind, Unmet, check, enchantment_requirements};
 use skills_core::progress::level;
 use skills_core::registry::Defs;
 use skills_core::wire::ToClient;
@@ -103,10 +103,20 @@ pub fn rider(host: &dyn Host, entity: u32, kind: &str) -> Option<Actor> {
 
 /// The first check the player fails cancels the action, with the "Needs" line; exempt players pass all.
 fn guard(host: &mut dyn Host, actor: &Actor, checks: &[(TargetKind, &str, Action)]) -> Flow {
+    guard_enchanted(host, actor, checks, &[])
+}
+
+/// [`guard`] for an item carrying these enchantments, whose locks add to the item checks'.
+fn guard_enchanted(
+    host: &mut dyn Host,
+    actor: &Actor,
+    checks: &[(TargetKind, &str, Action)],
+    enchanted: &[(String, u32)],
+) -> Flow {
     if actor.exempt {
         return Flow::Continue;
     }
-    match first_unmet(host, actor.player, checks) {
+    match first_unmet(host, actor.player, checks, enchanted) {
         Some((defs, unmet, action)) => {
             refuse(host, actor.player, &defs, &unmet, action);
             Flow::Cancel
@@ -120,6 +130,7 @@ fn first_unmet(
     host: &mut dyn Host,
     player: u128,
     checks: &[(TargetKind, &str, Action)],
+    enchanted: &[(String, u32)],
 ) -> Option<(std::sync::Arc<Defs>, Unmet, Action)> {
     let data = current()?;
     let state = match state_of(host, player) {
@@ -132,8 +143,13 @@ fn first_unmet(
         }
     };
     let levels = |skill: &str| level(&state, &data.defs, skill);
+    let enchantment_reqs = (!enchanted.is_empty() && super::rules::current(host).enchantment_locks)
+        .then(|| enchantment_requirements(&data.defs.locks, enchanted));
     checks.iter().find_map(|(kind, id, action)| {
-        let reqs = requirements(host, *kind, id);
+        let mut reqs = requirements(host, *kind, id);
+        if let (TargetKind::Item, Some(more)) = (kind, &enchantment_reqs) {
+            reqs = reqs.merged(more);
+        }
         check(&reqs, *action, &levels)
             .err()
             .map(|unmet| (data.defs.clone(), unmet, *action))
@@ -183,13 +199,20 @@ fn refuse(host: &mut dyn Host, player: u128, defs: &Defs, unmet: &Unmet, action:
 /// sent back to the hand from the tick, as a real move: refusing the use would leave the client showing the armor
 /// it already put on, since the server does not correct a refused use.
 pub fn on_use_item(host: &mut dyn Host, actor: &Actor, item: &str) -> Flow {
-    let flow = guard(host, actor, &[(TargetKind::Item, item, Action::Use)]);
+    let enchanted = in_hand_enchantments(host, actor.player, item);
+    let flow = guard_enchanted(
+        host,
+        actor,
+        &[(TargetKind::Item, item, Action::Use)],
+        &enchanted,
+    );
     if flow == Flow::Continue
         && !actor.exempt
         && first_unmet(
             host,
             actor.player,
             &[(TargetKind::Item, item, Action::Equip)],
+            &enchanted,
         )
         .is_some()
     {
@@ -200,27 +223,62 @@ pub fn on_use_item(host: &mut dyn Host, actor: &Actor, item: &str) -> Flow {
 
 /// Using an item on a block: the item's use, and placing it when it is a block that a lock covers.
 pub fn on_use_item_on(host: &mut dyn Host, actor: &Actor, item: &str) -> Flow {
-    guard(
+    let enchanted = in_hand_enchantments(host, actor.player, item);
+    guard_enchanted(
         host,
         actor,
         &[
             (TargetKind::Item, item, Action::Use),
             (TargetKind::Block, item, Action::Place),
         ],
+        &enchanted,
     )
+}
+
+/// The enchantments of the stack the player holds that is this item: the main hand's, else the off hand's.
+fn in_hand_enchantments(host: &dyn Host, player: u128, item: &str) -> Vec<(String, u32)> {
+    let main = host.held_stack(player).filter(|stack| &*stack.item == item);
+    let stack = main.or_else(|| {
+        host.player_equipment(player, EquipmentSlot::OffHand)
+            .filter(|stack| &*stack.item == item)
+    });
+    stack
+        .map(|stack| enchantments_of(&stack))
+        .unwrap_or_default()
+}
+
+/// A stack's enchantments, as the locks name them.
+fn enchantments_of(stack: &ItemStack) -> Vec<(String, u32)> {
+    stack
+        .enchantments()
+        .iter()
+        .map(|(id, level)| (id.to_string(), *level))
+        .collect()
 }
 
 /// A blow with what the main hand holds.
 pub fn on_attack(host: &mut dyn Host, actor: &Actor, main_hand: Option<&str>) -> Flow {
     main_hand.map_or(Flow::Continue, |item| {
-        guard(host, actor, &[(TargetKind::Item, item, Action::Attack)])
+        let enchanted = in_hand_enchantments(host, actor.player, item);
+        guard_enchanted(
+            host,
+            actor,
+            &[(TargetKind::Item, item, Action::Attack)],
+            &enchanted,
+        )
     })
 }
 
 /// Breaking a block with what the main hand holds.
 pub fn on_destroy(host: &mut dyn Host, actor: &Actor, main_hand: Option<&str>) -> Flow {
     main_hand.map_or(Flow::Continue, |item| {
-        guard(host, actor, &[(TargetKind::Item, item, Action::Break)])
+        let enchanted = in_hand_enchantments(host, actor.player, item);
+        guard_enchanted(
+            host,
+            actor,
+            &[(TargetKind::Item, item, Action::Break)],
+            &enchanted,
+        )
     })
 }
 
@@ -256,8 +314,18 @@ pub fn on_equip(host: &mut dyn Host, actor: &Actor, slot: &str, item: Option<&st
         return;
     }
     let Some(item) = item else { return };
+    let enchanted = host
+        .player_equipment(actor.player, slot)
+        .filter(|worn| &*worn.item == item)
+        .map(|worn| enchantments_of(&worn))
+        .unwrap_or_default();
     if WORN.contains(&slot)
-        && guard(host, actor, &[(TargetKind::Item, item, Action::Equip)]) == Flow::Cancel
+        && guard_enchanted(
+            host,
+            actor,
+            &[(TargetKind::Item, item, Action::Equip)],
+            &enchanted,
+        ) == Flow::Cancel
     {
         let to = match (
             equipped_from_hand(actor.player),
@@ -481,6 +549,7 @@ fn unequip(host: &mut dyn Host, player: u128, entity: u32, slot: EquipmentSlot, 
         host,
         player,
         &[(TargetKind::Item, &worn.item, Action::Equip)],
+        &enchantments_of(&worn),
     ) else {
         return;
     };
@@ -646,6 +715,81 @@ mod tests {
     const ENTITY: u32 = 42;
     const SKILLS: [&str; 5] = ["mining", "melee", "defense", "taming", "arcane"];
 
+    /// The item enchanted with `enchantment` at `level`.
+    fn enchanted(item: &str, enchantment: &str, level: u32) -> ItemStack {
+        let mut stack = stack(item);
+        stack
+            .data_mut()
+            .enchantments
+            .push((enchantment.into(), level));
+        stack
+    }
+
+    #[test]
+    fn an_enchantment_adds_its_lock_from_its_level() {
+        // Given a level-1 player, and a wooden sword (no lock of its own) with Sharpness II, then III, in hand
+        let _serial = exclusive();
+        let (mut host, actor) = setup(false);
+        host.slots = vec![Some(enchanted(
+            "minecraft:wooden_sword",
+            "minecraft:sharpness",
+            2,
+        ))];
+        let two = on_attack(&mut host, &actor, Some("minecraft:wooden_sword"));
+        host.slots = vec![Some(enchanted(
+            "minecraft:wooden_sword",
+            "minecraft:sharpness",
+            3,
+        ))];
+
+        // When they swing each
+        let three = on_attack(&mut host, &actor, Some("minecraft:wooden_sword"));
+
+        // Then II swings and III is refused for Sharpness's Melee 12
+        assert_eq!((two, three), (Flow::Continue, Flow::Cancel));
+        assert_eq!(host.action_bars_of(PLAYER), vec!["Needs Melee 12"]);
+    }
+
+    #[test]
+    fn the_rules_can_turn_enchantment_locks_off() {
+        // Given a level-1 player with a Sharpness III wooden sword, on a server whose rules turn them off
+        let _serial = exclusive();
+        let (mut host, actor) = setup(false);
+        host.slots = vec![Some(enchanted(
+            "minecraft:wooden_sword",
+            "minecraft:sharpness",
+            3,
+        ))];
+        crate::server::rules::force(skills_core::rules::Rules {
+            enchantment_locks: false,
+            ..Default::default()
+        });
+
+        // When they swing it
+        let flow = on_attack(&mut host, &actor, Some("minecraft:wooden_sword"));
+
+        // Then it swings
+        assert_eq!(flow, Flow::Continue);
+    }
+
+    #[test]
+    fn enchanted_armor_the_player_may_not_wear_comes_off() {
+        // Given a level-1 player wearing a leather chestplate (no lock of its own) with Protection III
+        let _serial = exclusive();
+        let (mut host, actor) = setup(false);
+        host.slots = vec![None; 41];
+        let chest = enchanted("minecraft:leather_chestplate", "minecraft:protection", 3);
+        host.wear(EquipmentSlot::Chest, chest.clone());
+
+        // When their equipment is checked
+        check_equipment(&mut host, &actor);
+
+        // Then it goes into their inventory, and they read why
+        assert_eq!(host.worn(EquipmentSlot::Chest), None);
+        assert_eq!(host.carried(), vec![(0, chest)]);
+        assert_eq!(host.action_bars_of(PLAYER), vec!["Needs Defense 12"]);
+    }
+
     fn stack(item: &str) -> ItemStack {
         ItemStack {
             item: item.into(),
@@ -680,6 +824,10 @@ mod tests {
             entry(json!({"block": {"id": "minecraft:anvil"}}), &["open"], "arcane", 6),
             entry(json!({"entity": {"id": "minecraft:horse"}}), &["mount"], "taming", 4),
             entry(json!({"entity": {"id": "minecraft:villager"}}), &["interact"], "arcane", 2),
+            json!({"target": {"enchantment": {"id": "minecraft:sharpness"}}, "enchantment_level": 3,
+                "actions": ["attack"], "requires": {"reskilled:melee": 12}}),
+            json!({"target": {"enchantment": {"id": "minecraft:protection"}}, "enchantment_level": 3,
+                "actions": ["equip"], "requires": {"reskilled:defense": 12}}),
         ]});
         let skills: Vec<(&str, Value)> = skills
             .iter()

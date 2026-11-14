@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
 
 pub use crate::defs::TargetKind;
-use crate::defs::{Action, Matcher};
+use crate::defs::{Action, LockEntry, Matcher, Target};
 use crate::registry::Defs;
 
 /// What the game knows about ids that data files cannot say.
@@ -45,7 +45,7 @@ pub fn matches(m: &Matcher, kind: TargetKind, id: &str, facts: &dyn Facts) -> bo
             match kind {
                 TargetKind::Item => facts.item_in_tag(id, tag),
                 TargetKind::Block => facts.block_in_tag(id, tag),
-                TargetKind::Entity => false,
+                TargetKind::Entity | TargetKind::Enchantment => false,
             }
         }
         Matcher::Repairable(material) => facts.item_repairable(id).as_deref() == Some(material),
@@ -96,6 +96,65 @@ pub fn requirements_for(
         }
     }
     reqs
+}
+
+/// What the enchantments on an item add to its requirements: every enchantment lock whose matcher picks one of
+/// them at or above the level it starts at, merged as [`requirements_for`] merges.
+pub fn enchantment_requirements(
+    entries: &[LockEntry],
+    enchantments: &[(String, u32)],
+) -> Requirements {
+    let mut reqs = Requirements::default();
+    for entry in entries {
+        let Target::Enchantment(matcher) = &entry.target else {
+            continue;
+        };
+        let from = entry.enchantment_level.unwrap_or(1);
+        let applies = enchantments.iter().any(|(id, level)| {
+            *level >= from && matches(matcher, TargetKind::Enchantment, id, &NoFacts)
+        });
+        if applies {
+            reqs.add(&entry.actions, &entry.requires);
+        }
+    }
+    reqs
+}
+
+/// For matchers that ask no tags (enchantments): every question answers no.
+struct NoFacts;
+
+impl Facts for NoFacts {
+    fn item_in_tag(&self, _item: &str, _tag: &str) -> bool {
+        false
+    }
+    fn block_in_tag(&self, _block: &str, _tag: &str) -> bool {
+        false
+    }
+    fn item_repairable(&self, _item: &str) -> Option<String> {
+        None
+    }
+}
+
+impl Requirements {
+    /// Adds the levels for these actions, keeping the highest per action and skill.
+    pub fn add(&mut self, actions: &[Action], requires: &BTreeMap<String, u32>) {
+        for action in actions {
+            let levels = self.by_action.entry(*action).or_default();
+            for (skill, level) in requires {
+                let kept = levels.entry(skill.clone()).or_default();
+                *kept = (*kept).max(*level);
+            }
+        }
+    }
+
+    /// Both sets of requirements together.
+    pub fn merged(mut self, other: &Requirements) -> Requirements {
+        for (action, levels) in &other.by_action {
+            let levels: BTreeMap<String, u32> = levels.clone();
+            self.add(&[*action], &levels);
+        }
+        self
+    }
 }
 
 /// Requirements per target, worked out on first use. Clear it whenever the data reloads.
@@ -210,6 +269,7 @@ mod tests {
             requires: requires.iter().map(|(s, l)| (s.to_string(), *l)).collect(),
             label: label.map(str::to_string),
             replace: false,
+            enchantment_level: None,
         }
     }
 
@@ -581,5 +641,72 @@ mod tests {
         ]
         .into();
         assert_eq!(labels, expected);
+    }
+
+    #[test]
+    fn enchantments_add_their_locks_from_the_level_they_name() {
+        // Given Sharpness locked for attacking at Melee 12 from level III and Melee 20 from level V, and Mending
+        // locked for every use at Arcane 16 from any level
+        let json = r#"{"format": 1, "entries": [
+            {"target": {"enchantment": {"id": "minecraft:sharpness"}}, "enchantment_level": 3, "actions": ["attack"],
+             "requires": {"reskilled:melee": 12}},
+            {"target": {"enchantment": {"id": "minecraft:sharpness"}}, "enchantment_level": 5, "actions": ["attack"],
+             "requires": {"reskilled:melee": 20}},
+            {"target": {"enchantment": {"pattern": "minecraft:mend*"}}, "actions": ["use", "attack", "break", "equip"],
+             "requires": {"reskilled:arcane": 16}}]}"#;
+        let crate::defs::DefFile::Lock(file) =
+            crate::defs::parse_file(crate::defs::DefKind::Lock, json).unwrap()
+        else {
+            panic!("a lock file");
+        };
+        let enchanted = |list: &[(&str, u32)]| -> Vec<(String, u32)> {
+            list.iter()
+                .map(|(id, level)| ((*id).to_string(), *level))
+                .collect()
+        };
+
+        // When swords with Sharpness II, IV and V and Mending are checked, and an item an enchantment lock does
+        // not name
+        let two =
+            enchantment_requirements(&file.entries, &enchanted(&[("minecraft:sharpness", 2)]));
+        let four =
+            enchantment_requirements(&file.entries, &enchanted(&[("minecraft:sharpness", 4)]));
+        let five_mending = enchantment_requirements(
+            &file.entries,
+            &enchanted(&[("minecraft:sharpness", 5), ("minecraft:mending", 1)]),
+        );
+        let item = requirements_for(
+            &Defs {
+                locks: file.entries.clone(),
+                ..Defs::default()
+            },
+            TargetKind::Item,
+            "minecraft:sharpness",
+            &TestFacts::default(),
+        );
+
+        // Then II needs nothing, IV needs Melee 12, V with Mending needs Melee 20 to attack and Arcane 16 for
+        // everything, and an enchantment lock never locks an item by id
+        let attack = |r: &Requirements| {
+            r.by_action
+                .get(&Action::Attack)
+                .cloned()
+                .unwrap_or_default()
+        };
+        assert!(two.by_action.is_empty());
+        assert_eq!(attack(&four), [("reskilled:melee".to_string(), 12)].into());
+        assert_eq!(
+            attack(&five_mending),
+            [
+                ("reskilled:arcane".to_string(), 16),
+                ("reskilled:melee".to_string(), 20)
+            ]
+            .into()
+        );
+        assert_eq!(
+            five_mending.by_action.get(&Action::Equip),
+            Some(&[("reskilled:arcane".to_string(), 16)].into())
+        );
+        assert!(item.by_action.is_empty());
     }
 }

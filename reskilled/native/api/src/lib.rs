@@ -313,8 +313,9 @@ impl Hooks for Mod {
         event: &mut LivingEntityUseItemStartEvent<'_>,
     ) -> Flow {
         let own = event.entity.is_none() && host.window();
-        let item = &event.stack.item;
-        if own && client::cache::with(|cache| cache.lacks(item, |action| action == Action::Use)) {
+        if own
+            && client::cache::with(|cache| cache.lacks(event.stack, |action| action == Action::Use))
+        {
             Flow::Cancel
         } else {
             Flow::Continue
@@ -322,13 +323,13 @@ impl Hooks for Mod {
     }
 
     fn item_decorations(&self, host: &dyn Host, event: &mut ItemDecorationsEvent<'_>) {
-        client::badge::draw_lock_badge(host, event.batch, &event.stack.item, event.x, event.y);
+        client::badge::draw_lock_badge(host, event.batch, event.stack, event.x, event.y);
     }
 
     fn tooltip(&self, _host: &dyn Host, event: &mut TooltipEvent<'_>) {
         event
             .lines
-            .extend(client::tooltip::requirement_lines(&event.stack.item));
+            .extend(client::tooltip::requirement_lines(event.stack));
     }
 
     fn client_disconnecting(&self, _host: &dyn Host, _event: &mut ClientDisconnectingEvent) {
@@ -336,9 +337,7 @@ impl Hooks for Mod {
     }
 
     fn tooltip_color(&self, _host: &dyn Host, event: &mut TooltipColorEvent<'_>) {
-        let locked = event
-            .stack
-            .and_then(|stack| client::tooltip::locked_border(&stack.item));
+        let locked = event.stack.and_then(client::tooltip::locked_border);
         if let Some([top, bottom]) = locked {
             event.border_top = top;
             event.border_bottom = bottom;

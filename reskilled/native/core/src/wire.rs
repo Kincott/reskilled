@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::defs::{Action, DefError};
+use crate::defs::{Action, DefError, Target};
 use crate::locks::{Requirements, labels_by_level};
 use crate::progress::{PlayerState, Request, STATE_FORMAT};
 use crate::registry::Defs;
@@ -127,7 +127,12 @@ pub fn client_defs_json(defs: &Defs) -> String {
         .collect();
     let client = ClientDefs {
         defs: Defs {
-            locks: Vec::new(),
+            locks: defs
+                .locks
+                .iter()
+                .filter(|entry| matches!(entry.target, Target::Enchantment(_)))
+                .cloned()
+                .collect(),
             ..defs.clone()
         },
         labels,
@@ -356,17 +361,29 @@ mod tests {
     }
 
     #[test]
-    fn client_defs_have_no_locks_but_have_labels() {
-        // Given definitions with a labelled lock on the diamond pickaxe
+    fn client_defs_keep_only_enchantment_locks_but_have_labels() {
+        // Given definitions with a labelled lock on the diamond pickaxe and a lock on Sharpness V
+        let sharpness = LockEntry {
+            target: Target::Enchantment(Matcher::Id("minecraft:sharpness".into())),
+            actions: vec![Action::Attack],
+            requires: [(MINING.to_string(), 20)].into(),
+            label: None,
+            replace: false,
+            enchantment_level: Some(5),
+        };
         let defs = Defs {
             skills: [(MINING.into(), mining())].into(),
-            locks: vec![LockEntry {
-                target: Target::Item(Matcher::Id("minecraft:diamond_pickaxe".into())),
-                actions: vec![Action::Break],
-                requires: [(MINING.to_string(), 16)].into(),
-                label: Some("reskilled.lock.diamond_tools".into()),
-                replace: false,
-            }],
+            locks: vec![
+                LockEntry {
+                    target: Target::Item(Matcher::Id("minecraft:diamond_pickaxe".into())),
+                    actions: vec![Action::Break],
+                    requires: [(MINING.to_string(), 16)].into(),
+                    label: Some("reskilled.lock.diamond_tools".into()),
+                    replace: false,
+                    enchantment_level: None,
+                },
+                sharpness.clone(),
+            ],
             ..Defs::default()
         };
 
@@ -374,8 +391,9 @@ mod tests {
         let json = client_defs_json(&defs);
         let client: ClientDefs = serde_json::from_str(&json).unwrap();
 
-        // Then the locks are gone, the skills and the labels by level are there
-        assert!(client.defs.locks.is_empty());
+        // Then the item locks are gone (the client cannot test tags) and the enchantment lock stays, so the client
+        // can read an item's enchantments itself; the skills and the labels by level are there
+        assert_eq!(client.defs.locks, vec![sharpness]);
         assert!(!json.contains("minecraft:diamond_pickaxe"), "{json}");
         assert_eq!(client.defs.skills[MINING], mining());
         assert_eq!(

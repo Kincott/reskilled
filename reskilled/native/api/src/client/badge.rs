@@ -3,7 +3,7 @@
 //! Drawn from the cached requirements; an item not answered yet is asked for and gets its padlock once the answer
 //! is in.
 
-use horizon_client::mod_api::{Host, HudBatch};
+use horizon_client::mod_api::{Host, HudBatch, ItemStack};
 
 use super::cache::{Corner, with};
 use super::paint::{PADLOCK_SIZE, padlock};
@@ -15,9 +15,9 @@ const DIMMED: u32 = 0x6608_090C;
 
 /// Dims the item's icon at `x`, `y` and draws the padlock over it when the player lacks a level one of its
 /// actions needs.
-pub fn draw_lock_badge(host: &dyn Host, batch: &mut HudBatch, item: &str, x: f32, y: f32) {
+pub fn draw_lock_badge(host: &dyn Host, batch: &mut HudBatch, stack: &ItemStack, x: f32, y: f32) {
     let settings = with(|cache| cache.settings.clone());
-    if !settings.lock_icon || !locked(item) {
+    if !settings.lock_icon || !locked(stack) {
         return;
     }
     if settings.dim_locked {
@@ -33,8 +33,8 @@ pub fn draw_lock_badge(host: &dyn Host, batch: &mut HudBatch, item: &str, x: f32
     padlock(host, batch, corner);
 }
 
-fn locked(item: &str) -> bool {
-    with(|cache| cache.lacks(item, |_| true))
+fn locked(stack: &ItemStack) -> bool {
+    with(|cache| cache.lacks(stack, |_| true))
 }
 
 #[cfg(test)]
