@@ -5,6 +5,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 pub mod actions;
 pub mod commands;
 pub mod data;
+pub mod earning;
 pub mod effects;
 pub mod enforce;
 pub mod focus;

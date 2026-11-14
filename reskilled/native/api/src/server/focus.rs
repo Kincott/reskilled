@@ -211,6 +211,7 @@ pub fn travel(players: &[(u128, &str, [f64; 3], bool)]) {
         if step > MOST_STEP {
             continue;
         }
+        super::earning::on_travel(player, step);
         let each = summed(player, |r| match r {
             Reward::Travel { points } => Some(*points),
             _ => None,

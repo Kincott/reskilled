@@ -35,6 +35,7 @@ messages! {
     ALREADY_OWNED = "reskilled.msg.already_owned" => "You already have that perk.";
     ALREADY_FOCUSED = "reskilled.msg.already_focused" => "That focus is already active.";
     NOT_OWNED = "reskilled.msg.not_owned" => "You do not have that perk.";
+    BUYING_OFF = "reskilled.msg.buying_off" => "On this server skills grow by doing their work.";
     SWITCHES_OFF = "reskilled.msg.switches_off" => "Perks cannot be switched off on this server.";
     REFUNDS_OFF = "reskilled.msg.refunds_off" => "Perks cannot be refunded on this server.";
     NEEDED_BY = "reskilled.msg.needed_by" => "%s needs it: refund that first.";
@@ -73,6 +74,7 @@ messages! {
     LEVEL = "reskilled.ui.level" => "%s/%s";
     LEVEL_OF = "reskilled.ui.level_of" => "Level %s of %s";
     LEVEL_UP = "reskilled.ui.level_up" => "Level up";
+    PROGRESS = "reskilled.ui.progress" => "Progress: %s/%s";
     RAISE_TO = "reskilled.ui.raise_to" => "Raise to level %s";
     COST = "reskilled.ui.cost" => "Cost: %s XP levels";
     COST_POINTS = "reskilled.ui.cost_points" => "Cost: %s XP points";
@@ -304,6 +306,7 @@ pub fn refusal(defs: &Defs, refusal: &Refusal, request: &Request) -> Text {
         Refusal::AlreadyOwned => say(&ALREADY_OWNED, &[]),
         Refusal::AlreadyFocused => say(&ALREADY_FOCUSED, &[]),
         Refusal::NotOwned => say(&NOT_OWNED, &[]),
+        Refusal::BuyingOff => say(&BUYING_OFF, &[]),
         Refusal::SwitchesOff => say(&SWITCHES_OFF, &[]),
         Refusal::RefundsOff => say(&REFUNDS_OFF, &[]),
         Refusal::NeededBy { perk } => say(&NEEDED_BY, &[perk_name(defs, perk)]),

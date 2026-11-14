@@ -261,6 +261,7 @@ mod tests {
                 bonus_points: 1,
                 perks: ["reskilled:mining_sure_grip".to_string()].into(),
                 disabled: Default::default(),
+                earned: 0,
             },
         );
 

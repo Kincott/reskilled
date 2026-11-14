@@ -4,8 +4,8 @@
 use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
 use skills_core::defs::{PerkDef, Reward};
 use skills_core::progress::{
-    PlayerState, Request, focus_cost, level, mastered, points_available, raise_cost, switched_off,
-    total_points,
+    PlayerState, Request, earn_threshold, focus_cost, level, mastered, points_available,
+    raise_cost, switched_off, total_points,
 };
 use skills_core::registry::Defs;
 use skills_core::rules::{CostUnit, Respec, Rules};
@@ -21,7 +21,7 @@ use crate::MOD_ID;
 use crate::text::{
     ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
     FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
-    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, RAISE_TO, REFUND,
+    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_TO, REFUND,
     REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL,
     REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF,
     VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say,
@@ -110,7 +110,20 @@ fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
 }
 
 /// Whether the player has the XP levels to raise the skill.
+/// Progress earned by doing toward the skill's next level, in actions: what is earned and what the level takes.
+fn earned_of(d: &Defs, state: &PlayerState, skill: &str) -> Option<(u32, u32)> {
+    let need = earn_threshold(d, state, skill)?;
+    let have = state.skills.get(skill).map_or(0, |p| p.earned);
+    Some((have / HUNDREDTHS, need / HUNDREDTHS))
+}
+
+/// Earned progress is kept in hundredths of an action.
+const HUNDREDTHS: u32 = 100;
+
 fn can_raise(d: &Defs, rules: &Rules, state: &PlayerState, xp: Option<u32>, skill: &str) -> bool {
+    if !rules.buying() {
+        return false;
+    }
     let affordable = |xp: u32, price: u32| match rules.cost_unit {
         CostUnit::Levels => xp >= price,
         CostUnit::Points => total_points(xp) >= price,
@@ -352,7 +365,12 @@ fn draw_card(pen: &mut Pen<'_>, card: &Card, skill: &str) {
         let diamonds = paint::POINT.repeat(points.min(MOST_POINTS));
         pen.text(&diamonds, card.bar.x, card.bar.y + 7.0, GOLD);
     }
-    if let Some(cost) = price(d, pen.rules, state, skill) {
+    if !pen.rules.buying() {
+        if let Some((have, need)) = earned_of(d, state, skill) {
+            let line = say(&LEVEL, &[number(have), number(need)]).plain();
+            paint::text_centred(pen.host, pen.batch, &line, &card.raise, GRAY);
+        }
+    } else if let Some(cost) = price(d, pen.rules, state, skill) {
         let look = if can_raise(d, pen.rules, state, pen.xp, skill) {
             Look::Go
         } else {
@@ -539,7 +557,33 @@ fn draw_summary(pen: &mut Pen<'_>, view: &Detail, skill: &str) {
         view.bar.y + 11.0,
         if points > 0 { GOLD } else { GRAY },
     );
-    let Some(cost) = price(d, pen.rules, state, skill) else {
+    let earned = earned_of(d, state, skill).filter(|_| pen.rules.earning());
+    if let (Some((have, need)), false) = (earned, pen.rules.buying()) {
+        let bar = Rect {
+            y: view.raise.y + 6.0,
+            h: 6.0,
+            ..view.raise
+        };
+        paint::bar(pen.host, pen.batch, &bar, have, need);
+        let under = Rect {
+            y: view.raise.y + view.raise.h + 3.0,
+            h: paint::GLYPH,
+            ..view.raise
+        };
+        let line = say(&PROGRESS, &[number(have), number(need)]).plain();
+        paint::text_centred(pen.host, pen.batch, &line, &under, GRAY);
+        return;
+    }
+    if let Some((have, need)) = earned {
+        let below = Rect {
+            y: view.raise.y + view.raise.h + 13.0,
+            h: paint::GLYPH,
+            ..view.raise
+        };
+        let line = say(&PROGRESS, &[number(have), number(need)]).plain();
+        paint::text_centred(pen.host, pen.batch, &line, &below, GRAY);
+    }
+    let Some(cost) = price(d, pen.rules, state, skill).filter(|_| pen.rules.buying()) else {
         if mastered(d, state, skill) {
             let label = say(&MASTERED, &[]).plain();
             paint::text_centred(pen.host, pen.batch, &label, &view.raise, GOLD);
@@ -1633,6 +1677,52 @@ mod tests {
         // Then Mining's card asks 240 and its page says the cost is 240 XP points
         contains(&overview, &["240"]);
         contains(&page, &["Cost: 240 XP points"]);
+    }
+
+    #[test]
+    fn when_skills_only_grow_by_doing_progress_replaces_the_raise() {
+        // Given skills growing only by doing, Mining at 12 with 50 actions' worth of its 120 earned
+        let _serial = exclusive();
+        let mut host = screen_open();
+        with(|cache| {
+            cache.rules.progression = skills_core::rules::Progression::Earn;
+            cache.state.skills.get_mut(MINING).unwrap().earned = 5_000;
+        });
+
+        // When the overview is drawn, then Mining's page, and Mining's card spot is clicked where its raise was
+        let overview = drawn(&host, AWAY);
+        click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
+        host.drawn.borrow_mut().clear();
+        with(|cache| {
+            cache.selected = 1;
+            cache.view = View::Skill;
+        });
+        let page = drawn(&host, AWAY);
+
+        // Then the card shows 50/120 and no price, the page shows the progress and no level-up button, and nothing
+        // is bought
+        contains(&overview, &["50/120"]);
+        assert!(!overview.iter().any(|t| t == "12"), "{overview:?}");
+        contains(&page, &["Progress: 50/120"]);
+        assert!(!page.iter().any(|t| t == "Level up"), "{page:?}");
+        assert!(requests_sent(&mut host).is_empty());
+    }
+
+    #[test]
+    fn when_skills_grow_both_ways_the_page_shows_the_raise_and_the_progress() {
+        // Given skills growing both ways, Mining at 12 with 50 actions earned
+        let _serial = exclusive();
+        let host = mining_open();
+        with(|cache| {
+            cache.rules.progression = skills_core::rules::Progression::Both;
+            cache.state.skills.get_mut(MINING).unwrap().earned = 5_000;
+        });
+
+        // When Mining's page is drawn
+        let page = drawn(&host, AWAY);
+
+        // Then it offers the raise and shows the progress
+        contains(&page, &["Level up", "Progress: 50/120"]);
     }
 
     #[test]

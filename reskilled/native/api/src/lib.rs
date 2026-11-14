@@ -2,8 +2,8 @@
 //! Horizon's hook points (Horizon docs/native-mods.md, "Trait mods"); each hands its work to the module that owns it.
 use horizon_client::mod_api::{
     AddServerReloadListenersEvent, AttackEntityEvent, BabyEntitySpawnEvent, BlockExpEvent,
-    ClientDisconnectingEvent, ContainerOpenedEvent, DestroyBlockEvent, EntityMountEvent,
-    EntityTameEvent, Flow, FurnaceExtractEvent, GuiRenderPostEvent, Hooks, Host,
+    ClientDisconnectingEvent, ContainerOpenedEvent, DestroyBlockEvent, EnchantItemEvent,
+    EntityMountEvent, EntityTameEvent, Flow, FurnaceExtractEvent, GuiRenderPostEvent, Hooks, Host,
     InteractEntityEvent, InventoryClickEvent, ItemDecorationsEvent, ItemStack, KeyEvent, LevelHost,
     LivingEntityUseItemStartEvent, LivingExperienceDropEvent, LivingIncomingDamageEvent,
     LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent, NetFromServerEvent,
@@ -127,9 +127,20 @@ impl Hooks for Mod {
 
     fn attack_entity(&self, host: &mut dyn Host, _event: &mut AttackEntityEvent<'_>) -> Flow {
         let main_hand = host.held().map(|(item, _, _)| item);
-        acted(host, |host, actor| {
+        let flow = acted(host, |host, actor| {
             enforce::on_attack(host, actor, main_hand.as_deref())
-        })
+        });
+        if flow == Flow::Continue
+            && let Some(player) = host.acting_player()
+            && server::focus::rewarded(player.game_mode)
+        {
+            server::earning::on_attack(player.uuid);
+        }
+        flow
+    }
+
+    fn enchant_item(&self, _host: &mut dyn Host, event: &mut EnchantItemEvent<'_>) {
+        server::earning::on_enchant(event.player);
     }
 
     fn destroy_block(&self, host: &mut dyn Host, event: &mut DestroyBlockEvent) -> Flow {
@@ -142,6 +153,9 @@ impl Hooks for Mod {
         {
             let rewarded = server::focus::rewarded(player.game_mode);
             server::focus::on_break(host, player.uuid, rewarded, &player.dimension, event.pos);
+            if rewarded {
+                server::earning::on_break(host, player.uuid, main_hand.as_deref());
+            }
         }
         flow
     }
@@ -172,12 +186,14 @@ impl Hooks for Mod {
     fn entity_tame(&self, host: &mut dyn Host, event: &mut EntityTameEvent<'_>) {
         if let Some(owner) = event.owner {
             server::focus::on_tame(host, owner);
+            server::earning::on_tame(owner);
         }
     }
 
     fn baby_entity_spawn(&self, host: &mut dyn Host, event: &mut BabyEntitySpawnEvent<'_>) -> Flow {
         if event.player != 0 {
             server::focus::on_breed(host, event.player);
+            server::earning::on_breed(event.player);
         }
         Flow::Continue
     }
@@ -205,6 +221,7 @@ impl Hooks for Mod {
             &mut event.amount,
         );
         server::focus::hurt(event.entity, event.causing);
+        server::earning::hurt(event.entity, event.causing, event.damage_type);
         Flow::Continue
     }
 
@@ -293,6 +310,7 @@ impl Hooks for Mod {
         if let Some(player) = host.acting_player() {
             server::actions::run_pending_for(host, player.uuid);
             server::rules::run_for(host, player.uuid);
+            server::earning::run_for(host, player.uuid);
             server::focus::pay(host, player.uuid);
         }
     }

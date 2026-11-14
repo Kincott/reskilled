@@ -52,6 +52,13 @@ pub struct SkillProgress {
     /// Owned perks the player switched off: still theirs, not working.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub disabled: BTreeSet<String>,
+    /// Progress earned by doing the skill's work toward its next level, in hundredths of an action.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub earned: u32,
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
 }
 
 /// What a player asks the server to do.
@@ -103,6 +110,7 @@ pub enum Refusal {
     AlreadyOwned,
     AlreadyFocused,
     NotOwned,
+    BuyingOff,
     SwitchesOff,
     RefundsOff,
     /// Another owned perk needs this one.
@@ -288,6 +296,9 @@ fn raise(
     skill: &str,
 ) -> Result<Outcome, Refusal> {
     defs.skill(skill).ok_or(Refusal::UnknownSkill)?;
+    if !rules.buying() {
+        return Err(Refusal::BuyingOff);
+    }
     let cost = raise_cost(defs, state, skill).ok_or(Refusal::AtMax)?;
     let (levels_spent, points_spent) = match rules.cost_unit {
         CostUnit::Levels => {
@@ -311,6 +322,45 @@ fn raise(
         levels_spent,
         points_spent,
     })
+}
+
+/// Hundredths of an action the skill's next level takes when earned by doing: ten actions for each level it has.
+/// None at its top level.
+pub fn earn_threshold(defs: &Defs, state: &PlayerState, skill: &str) -> Option<u32> {
+    defs.skill(skill)?;
+    let now = level(state, defs, skill);
+    (now < defs.max_level(skill)).then_some(now.saturating_mul(ACTIONS_PER_LEVEL * HUNDREDTHS))
+}
+
+/// Ten actions a level, counted in hundredths so a pace below 100% adds up.
+const ACTIONS_PER_LEVEL: u32 = 10;
+const HUNDREDTHS: u32 = 100;
+
+/// Adds `hundredths` of progress to the skill, climbing as many levels as it fills, the rest carried; a skill at
+/// its top keeps nothing. Gives the new state and the levels gained.
+pub fn earn(defs: &Defs, state: &PlayerState, skill: &str, hundredths: u32) -> (PlayerState, u32) {
+    let mut next = state.clone();
+    let mut gained = 0;
+    let mut pool = state
+        .skills
+        .get(skill)
+        .map_or(0, |p| p.earned)
+        .saturating_add(hundredths);
+    while let Some(needed) = earn_threshold(defs, &next, skill) {
+        if pool < needed {
+            break;
+        }
+        pool -= needed;
+        gained += 1;
+        next.skills.entry(skill.to_string()).or_default().level = level(&next, defs, skill) + 1;
+    }
+    if earn_threshold(defs, &next, skill).is_none() {
+        pool = 0;
+    }
+    if defs.skill(skill).is_some() {
+        next.skills.entry(skill.to_string()).or_default().earned = pool;
+    }
+    (next, gained)
 }
 
 /// The XP points it takes to go from `level` to the next, as vanilla counts them.
@@ -929,6 +979,83 @@ mod tests {
         assert_eq!(short, Err(Refusal::NotEnoughXpPoints { needed: 20 }));
         assert_eq!((paid.levels_spent, paid.points_spent), (0, 20));
         assert_eq!(level(&paid.state, &defs, MINING), 2);
+    }
+
+    #[test]
+    fn earned_progress_fills_to_the_next_level_and_carries_over() {
+        // Given Mining at 2 (the next level needs 20 actions' worth, 2000 hundredths)
+        let defs = defs();
+        let state = at_level(MINING, 2);
+
+        // When 1500 hundredths are earned, then 700 more, and a skill at its top earns some
+        let (part, gained_part) = earn(&defs, &state, MINING, 1_500);
+        let (over, gained_over) = earn(&defs, &part, MINING, 700);
+        let (top, gained_top) = earn(&defs, &at_level(MINING, 32), MINING, 5_000);
+
+        // Then the first stays at 2 with 1500 toward 3; the second reaches 3 with 200 over; the top keeps nothing
+        assert_eq!(earn_threshold(&defs, &state, MINING), Some(2_000));
+        assert_eq!(
+            (
+                level(&part, &defs, MINING),
+                part.skills[MINING].earned,
+                gained_part
+            ),
+            (2, 1_500, 0)
+        );
+        assert_eq!(
+            (
+                level(&over, &defs, MINING),
+                over.skills[MINING].earned,
+                gained_over
+            ),
+            (3, 200, 1)
+        );
+        assert_eq!(
+            (
+                level(&top, &defs, MINING),
+                top.skills[MINING].earned,
+                gained_top
+            ),
+            (32, 0, 0)
+        );
+    }
+
+    #[test]
+    fn a_big_earning_can_climb_several_levels() {
+        // Given Mining at 1 (1000, then 2000, then 3000 hundredths to climb)
+        let defs = defs();
+
+        // When 6500 hundredths are earned at once
+        let (state, gained) = earn(&defs, &at_level(MINING, 1), MINING, 6_500);
+
+        // Then it climbs to 4 with 500 over
+        assert_eq!(
+            (
+                level(&state, &defs, MINING),
+                state.skills[MINING].earned,
+                gained
+            ),
+            (4, 500, 3)
+        );
+    }
+
+    #[test]
+    fn buying_is_refused_when_skills_only_grow_by_doing() {
+        // Given a server where skills only grow by doing
+        let defs = defs();
+        let earn_only = rules(|r| r.progression = crate::rules::Progression::Earn);
+
+        // When a player with plenty of levels raises Mining
+        let raised = apply_under(
+            &defs,
+            &earn_only,
+            &at_level(MINING, 1),
+            PLENTY,
+            &raise(MINING),
+        );
+
+        // Then it is refused
+        assert_eq!(raised, Err(Refusal::BuyingOff));
     }
 
     #[test]
