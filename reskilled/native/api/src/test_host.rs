@@ -101,6 +101,10 @@ pub struct TestHost {
     pub effects_given: Vec<(u128, horizon_client::mod_api::NativeEffect)>,
     /// The effects the player has now, as `effects` reads them.
     pub active_effects: Vec<horizon_client::mod_api::NativeEffect>,
+    /// Health set through `set_player_status`, by player.
+    pub health_set: Vec<(u128, f32)>,
+    /// Items `item_from_snbt` does not know.
+    pub unknown_items: Vec<String>,
     /// Blocks set through `set_block`: dimension, position, state.
     pub blocks_set: Vec<(String, [i32; 3], horizon_client::mod_api::BlockStateId)>,
     /// Each block's default state, as `default_state` gives it.
@@ -359,6 +363,28 @@ impl Host for TestHost {
         self.active_effects.retain(|e| e.id != effect.id);
         self.active_effects.push(effect.clone());
         true
+    }
+
+    fn set_player_status(
+        &mut self,
+        uuid: u128,
+        health: Option<f32>,
+        _food: Option<(i32, f32, f32)>,
+        _xp: Option<(i32, f32, i32)>,
+    ) -> bool {
+        if let Some(health) = health {
+            self.health_set.push((uuid, health));
+        }
+        true
+    }
+
+    fn attribute(&mut self, _uuid: u128, attribute: &str) -> Option<(f64, f64)> {
+        (attribute == "minecraft:max_health").then_some((20.0, 24.0))
+    }
+
+    fn item_from_snbt(&self, snbt: &str) -> Option<ItemStack> {
+        let id = snbt.split('"').nth(1)?;
+        (!self.unknown_items.iter().any(|unknown| unknown == id)).then(|| ItemStack::new(id, 1))
     }
 
     fn effects(&self, _uuid: u128) -> Option<Vec<horizon_client::mod_api::NativeEffect>> {

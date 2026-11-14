@@ -13,8 +13,10 @@ use skills_core::locks::{TargetKind, matches};
 use super::data::HostFacts;
 use super::effects::{effects_of, player_of_entity};
 use super::enforce::inventory_index;
-use super::{focus, lock, queue};
+use super::state::online_players;
+use super::{focus, homes, lock, queue};
 use crate::text::{LAST_STAND, say};
+use skills_core::effects::ActiveEffects;
 
 const TICKS_PER_SECOND: u64 = 20;
 /// How long a noted replant waits for its drops and the player's tick, in ticks.
@@ -38,6 +40,26 @@ static ARMOR_RUNES: Mutex<BTreeMap<u128, u32>> = Mutex::new(BTreeMap::new());
 static SEEN_EFFECTS: Mutex<BTreeMap<u128, BTreeMap<String, i32>>> = Mutex::new(BTreeMap::new());
 /// The tick each player's enchanted gear is next mended.
 static REPAIR_DUE: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
+/// A placed block a player with salvage is breaking: player, dimension, position, block.
+type Salvage = (u128, String, [i32; 3], String);
+
+static SALVAGE: Mutex<Vec<Salvage>> = Mutex::new(Vec::new());
+/// The tick each player got into bed.
+static IN_BED: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
+/// Players who woke from a full sleep, rested on their next tick.
+static RESTED: Mutex<Vec<u128>> = Mutex::new(Vec::new());
+/// The tick each player's home effects are next looked at.
+static HOME_DUE: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
+/// The ticks a night's sleep takes before the morning comes.
+const FULL_SLEEP_TICKS: u64 = 100;
+/// How often the effects near home are looked at, in ticks.
+const HOME_CHECK_TICKS: u64 = 20;
+/// A near-home effect lasts this long and is topped up when below `HOME_EFFECT_TOP_UP`, so its countdown passes
+/// the points where effects like regeneration act.
+const HOME_EFFECT_TICKS: i32 = 100;
+const HOME_EFFECT_TOP_UP: i32 = 25;
+const MONSTER: &str = "monster";
+const MAX_HEALTH: &str = "minecraft:max_health";
 /// Ripe crops broken by players with replanting, waiting to be planted again.
 static REPLANTS: Mutex<Vec<Replant>> = Mutex::new(Vec::new());
 
@@ -69,6 +91,8 @@ pub fn run_for(
     }
     count_armor_runes(host, player);
     shorten_effects(host, player);
+    rest(host, player);
+    home_effects(host, player, dimension, feet);
     mend_runes(host, player, selected);
     grow_crops(host, player, dimension, feet);
     plant_again(host, player);
@@ -153,6 +177,111 @@ fn shorten_effects(host: &mut dyn Host, player: u128) {
         next.insert(effect.id.clone(), duration);
     }
     lock(&SEEN_EFFECTS).insert(player, next);
+}
+
+pub fn on_bed_enter(player: u128) {
+    lock(&IN_BED).insert(player, queue::now());
+}
+
+/// The player left their bed: after a full night's sleep they rest on their next tick.
+pub fn on_bed_leave(player: u128) {
+    let entered = lock(&IN_BED).remove(&player);
+    if entered.is_some_and(|at| queue::now() >= at + FULL_SLEEP_TICKS) {
+        lock(&RESTED).push(player);
+    }
+}
+
+/// A rested player with restful sleep is healed and loses the effects it clears.
+fn rest(host: &mut dyn Host, player: u128) {
+    let rested = {
+        let mut rested = lock(&RESTED);
+        let before = rested.len();
+        rested.retain(|p| *p != player);
+        before != rested.len()
+    };
+    let Some(effects) = effects_of(player).filter(|e| rested && !e.restful_sleep.is_empty()) else {
+        return;
+    };
+    if let Some((_, most)) = host.attribute(player, MAX_HEALTH) {
+        host.set_player_status(player, Some(most as f32), None, None);
+    }
+    for effect in &effects.restful_sleep {
+        host.remove_effect(player, effect);
+    }
+}
+
+/// Near their home, the player keeps their near-home effects.
+fn home_effects(host: &mut dyn Host, player: u128, dimension: &str, feet: [f64; 3]) {
+    let Some(effects) = effects_of(player).filter(|e| !e.near_home.is_empty()) else {
+        return;
+    };
+    if !due(&HOME_DUE, player, HOME_CHECK_TICKS) {
+        return;
+    }
+    homes::ensure_loaded(host);
+    let Some(home) = homes::home_of(player) else {
+        return;
+    };
+    let now = host.effects(player).unwrap_or_default();
+    for (radius, effect, amplifier) in &effects.near_home {
+        if !homes::near(&home, dimension, feet, *radius) {
+            continue;
+        }
+        let left = now
+            .iter()
+            .find(|e| e.id == *effect && e.amplifier >= *amplifier)
+            .map_or(0, |e| e.duration);
+        if left < HOME_EFFECT_TOP_UP {
+            host.add_effect(
+                player,
+                &NativeEffect {
+                    id: effect.clone(),
+                    amplifier: *amplifier,
+                    duration: HOME_EFFECT_TICKS,
+                    ambient: true,
+                    particles: false,
+                },
+            );
+        }
+    }
+}
+
+/// The homes of the players online, each with `radius` from their effects.
+fn online_homes(radius: impl Fn(&ActiveEffects) -> Option<u32>) -> Vec<(homes::Home, u32)> {
+    online_players()
+        .into_iter()
+        .filter_map(|player| {
+            let r = effects_of(player).and_then(|e| radius(&e))?;
+            Some((homes::home_of(player)?, r))
+        })
+        .collect()
+}
+
+/// An explosion in `dimension` is about to break `blocks`: those near the home of an online player with a home
+/// ward are spared.
+pub fn on_explosion(dimension: &str, blocks: &mut Vec<[i32; 3]>) {
+    let wards = online_homes(|e| e.home_ward);
+    if wards.is_empty() {
+        return;
+    }
+    blocks.retain(|block| {
+        let centre = block.map(|v| f64::from(v) + 0.5);
+        !wards
+            .iter()
+            .any(|(home, radius)| homes::near(home, dimension, centre, *radius))
+    });
+}
+
+/// Whether a natural spawn of `category` may happen at `pos`: monsters are kept away from the home of an online
+/// player with a safe haven.
+pub fn may_spawn(dimension: &str, category: &str, pos: [i32; 3]) -> bool {
+    if category != MONSTER {
+        return true;
+    }
+    let centre = pos.map(|v| f64::from(v) + 0.5);
+    !online_homes(|e| e.safe_haven)
+        .iter()
+        .any(|(home, radius)| homes::near(home, dimension, centre, *radius))
 }
 
 /// On the interval, each enchanted item worn, in the off hand or in the hand loses some damage.
@@ -270,9 +399,10 @@ pub fn on_kill(host: &dyn Host, entity: u32, kind: &str) {
     }
 }
 
-/// A player is breaking the block at `pos`: a ripe crop they replant is noted, to take a seed from its drops.
-pub fn on_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3]) {
-    let Some(effects) = effects_of(player).filter(|e| !e.replant.is_empty()) else {
+/// A player is breaking the block at `pos` (`placed` when a player had placed it): a block they placed is noted
+/// for salvage, and a ripe crop they replant is noted, to take a seed from its drops.
+pub fn on_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3], placed: bool) {
+    let Some(effects) = effects_of(player) else {
         return;
     };
     let Some(level) = host.level(dimension) else {
@@ -281,6 +411,12 @@ pub fn on_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3
     let Some(block) = host.level_block(level, pos) else {
         return;
     };
+    // A planted crop has an age; its harvest is not salvaged.
+    if placed && effects.salvage && host.level_block_property(level, pos, AGE).is_none() {
+        let mut salvage = lock(&SALVAGE);
+        salvage.retain(|(_, d, p, _)| d != dimension || *p != pos);
+        salvage.push((player, dimension.to_string(), pos, block.clone()));
+    }
     let Some(crop) = effects.replant.iter().find(|crop| crop.block == block) else {
         return;
     };
@@ -301,8 +437,28 @@ pub fn on_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3
     });
 }
 
-/// A block broken by `player` drops `drops`: a noted ripe crop gives up one of its seeds to be planted again.
-pub fn on_drops(player: u128, dimension: &str, pos: [i32; 3], drops: &mut Vec<ItemStack>) {
+/// A block broken by `player` drops `drops`: a placed block noted for salvage drops itself instead, and a noted
+/// ripe crop gives up one of its seeds to be planted again.
+pub fn on_drops(
+    host: &dyn Host,
+    player: u128,
+    dimension: &str,
+    pos: [i32; 3],
+    drops: &mut Vec<ItemStack>,
+) {
+    let salvaged = {
+        let mut salvage = lock(&SALVAGE);
+        let at = salvage
+            .iter()
+            .position(|(p, d, at, _)| *p == player && d == dimension && *at == pos);
+        at.map(|at| salvage.remove(at).3)
+    };
+    if let Some(block) = salvaged
+        && let Some(item) = host.item_from_snbt(&format!("{{id:\"{block}\",count:1}}"))
+    {
+        *drops = vec![item];
+        return;
+    }
     let mut replants = lock(&REPLANTS);
     let Some(replant) = replants
         .iter_mut()
@@ -402,6 +558,10 @@ pub(crate) fn reset() {
     lock(&ARMOR_RUNES).clear();
     lock(&SEEN_EFFECTS).clear();
     lock(&REPAIR_DUE).clear();
+    lock(&SALVAGE).clear();
+    lock(&IN_BED).clear();
+    lock(&RESTED).clear();
+    lock(&HOME_DUE).clear();
 }
 
 #[cfg(test)]
@@ -569,13 +729,13 @@ mod tests {
         // When the player breaks both, each dropping wheat and two seeds, and their tick runs
         let mut kept = Vec::new();
         for pos in [[1, 64, 0], [2, 64, 0]] {
-            on_break(&mut host, PLAYER, OVERWORLD, pos);
+            on_break(&mut host, PLAYER, OVERWORLD, pos, false);
             host.blocks.remove(&pos);
             let mut drops = vec![
                 ItemStack::new("minecraft:wheat", 1),
                 ItemStack::new("minecraft:wheat_seeds", 2),
             ];
-            on_drops(PLAYER, OVERWORLD, pos, &mut drops);
+            on_drops(&host, PLAYER, OVERWORLD, pos, &mut drops);
             kept.push(drops.iter().map(|s| s.count).sum::<u32>());
         }
         tick(&mut host, 20.0);
@@ -721,5 +881,142 @@ mod tests {
         // Then the chestplate is at 40, the helmet untouched, and the sword fully mended
         let damage = |i: usize| host.slots[i].as_ref().unwrap().damage;
         assert_eq!((damage(38), damage(39), damage(0)), (40, 50, 0));
+    }
+
+    fn at_home(host: &mut TestHost) {
+        crate::server::homes::set(host, PLAYER, OVERWORLD, [0, 64, 0], "bed");
+    }
+
+    #[test]
+    fn blocks_the_player_placed_drop_themselves() {
+        // Given salvage, and a placed glass, a glass nobody placed, and a placed block with no item
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(&mut host, json!([{"type": "salvage"}]));
+        host.unknown_items.push("minecraft:fire".into());
+        let breaks = [
+            ([1, 64, 0], "minecraft:glass", true),
+            ([2, 64, 0], "minecraft:glass", false),
+            ([3, 64, 0], "minecraft:fire", true),
+        ];
+
+        // When the player breaks each and they drop nothing
+        let mut dropped = Vec::new();
+        for (pos, block, placed) in breaks {
+            host.blocks.insert(pos, (block.to_string(), vec![]));
+            on_break(&mut host, PLAYER, OVERWORLD, pos, placed);
+            let mut drops = Vec::new();
+            on_drops(&host, PLAYER, OVERWORLD, pos, &mut drops);
+            dropped.push(drops.iter().map(|s| s.item.to_string()).collect::<Vec<_>>());
+        }
+
+        // Then only the placed glass drops itself
+        assert_eq!(
+            dropped,
+            vec![vec!["minecraft:glass".to_string()], vec![], vec![]]
+        );
+    }
+
+    #[test]
+    fn a_full_sleep_heals_and_clears_but_a_nap_does_not() {
+        // Given restful sleep clearing poison, and a poisoned player
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "restful_sleep", "clears": ["minecraft:poison"]}]),
+        );
+        host.active_effects.push(NativeEffect {
+            id: "minecraft:poison".into(),
+            amplifier: 0,
+            duration: 400,
+            ambient: false,
+            particles: true,
+        });
+
+        // When they nap for 10 ticks, then sleep 100, their tick running after each
+        on_bed_enter(PLAYER);
+        for _ in 0..10 {
+            tick(&mut host, 10.0);
+        }
+        on_bed_leave(PLAYER);
+        tick(&mut host, 10.0);
+        let after_nap = (host.health_set.clone(), host.active_effects.len());
+        on_bed_enter(PLAYER);
+        for _ in 0..100 {
+            tick(&mut host, 10.0);
+        }
+        on_bed_leave(PLAYER);
+        tick(&mut host, 10.0);
+
+        // Then the nap did nothing, and the sleep healed them to their 24 health and took the poison off
+        assert_eq!(after_nap, (vec![], 1));
+        assert_eq!(host.health_set, vec![(PLAYER, 24.0)]);
+        assert!(host.active_effects.is_empty());
+    }
+
+    #[test]
+    fn near_home_the_player_gets_its_effect() {
+        // Given regeneration within 16 blocks of home, and a bed at 0 64 0
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "near_home", "radius": 16, "effect": "minecraft:regeneration", "amplifier": 0}]),
+        );
+        at_home(&mut host);
+
+        // When the player spends two seconds by the bed, then two seconds 40 blocks away
+        for _ in 0..40 {
+            tick(&mut host, 20.0);
+        }
+        let near = host.effects_given.len();
+        host.effects_given.clear();
+        for _ in 0..40 {
+            run(&mut host, Vec::new());
+            run_for(&mut host, PLAYER, OVERWORLD, [40.5, 64.0, 0.5], 20.0, 0);
+        }
+
+        // Then they had regeneration at home and none away
+        assert!(near > 0);
+        assert!(host.effects_given.is_empty());
+    }
+
+    #[test]
+    fn explosions_near_home_spare_the_blocks_while_the_owner_is_on() {
+        // Given a home ward of 24 blocks, a bed at 0 64 0, and the owner online
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(&mut host, json!([{"type": "home_ward", "radius": 24}]));
+        at_home(&mut host);
+        crate::server::state::logged_in(PLAYER, "Ann");
+
+        // When a creeper blows up blocks by the bed and far away, and one in the nether by the same spot
+        let mut blocks = vec![[5, 64, 5], [100, 64, 0]];
+        on_explosion(OVERWORLD, &mut blocks);
+        let mut nether = vec![[5, 64, 5]];
+        on_explosion("minecraft:the_nether", &mut nether);
+
+        // Then only the far block and the nether one break
+        assert_eq!(blocks, vec![[100, 64, 0]]);
+        assert_eq!(nether, vec![[5, 64, 5]]);
+    }
+
+    #[test]
+    fn monsters_do_not_spawn_near_a_safe_home() {
+        // Given a safe haven of 32 blocks, a bed at 0 64 0, and the owner online
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(&mut host, json!([{"type": "safe_haven", "radius": 32}]));
+        at_home(&mut host);
+        crate::server::state::logged_in(PLAYER, "Ann");
+
+        // When monsters and animals would spawn by the bed, and monsters far away
+        let near = may_spawn(OVERWORLD, "monster", [10, 64, 10]);
+        let animals = may_spawn(OVERWORLD, "creature", [10, 64, 10]);
+        let far = may_spawn(OVERWORLD, "monster", [80, 64, 0]);
+
+        // Then only the monsters by the bed are kept away
+        assert_eq!((near, animals, far), (false, true, true));
     }
 }

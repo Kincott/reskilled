@@ -3,17 +3,18 @@
 use horizon_client::mod_api::{
     AddServerReloadListenersEvent, AttackEntityEvent, BabyEntitySpawnEvent, BlockExpEvent,
     ClientDisconnectingEvent, ContainerOpenedEvent, DestroyBlockEvent, EnchantItemEvent,
-    EntityMountEvent, EntityTameEvent, Flow, FurnaceExtractEvent, GuiRenderPostEvent, Hooks, Host,
-    InteractEntityEvent, InventoryClickEvent, ItemDecorationsEvent, ItemStack, KeyEvent, LevelHost,
-    LivingDeathEvent, LivingEntityUseItemStartEvent, LivingExperienceDropEvent,
-    LivingIncomingDamageEvent, LivingIncomingDamageV2Event, LootDropsEvent,
-    ModifyDefaultComponentsEvent, NetFromClientEvent, NetFromServerEvent, OnEquipEvent,
-    PerformCommandEvent, PerformConsoleCommandEvent, PlaceBlockEvent, PlayerCloneEvent,
-    PlayerLoggedInEvent, PlayerLoggedOutEvent, PlayerSwapHandsEvent, PlayerTickEvent,
-    PlayerXpChangeEvent, PrepareAnvilEvent, RegisterCommandsEvent,
-    ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent, ScreenRenderPostEvent,
-    ServerDataLoadedEvent, ServerReloadListenerApplyEvent, ServerStoppedEvent, TickEvent,
-    TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
+    EntityMountEvent, EntityTameEvent, ExplosionDetonateEvent, Flow, FurnaceExtractEvent,
+    GuiRenderPostEvent, Hooks, Host, InteractEntityEvent, InventoryClickEvent,
+    ItemDecorationsEvent, ItemStack, KeyEvent, LevelHost, LivingDeathEvent,
+    LivingEntityUseItemStartEvent, LivingExperienceDropEvent, LivingIncomingDamageEvent,
+    LivingIncomingDamageV2Event, LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent,
+    NetFromServerEvent, OnEquipEvent, PerformCommandEvent, PerformConsoleCommandEvent,
+    PlaceBlockEvent, PlayerBedEnterEvent, PlayerBedLeaveEvent, PlayerCloneEvent,
+    PlayerLoggedInEvent, PlayerLoggedOutEvent, PlayerSpawnPointSetEvent, PlayerSwapHandsEvent,
+    PlayerTickEvent, PlayerXpChangeEvent, PotentialSpawnsEvent, PrepareAnvilEvent,
+    RegisterCommandsEvent, ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent,
+    ScreenRenderPostEvent, ServerDataLoadedEvent, ServerReloadListenerApplyEvent,
+    ServerStoppedEvent, TickEvent, TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
 };
 use skills_core::defs::Action;
 
@@ -157,7 +158,7 @@ impl Hooks for Mod {
             let rewarded = server::focus::rewarded(player.game_mode);
             let placed =
                 server::focus::on_break(host, player.uuid, rewarded, &player.dimension, event.pos);
-            server::mechanics::on_break(host, player.uuid, &player.dimension, event.pos);
+            server::mechanics::on_break(host, player.uuid, &player.dimension, event.pos, placed);
             if rewarded && !placed {
                 server::earning::on_break(host, player.uuid, main_hand.as_deref());
             }
@@ -248,7 +249,7 @@ impl Hooks for Mod {
     fn loot_drops(&self, host: &mut dyn Host, event: &mut LootDropsEvent<'_>) {
         let context = event.context;
         if let (Some(player), Some((pos, _))) = (context.player, context.block) {
-            server::mechanics::on_drops(player, context.dimension, pos, event.drops);
+            server::mechanics::on_drops(host, player, context.dimension, pos, event.drops);
             server::effects::bonus_drops(
                 host,
                 player,
@@ -337,6 +338,37 @@ impl Hooks for Mod {
     ) -> Flow {
         server::mechanics::on_weapon_hit(event.causing, event.weapon, &mut event.amount);
         Flow::Continue
+    }
+
+    fn player_spawn_point_set(
+        &self,
+        host: &mut dyn Host,
+        event: &mut PlayerSpawnPointSetEvent<'_>,
+    ) -> Flow {
+        server::homes::set(host, event.player, event.dimension, event.pos, event.cause);
+        Flow::Continue
+    }
+
+    fn player_bed_enter(&self, _host: &mut dyn Host, event: &mut PlayerBedEnterEvent<'_>) -> Flow {
+        server::mechanics::on_bed_enter(event.player);
+        Flow::Continue
+    }
+
+    fn player_bed_leave(&self, _host: &mut dyn Host, event: &mut PlayerBedLeaveEvent<'_>) {
+        server::mechanics::on_bed_leave(event.player);
+    }
+
+    fn explosion_detonate(&self, host: &mut dyn Host, event: &mut ExplosionDetonateEvent<'_>) {
+        server::homes::ensure_loaded(host);
+        server::mechanics::on_explosion(event.dimension, event.blocks);
+    }
+
+    fn potential_spawns(&self, _host: &dyn Host, event: &mut PotentialSpawnsEvent<'_>) -> Flow {
+        if server::mechanics::may_spawn(event.dimension, event.category, event.pos) {
+            Flow::Continue
+        } else {
+            Flow::Cancel
+        }
     }
 
     fn living_death(&self, host: &mut dyn Host, event: &mut LivingDeathEvent<'_>) -> Flow {
