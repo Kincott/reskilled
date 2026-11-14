@@ -70,7 +70,26 @@ pub fn on_break(host: &dyn Host, player: u128, main_hand: Option<&str>) {
     }
 }
 
-pub fn on_attack(player: u128) {
+/// Things a blow lands on that are not creatures: hitting them grows nothing.
+const NOT_CREATURES: [&str; 8] = [
+    "minecraft:armor_stand",
+    "minecraft:item_frame",
+    "minecraft:glow_item_frame",
+    "minecraft:painting",
+    "minecraft:end_crystal",
+    "minecraft:leash_knot",
+    "minecraft:interaction",
+    "minecraft:item",
+];
+
+/// A blow on an entity of `kind`: Melee grows when it is a creature, not a boat, a minecart or a decoration.
+pub fn on_attack(player: u128, kind: &str) {
+    let vehicle = ["boat", "_raft", "minecart"]
+        .iter()
+        .any(|end| kind.ends_with(end));
+    if vehicle || NOT_CREATURES.contains(&kind) {
+        return;
+    }
     note(player, MELEE, 1.0);
 }
 
@@ -259,6 +278,36 @@ mod tests {
     }
 
     #[test]
+    fn blows_on_things_that_are_not_creatures_grow_nothing() {
+        // Given skills growing by doing, Melee at 1 (ten blows to climb)
+        let _serial = exclusive();
+        let mut host = world(Progression::Earn, 100);
+
+        // When the player strikes boats, minecarts, armor stands, item frames and paintings ten times each
+        for kind in [
+            "minecraft:oak_boat",
+            "minecraft:minecart",
+            "minecraft:armor_stand",
+            "minecraft:item_frame",
+            "minecraft:painting",
+            "minecraft:end_crystal",
+        ] {
+            for _ in 0..10 {
+                on_attack(PLAYER, kind);
+            }
+        }
+        run_for(&mut host, PLAYER);
+        let after_things = at(&mut host, "melee");
+        for _ in 0..10 {
+            on_attack(PLAYER, "minecraft:zombie");
+        }
+        run_for(&mut host, PLAYER);
+
+        // Then none of it counts, and ten blows on a zombie do
+        assert_eq!((after_things, at(&mut host, "melee")), (1, 2));
+    }
+
+    #[test]
     fn the_pace_scales_what_work_is_worth() {
         // Given skills growing by doing at half pace
         let _serial = exclusive();
@@ -288,7 +337,7 @@ mod tests {
         // When the player does plenty of work and their tick runs
         for _ in 0..50 {
             on_break(&host, PLAYER, Some("minecraft:iron_pickaxe"));
-            on_attack(PLAYER);
+            on_attack(PLAYER, "minecraft:zombie");
         }
         run_for(&mut host, PLAYER);
 
@@ -311,7 +360,7 @@ mod tests {
         // When the player strikes ten blows, enchants twice, tames an animal, walks 200 blocks, lands ten
         // projectile hits and takes ten hits, and their tick runs
         for _ in 0..10 {
-            on_attack(PLAYER);
+            on_attack(PLAYER, "minecraft:zombie");
             on_projectile_hit(PLAYER);
             on_hit_taken(PLAYER);
         }

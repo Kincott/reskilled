@@ -127,7 +127,7 @@ impl Hooks for Mod {
         })
     }
 
-    fn attack_entity(&self, host: &mut dyn Host, _event: &mut AttackEntityEvent<'_>) -> Flow {
+    fn attack_entity(&self, host: &mut dyn Host, event: &mut AttackEntityEvent<'_>) -> Flow {
         let main_hand = host.held().map(|(item, _, _)| item);
         let flow = acted(host, |host, actor| {
             enforce::on_attack(host, actor, main_hand.as_deref())
@@ -136,7 +136,7 @@ impl Hooks for Mod {
             && let Some(player) = host.acting_player()
             && server::focus::rewarded(player.game_mode)
         {
-            server::earning::on_attack(player.uuid);
+            server::earning::on_attack(player.uuid, event.kind);
         }
         flow
     }
@@ -154,8 +154,9 @@ impl Hooks for Mod {
             && let Some(player) = host.acting_player()
         {
             let rewarded = server::focus::rewarded(player.game_mode);
-            server::focus::on_break(host, player.uuid, rewarded, &player.dimension, event.pos);
-            if rewarded {
+            let placed =
+                server::focus::on_break(host, player.uuid, rewarded, &player.dimension, event.pos);
+            if rewarded && !placed {
                 server::earning::on_break(host, player.uuid, main_hand.as_deref());
             }
         }

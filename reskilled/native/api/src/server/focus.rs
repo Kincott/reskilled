@@ -70,8 +70,15 @@ pub fn on_place(dimension: &str, pos: [i32; 3]) {
 }
 
 /// A player breaks a block: points for each reward it matches, and the block's XP noted as theirs. `rewarded` is
-/// false for a creative or spectator player, who earns nothing.
-pub fn on_break(host: &mut dyn Host, player: u128, rewarded: bool, dimension: &str, pos: [i32; 3]) {
+/// false for a creative or spectator player, who earns nothing. Whether a player had placed the block, so other
+/// rewards for work (earning) can leave it out.
+pub fn on_break(
+    host: &mut dyn Host,
+    player: u128,
+    rewarded: bool,
+    dimension: &str,
+    pos: [i32; 3],
+) -> bool {
     let spot = (dimension.to_string(), pos);
     let placed = {
         let mut placed = lock(&PLACED);
@@ -81,9 +88,14 @@ pub fn on_break(host: &mut dyn Host, player: u128, rewarded: bool, dimension: &s
         }
         was
     };
-    if !rewarded {
-        return;
+    if rewarded {
+        pay_break(host, player, dimension, pos, placed);
     }
+    placed
+}
+
+/// [`on_break`]'s rewards for a player who earns them.
+fn pay_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3], placed: bool) {
     lock(&BROKEN).insert(pos, (player, queue::now()));
     let rewards = rewards_of(player);
     if !rewards.iter().any(|r| matches!(r, Reward::Break { .. })) {
@@ -375,6 +387,22 @@ mod tests {
         assert_eq!(after_three, 0);
         assert_eq!(paid(&host), 2);
         assert_eq!(owed(PLAYER), 0.25);
+    }
+
+    #[test]
+    fn breaking_says_whether_the_block_was_placed_by_a_player() {
+        // Given a player focused on Working and a log nobody placed
+        let _serial = exclusive();
+        let mut host = focused(&["working"]);
+        log_at(&mut host, LOG);
+
+        // When they place a log and break it, then break the natural one
+        on_place(OVERWORLD, LOG);
+        let placed = on_break(&mut host, PLAYER, true, OVERWORLD, LOG);
+        let natural = on_break(&mut host, PLAYER, true, OVERWORLD, LOG);
+
+        // Then the first break says the block was placed, so other rewards (earning) can skip it
+        assert_eq!((placed, natural), (true, false));
     }
 
     #[test]
