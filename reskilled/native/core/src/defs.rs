@@ -70,6 +70,9 @@ pub struct PerkDef {
     /// Perks that must be bought first.
     #[serde(default)]
     pub requires: Vec<String>,
+    /// Levels in other skills needed as well, to buy it and to keep it working.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub also_needs: BTreeMap<String, u32>,
     pub effects: Vec<Effect>,
 }
 
@@ -732,6 +735,7 @@ mod tests {
                 cost: 2,
                 min_level: 8,
                 requires: vec!["reskilled:mining_sure_grip".into()],
+                also_needs: Default::default(),
                 effects: vec![
                     Effect::Attribute {
                         attribute: "minecraft:block_break_speed".into(),

@@ -133,6 +133,11 @@ pub enum Refusal {
     BelowMinLevel {
         needed: u32,
     },
+    /// The perk also needs this level of the player's own in another skill.
+    BelowSkillLevel {
+        skill: String,
+        needed: u32,
+    },
     MissingPerk {
         perk: String,
     },
@@ -467,6 +472,17 @@ pub fn levels_for_points(level: u32, points: u32) -> Option<(u32, u32)> {
     Some((taken.0, taken.1 - points))
 }
 
+/// The first other skill the perk needs that the player's own level falls short of, with the level it needs.
+pub fn missing_skill<'a>(
+    defs: &Defs,
+    state: &PlayerState,
+    perk: &'a PerkDef,
+) -> Option<(&'a String, &'a u32)> {
+    perk.also_needs
+        .iter()
+        .find(|(skill, needed)| own_level(state, defs, skill) < **needed)
+}
+
 fn buy_perk(defs: &Defs, state: &PlayerState, id: &str) -> Result<Outcome, Refusal> {
     let perk = defs.perks.get(id).ok_or(Refusal::UnknownPerk)?;
     if owns(state, id) {
@@ -475,6 +491,12 @@ fn buy_perk(defs: &Defs, state: &PlayerState, id: &str) -> Result<Outcome, Refus
     if own_level(state, defs, &perk.skill) < perk.min_level {
         return Err(Refusal::BelowMinLevel {
             needed: perk.min_level,
+        });
+    }
+    if let Some((skill, needed)) = missing_skill(defs, state, perk) {
+        return Err(Refusal::BelowSkillLevel {
+            skill: skill.clone(),
+            needed: *needed,
         });
     }
     if let Some(missing) = perk.requires.iter().find(|required| !owns(state, required)) {
@@ -561,6 +583,7 @@ pub fn active_perks<'a>(defs: &'a Defs, state: &PlayerState) -> Vec<&'a PerkDef>
             owns(state, &perk.id)
                 && !switched_off(state, &perk.id)
                 && own_level(state, defs, &perk.skill) >= perk.min_level
+                && missing_skill(defs, state, perk).is_none()
         })
         .collect()
 }
@@ -604,6 +627,7 @@ mod tests {
             cost,
             min_level,
             requires: requires.iter().map(|r| r.to_string()).collect(),
+            also_needs: BTreeMap::new(),
             effects: vec![],
         }
     }
@@ -649,6 +673,52 @@ mod tests {
         let mut state = at_level(MINING, shared);
         state.skills.get_mut(MINING).unwrap().own = Some(own);
         state
+    }
+
+    #[test]
+    fn a_perk_needing_another_skill_waits_for_its_own_level() {
+        // Given a Mining perk that also needs Melee 5, and players at Melee 4, at 5, and lifted to 9 from an own 4
+        let mut defs = defs();
+        let mut both = perk("reskilled:both", 1, 1, &[]);
+        both.also_needs = [(MELEE.to_string(), 5)].into();
+        defs.perks.insert(both.id.clone(), both);
+        let melee = |level: u32, own: Option<u32>| {
+            let mut state = at_level(MINING, 4);
+            state.skills.insert(
+                MELEE.into(),
+                SkillProgress {
+                    level,
+                    own,
+                    ..SkillProgress::default()
+                },
+            );
+            state
+        };
+
+        // When each tries to buy it, and the one who bought it at 5 drops to an own Melee 4
+        let short = apply(&defs, &melee(4, None), PLENTY, &buy("reskilled:both"));
+        let enough = apply(&defs, &melee(5, None), PLENTY, &buy("reskilled:both")).unwrap();
+        let lifted = apply(&defs, &melee(9, Some(4)), PLENTY, &buy("reskilled:both"));
+        let mut dropped = enough.state.clone();
+        dropped.skills.get_mut(MELEE).unwrap().level = 4;
+
+        // Then only Melee 5 of their own buys it, and below it the perk stops working
+        let refused = Err(Refusal::BelowSkillLevel {
+            skill: MELEE.into(),
+            needed: 5,
+        });
+        assert_eq!(short, refused);
+        assert_eq!(lifted, refused);
+        assert!(
+            active_perks(&defs, &enough.state)
+                .iter()
+                .any(|p| p.id == "reskilled:both")
+        );
+        assert!(
+            !active_perks(&defs, &dropped)
+                .iter()
+                .any(|p| p.id == "reskilled:both")
+        );
     }
 
     #[test]

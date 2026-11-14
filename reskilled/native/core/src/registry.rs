@@ -176,14 +176,13 @@ fn resolve_perks(
     errors: &mut Vec<DefError>,
 ) -> BTreeMap<String, PerkDef> {
     perks.retain(|id, perk| {
-        let known = skills.contains_key(&perk.def.skill);
-        if !known {
-            errors.push(perk.error(format!(
-                "perk {id:?} names unknown skill {:?}",
-                perk.def.skill
-            )));
+        let unknown = std::iter::once(&perk.def.skill)
+            .chain(perk.def.also_needs.keys())
+            .find(|skill| !skills.contains_key(*skill));
+        if let Some(unknown) = unknown {
+            errors.push(perk.error(format!("perk {id:?} names unknown skill {unknown:?}")));
         }
-        known
+        unknown.is_none()
     });
     loop {
         let present: BTreeSet<String> = perks.keys().cloned().collect();
@@ -528,6 +527,30 @@ mod tests {
             errors[0].reason
         );
         assert!(errors[1].reason.contains("\"p:a\""), "{}", errors[1].reason);
+    }
+
+    #[test]
+    fn perk_also_needing_an_unknown_skill_is_dropped_with_error() {
+        // Given a perk that also needs a skill nobody defines
+        let json = format!(
+            r#"{{"format": 1, "id": "p:a", "skill": "{MINING}", "name": "n", "description": "d", "cost": 1,
+                "min_level": 1, "also_needs": {{"p:nothing": 4}}, "effects": []}}"#
+        );
+        let files = vec![
+            skill("s:reskilled/skills/mining", 0, MINING, 0, "minecraft:stone"),
+            source("p:reskilled/perks/a", 1, DefKind::Perk, &json),
+        ];
+
+        // When they are merged
+        let (defs, errors) = build(files);
+
+        // Then it is dropped, saying which skill is unknown
+        assert!(defs.perks.is_empty());
+        assert!(
+            errors[0].reason.contains("\"p:nothing\""),
+            "{}",
+            errors[0].reason
+        );
     }
 
     #[test]

@@ -4,8 +4,8 @@
 use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
 use skills_core::defs::{PerkDef, Reward};
 use skills_core::progress::{
-    PlayerState, Request, apply_under, earn_threshold, focus_cost, level, mastered, own_level,
-    points_available, raise_cost, switched_off, total_points,
+    PlayerState, Request, apply_under, earn_threshold, focus_cost, level, mastered, missing_skill,
+    own_level, points_available, raise_cost, switched_off, total_points,
 };
 use skills_core::registry::Defs;
 use skills_core::rules::{CostUnit, Respec, Rules};
@@ -75,9 +75,12 @@ fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
     if owns(state, &perk.id) {
         return PerkStatus::Owned;
     }
-    if level(state, defs, &perk.skill) < perk.min_level {
+    if own_level(state, defs, &perk.skill) < perk.min_level {
         let needs = [skill_name(defs, &perk.skill), number(perk.min_level)];
         return PerkStatus::Locked(say(&NEEDS, &needs));
+    }
+    if let Some((skill, needed)) = missing_skill(defs, state, perk) {
+        return PerkStatus::Locked(say(&NEEDS, &[skill_name(defs, skill), number(*needed)]));
     }
     if let Some(missing) = perk.requires.iter().find(|r| !owns(state, r)) {
         return PerkStatus::Locked(say(&MISSING_PERK, &[perk_name(defs, missing)]));
@@ -784,8 +787,13 @@ fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
     let enough = points_available(d, state, &perk.skill) >= perk.cost;
     lines.push(say(&PERK_COST, &[number(perk.cost)]).with_color(met(enough)));
     if perk.min_level > 1 {
-        let reached = level(state, d, &perk.skill) >= perk.min_level;
+        let reached = own_level(state, d, &perk.skill) >= perk.min_level;
         let needs = [skill_name(d, &perk.skill), number(perk.min_level)];
+        lines.push(say(&NEEDS, &needs).with_color(met(reached)));
+    }
+    for (skill, needed) in &perk.also_needs {
+        let reached = own_level(state, d, skill) >= *needed;
+        let needs = [skill_name(d, skill), number(*needed)];
         lines.push(say(&NEEDS, &needs).with_color(met(reached)));
     }
     for other in &perk.requires {
@@ -1041,6 +1049,7 @@ mod tests {
             cost: 1,
             min_level,
             requires: requires.iter().map(|r| format!("reskilled:{r}")).collect(),
+            also_needs: Default::default(),
             effects: vec![],
         }
     }
@@ -1510,6 +1519,28 @@ mod tests {
                 "Cost: 1 perk points",
                 "Needs Mining 16"
             ]
+        );
+    }
+
+    #[test]
+    fn a_perk_lists_the_other_skills_it_needs() {
+        // Given Mining's view, its third perk (Deep Veins) also needing Melee 20, the player at Melee 1
+        let _serial = exclusive();
+        let host = mining_open();
+        with(|cache| {
+            let perks = &mut cache.defs.as_mut().unwrap().defs.perks;
+            let deep = perks.values_mut().find(|p| p.min_level == 16).unwrap();
+            deep.also_needs = [(MELEE.to_string(), 20)].into();
+        });
+        let row = mining_view().rows[2];
+
+        // When the mouse is over it
+        drawn(&host, inside(&row.rect));
+
+        // Then its tooltip also says it needs Melee 20
+        assert_eq!(
+            tooltip(&host).last().map(String::as_str),
+            Some("Needs Melee 20")
         );
     }
 

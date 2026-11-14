@@ -308,6 +308,10 @@ pub fn refusal(defs: &Defs, refusal: &Refusal, request: &Request) -> Text {
                 &[skill.unwrap_or_else(Text::empty), number(*needed)],
             )
         }
+        Refusal::BelowSkillLevel { skill, needed } => say(
+            &BELOW_MIN_LEVEL,
+            &[skill_name(defs, skill), number(*needed)],
+        ),
         Refusal::MissingPerk { perk } => say(&MISSING_PERK, &[perk_name(defs, perk)]),
         Refusal::AlreadyOwned => say(&ALREADY_OWNED, &[]),
         Refusal::AlreadyFocused => say(&ALREADY_FOCUSED, &[]),

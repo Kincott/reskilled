@@ -184,6 +184,7 @@ mod tests {
             cost: 1,
             min_level,
             requires: vec![],
+            also_needs: Default::default(),
             effects,
         }
     }
