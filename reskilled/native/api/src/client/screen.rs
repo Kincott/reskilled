@@ -22,10 +22,10 @@ use crate::text::{
     ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
     FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
     NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_BY,
-    RAISE_MANY, RAISE_TO, REFUND, REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK,
-    REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, SWITCHED_OFF,
-    TITLE, UNLOCK, VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description,
-    perk_name, say, skill_name,
+    RAISE_CTRL, RAISE_SHIFT, RAISE_TO, REFUND, REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP,
+    REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS,
+    SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number,
+    perk_description, perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -475,7 +475,8 @@ fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     vec![
         say(&RAISE_TO, &[number(level(state, d, skill) + 1)]).with_color(WHITE),
         cost_line(pen.rules, cost).with_color(colour),
-        say(&RAISE_MANY, &[]).with_color(GRAY),
+        say(&RAISE_SHIFT, &[]).with_color(GRAY),
+        say(&RAISE_CTRL, &[]).with_color(GRAY),
     ]
 }
 
@@ -1511,7 +1512,8 @@ mod tests {
             vec![
                 "Raise to level 13",
                 "Cost: 12 XP levels",
-                "Hold Shift for +5, Ctrl for all you can pay for."
+                "Shift: +5 levels",
+                "Ctrl: all you can pay for"
             ]
         );
     }
@@ -1749,8 +1751,8 @@ mod tests {
 
         // Then its tooltip ends with the hint
         assert_eq!(
-            tooltip(&host).last().map(String::as_str),
-            Some("Hold Shift for +5, Ctrl for all you can pay for.")
+            tooltip(&host)[2..],
+            ["Shift: +5 levels", "Ctrl: all you can pay for"]
         );
     }
 
