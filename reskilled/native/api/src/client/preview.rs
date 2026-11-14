@@ -540,7 +540,16 @@ fn the_guide_fits_the_window() {
                 });
                 let rows = |text: &str, w: f32| super::paint::wrapped(&host, text, w).len();
                 let card_rows: usize = lines.iter().map(|(text, _)| rows(text, p.lines.w)).sum();
-                assert!(card_rows <= 3, "{name}: card lines {lines:?} are cut");
+                // Two rows: the footer may take the third when its needs wrap.
+                assert!(card_rows <= 2, "{name}: card lines {lines:?} may be cut");
+                let cut: Vec<&String> = painted
+                    .iter()
+                    .filter_map(|paint| match paint {
+                        Paint::Text { text, .. } if text.contains("...") => Some(text),
+                        _ => None,
+                    })
+                    .collect();
+                assert!(cut.is_empty(), "{name}: {cut:?} is cut short");
                 let Some(guide) = guide else {
                     continue;
                 };
@@ -555,5 +564,33 @@ fn the_guide_fits_the_window() {
                 assert!(blocks.is_some_and(|n| n > 0), "{name}: an empty scene");
             }
         }
+    }
+}
+
+#[test]
+fn a_perk_with_two_needs_shows_both() {
+    for size in [SMALLEST, USUAL] {
+        // Given the shipped mod and Replant, which needs Gathering 16 and Agility 8, for a player with neither
+        let _serial = exclusive();
+        let host = player(size);
+        let states = known_states();
+
+        // When its guide page is drawn
+        open_guide(&skill("gathering_sapling_keeper"), 2);
+        host.painted.borrow_mut().clear();
+        let sizef = [size[0] as f32, size[1] as f32];
+        draw(&host, &mut HudBatch::new(size), sizef, AWAY);
+        let painted = save_naming(&host, &format!("guide_needs_{}", size[0]), size, &states);
+
+        // Then both needs are there in full, with the cost and Locked, inside the window and clear of each other
+        let drawn = host.drawn_text();
+        for whole in ["Needs Gathering 16", "Needs Agility 8", "Locked"] {
+            assert!(
+                drawn.iter().any(|t| t == whole),
+                "{whole} missing from {drawn:?}"
+            );
+        }
+        assert_inside_window(&host, &painted, size, "needs");
+        assert_no_text_overlap(&host, &painted, "needs");
     }
 }

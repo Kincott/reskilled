@@ -81,6 +81,15 @@ pub fn scene_blocks(host: &dyn Host, frame: &Frame) -> Vec<([i32; 3], BlockState
     blocks
 }
 
+/// Forgets every resolved state and warning, for tests that share the process.
+#[cfg(test)]
+pub fn reset() {
+    let mut resolved = lock(&RESOLVED);
+    resolved.version = 0;
+    resolved.states.clear();
+    lock(&WARNED).clear();
+}
+
 /// Takes `id` as what `state` names, as if it had been resolved: for tests whose host has no table of block states.
 #[cfg(test)]
 pub fn remember(state: &str, id: BlockStateId) {

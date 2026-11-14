@@ -164,6 +164,7 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
             .iter()
             .any(|active| active.id == perk.id);
         let lines = card_texts(perk, &cache.attributes, applied);
+        let footer = footer_rows(host, &p, d, &cache.state, perk);
         paint::slot(host, batch, &p.scene);
         match d.guides.get(&perk.id) {
             Some(guide) => {
@@ -176,7 +177,11 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
                     Look::Plain,
                     over(&p.replay),
                 );
-                draw_lines(host, batch, &p.lines, &lines);
+                let room = Rect {
+                    h: p.lines.h - footer_lift(&footer),
+                    ..p.lines
+                };
+                draw_lines(host, batch, &room, &lines);
             }
             None => {
                 let card = p.scene.shrunk(CARD_INSET);
@@ -190,7 +195,7 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
                 draw_lines(host, batch, &below, &lines);
             }
         }
-        draw_footer(host, batch, &p, d, &cache.state, perk);
+        draw_footer(host, batch, &p, &footer);
         if let Some(lines) = tip {
             host.gui_tooltip(batch, &lines, mouse);
         }
@@ -308,36 +313,27 @@ fn draw_lines(host: &dyn Host, batch: &mut HudBatch, area: &Rect, lines: &[(Stri
     }
 }
 
-/// The footer: "Owned", or what the perk costs and needs, each part green once met, with "Locked" at its end
-/// while the player cannot unlock it.
-fn draw_footer(
+/// Most rows the footer takes; a second comes out of the card lines' room.
+const FOOTER_ROWS: usize = 2;
+
+/// A footer row's parts: text, left edge and colour.
+type FooterRow = Vec<(String, f32, u32)>;
+
+/// The footer laid out in rows: "Owned", or what the perk costs and needs, each part green once met, with "Locked"
+/// at the right end of the last row while the player cannot unlock it. Parts wrap to a second row rather than being
+/// cut, so every need shows.
+fn footer_rows(
     host: &dyn Host,
-    batch: &mut HudBatch,
     p: &GuidePage,
     d: &Defs,
     state: &PlayerState,
     perk: &PerkDef,
-) {
-    let inner = p.window.shrunk(3.0);
-    host.fill(
-        batch,
-        [inner.x, p.window.y + GUIDE_RULE_Y, inner.w, 1.0],
-        paint::CARD_EDGE,
-    );
-    let y = p.window.y + GUIDE_FOOTER_Y;
+) -> Vec<FooterRow> {
     let (left, right) = (p.lines.x, p.lines.x + p.lines.w);
     if owns(state, &perk.id) {
-        host.text(batch, &say(&OWNED, &[]).plain(), [left, y], GOLD, true);
-        return;
+        return vec![vec![(say(&OWNED, &[]).plain(), left, GOLD)]];
     }
-    let right = match status(d, state, perk) {
-        PerkStatus::Locked(_) => {
-            let locked = say(&LOCKED, &[]).plain();
-            paint::text_right(host, batch, &locked, right, y, RED);
-            right - host.text_width(&locked) - FOOTER_GAP
-        }
-        PerkStatus::Owned | PerkStatus::Buyable => right,
-    };
+    let mut rows: Vec<FooterRow> = vec![Vec::new()];
     let mut x = left;
     for part in need_lines(d, state, perk) {
         let rgb = part
@@ -345,13 +341,50 @@ fn draw_footer(
             .first()
             .and_then(|s| s.style.color)
             .unwrap_or(GRAY);
-        let text = paint::fitted(host, &part.plain(), right - x);
-        if text.starts_with("...") || x >= right {
-            break;
+        let mut text = part.plain();
+        if x > left && x + host.text_width(&text) > right && rows.len() < FOOTER_ROWS {
+            rows.push(Vec::new());
+            x = left;
         }
-        host.text(batch, &text, [x, y], rgb, true);
+        if x + host.text_width(&text) > right {
+            text = paint::fitted(host, &text, right - x);
+        }
+        let row = rows.last_mut().expect("there is a row");
+        row.push((text.clone(), x, rgb));
         x += host.text_width(&text) + FOOTER_GAP;
     }
+    if let PerkStatus::Locked(_) = status(d, state, perk) {
+        let locked = say(&LOCKED, &[]).plain();
+        let width = host.text_width(&locked);
+        if x + width > right && rows.len() < FOOTER_ROWS {
+            rows.push(Vec::new());
+        }
+        let row = rows.last_mut().expect("there is a row");
+        row.push((locked, right - width, RED));
+    }
+    rows
+}
+
+/// The rule over the footer and its rows, the last at the page's foot and the others above it.
+fn draw_footer(host: &dyn Host, batch: &mut HudBatch, p: &GuidePage, rows: &[FooterRow]) {
+    let inner = p.window.shrunk(3.0);
+    let lift = footer_lift(rows);
+    host.fill(
+        batch,
+        [inner.x, p.window.y + GUIDE_RULE_Y - lift, inner.w, 1.0],
+        paint::CARD_EDGE,
+    );
+    for (n, row) in rows.iter().enumerate() {
+        let y = p.window.y + GUIDE_FOOTER_Y - lift + n as f32 * LINE;
+        for (text, x, rgb) in row {
+            host.text(batch, text, [*x, y], *rgb, true);
+        }
+    }
+}
+
+/// How far a footer of more than one row raises the rule, taken from the card lines' room.
+fn footer_lift(rows: &[FooterRow]) -> f32 {
+    rows.len().saturating_sub(1) as f32 * LINE
 }
 
 /// The perk's card lines in words, each with its colour.
