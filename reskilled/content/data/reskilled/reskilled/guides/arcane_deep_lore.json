@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "perk": "reskilled:arcane_deep_lore",
+  "priority": 0,
+  "seconds": 8,
+  "view": {"center": [1.5, 1.0, 1.5], "yaw": 35, "pitch": 30, "scale": 20, "spin": 6},
+  "steps": [
+    {"at": 0, "place": [
+      {"pos": [0, 0, 0], "block": "minecraft:stone_bricks"},
+      {"pos": [0, 0, 1], "block": "minecraft:stone_bricks"},
+      {"pos": [0, 0, 2], "block": "minecraft:stone_bricks"},
+      {"pos": [1, 0, 0], "block": "minecraft:stone_bricks"},
+      {"pos": [1, 0, 1], "block": "minecraft:stone_bricks"},
+      {"pos": [1, 0, 2], "block": "minecraft:stone_bricks"},
+      {"pos": [2, 0, 0], "block": "minecraft:stone_bricks"},
+      {"pos": [2, 0, 1], "block": "minecraft:stone_bricks"},
+      {"pos": [2, 0, 2], "block": "minecraft:stone_bricks"},
+      {"pos": [1, 1, 1], "block": "minecraft:brewing_stand"},
+      {"pos": [0, 1, 2], "block": "minecraft:cauldron"}
+    ]},
+    {"at": 0, "effect": {"effect": "minecraft:poison", "at": [0.45, 0.4]}},
+    {"at": 0, "caption": {"key": "reskilled.guide.arcane_deep_lore.1", "text": "A harmful effect is put on you."}},
+    {"at": 2.5, "icon": {"item": "minecraft:clock", "at": [0.58, 0.4]}},
+    {"at": 2.5, "caption": {"key": "reskilled.guide.arcane_deep_lore.2", "text": "It lasts only %s as long as it would.", "args": [{"effect": "shorter_effects", "field": "multiplier", "as": "percent"}]}},
+    {"at": 6, "clear": "icons"},
+    {"at": 6, "caption": {"key": "reskilled.guide.arcane_deep_lore.3", "text": "So it wears off sooner."}}
+  ]
+}

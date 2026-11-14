@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "perk": "reskilled:building_salvage",
+  "priority": 0,
+  "seconds": 8,
+  "view": {"center": [1.5, 1.0, 1.5], "yaw": 35, "pitch": 30, "scale": 20, "spin": 6},
+  "steps": [
+    {"at": 0, "place": [
+      {"pos": [0, 0, 0], "block": "minecraft:stone"},
+      {"pos": [0, 0, 1], "block": "minecraft:stone"},
+      {"pos": [0, 0, 2], "block": "minecraft:stone"},
+      {"pos": [1, 0, 0], "block": "minecraft:stone"},
+      {"pos": [1, 0, 1], "block": "minecraft:stone"},
+      {"pos": [1, 0, 2], "block": "minecraft:stone"},
+      {"pos": [2, 0, 0], "block": "minecraft:stone"},
+      {"pos": [2, 0, 1], "block": "minecraft:stone"},
+      {"pos": [2, 0, 2], "block": "minecraft:stone"}
+    ]},
+    {"at": 0, "caption": {"key": "reskilled.guide.building_salvage.1", "text": "You place a block of glass."}},
+    {"at": 1, "place": [{"pos": [1, 1, 1], "block": "minecraft:glass"}]},
+    {"at": 4, "remove": [[1, 1, 1]]},
+    {"at": 4, "icon": {"item": "minecraft:glass", "at": [0.5, 0.45]}},
+    {"at": 4, "caption": {"key": "reskilled.guide.building_salvage.2", "text": "Break it, and you get the block back."}}
+  ]
+}

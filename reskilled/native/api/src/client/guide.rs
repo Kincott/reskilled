@@ -44,7 +44,6 @@ const MIN_HEARTS: u32 = 10;
 const HEART_CONTAINER: &str = "gui/sprites/hud/heart/container";
 const HEART_FULL: &str = "gui/sprites/hud/heart/full";
 const HEART_HALF: &str = "gui/sprites/hud/heart/half";
-const EFFECT_SPRITES: &str = "gui/sprites/mob_effect/";
 /// The space between the footer's parts.
 const FOOTER_GAP: f32 = 10.0;
 /// Card lines whose values are percents (already times 100), and the one whose first value is health points.
@@ -260,8 +259,7 @@ fn draw_overlays(host: &dyn Host, batch: &mut HudBatch, box_: &Rect, frame: &Fra
             host.item(batch, item, corner, ICON);
         }
         if let Some(effect) = effect {
-            let path = effect.split_once(':').map_or(effect.as_str(), |(_, p)| p);
-            let name = format!("{EFFECT_SPRITES}{path}");
+            let name = effect_sprite(effect);
             let dst = [centre[0] - ICON / 2.0, centre[1] - ICON / 2.0, ICON, ICON];
             host.sprite(batch, &name, [0.0, 0.0, EFFECT_SPRITE, EFFECT_SPRITE], dst);
         }
@@ -284,6 +282,16 @@ fn draw_overlays(host: &dyn Host, batch: &mut HudBatch, box_: &Rect, frame: &Fra
                 host.sprite(batch, HEART_HALF, src, dst);
             }
         }
+    }
+}
+
+/// An effect's icon in the GUI atlas: `mob_effect/<path>` for vanilla's, `<namespace>:mob_effect/<path>` for a
+/// mod's, as the game names them.
+fn effect_sprite(effect: &str) -> String {
+    match effect.split_once(':') {
+        None => format!("mob_effect/{effect}"),
+        Some(("minecraft", path)) => format!("mob_effect/{path}"),
+        Some((namespace, path)) => format!("{namespace}:mob_effect/{path}"),
     }
 }
 
@@ -347,7 +355,7 @@ fn draw_footer(
 }
 
 /// The perk's card lines in words, each with its colour.
-fn card_texts(
+pub(super) fn card_texts(
     perk: &PerkDef,
     attributes: &BTreeMap<String, f64>,
     owned: bool,
@@ -544,7 +552,7 @@ mod tests {
     use skills_core::registry::Defs;
     use skills_core::wire::ClientDefs;
 
-    use super::{card_line, card_texts};
+    use super::{card_line, card_texts, effect_sprite};
     use crate::MOD_ID;
     use crate::client::cache::{View, with};
     use crate::client::layout::{detail, page};
@@ -805,6 +813,23 @@ mod tests {
         assert_eq!(
             tip.last().map(String::as_str),
             Some("Press G to see it in action")
+        );
+    }
+
+    #[test]
+    fn effect_icons_are_named_as_the_game_names_them() {
+        // Given a vanilla effect, the same without its namespace, and a mod's effect
+        // When each is named as a sprite
+        let names = ["minecraft:strength", "poison", "mymod:glow"].map(effect_sprite);
+
+        // Then vanilla's are in mob_effect/ and the mod's under its namespace
+        assert_eq!(
+            names,
+            [
+                "mob_effect/strength",
+                "mob_effect/poison",
+                "mymod:mob_effect/glow"
+            ]
         );
     }
 

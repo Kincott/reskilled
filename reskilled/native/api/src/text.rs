@@ -201,7 +201,7 @@ messages! {
     CARD_EXTRA_DROP = "reskilled.card.extra_drop" => "%s chance of an extra drop";
     CARD_CROP_GROWTH = "reskilled.card.crop_growth" => "%s chance for each nearby crop to grow a stage";
     CARD_ENCHANTED_WEAPON = "reskilled.card.enchanted_weapon" => "+%s damage per enchantment on your weapon, up to %s";
-    CARD_ENCHANTED_ARMOR = "reskilled.card.enchanted_armor" => "-%s damage taken per enchantment on your armor, up to %s";
+    CARD_ENCHANTED_ARMOR = "reskilled.card.enchanted_armor" => "%s less damage taken per enchantment on your armor, up to %s";
     CARD_SHORTER_EFFECTS = "reskilled.card.shorter_effects" => "Harmful effects last %s as long";
     CARD_RUNE_REPAIR = "reskilled.card.rune_repair" => "Enchanted gear mends %s durability every %s seconds";
     CARD_LAST_STAND = "reskilled.card.last_stand" => "Above %s hearts, a killing blow leaves half a heart; then it rests %s seconds";

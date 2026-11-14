@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "perk": "reskilled:building_hearth",
+  "priority": 0,
+  "seconds": 8,
+  "view": {"center": [1.5, 1.0, 1.5], "yaw": 35, "pitch": 30, "scale": 20, "spin": 6},
+  "steps": [
+    {"at": 0, "place": [
+      {"pos": [0, 0, 0], "block": "minecraft:oak_planks"},
+      {"pos": [0, 0, 1], "block": "minecraft:oak_planks"},
+      {"pos": [0, 0, 2], "block": "minecraft:oak_planks"},
+      {"pos": [1, 0, 0], "block": "minecraft:oak_planks"},
+      {"pos": [1, 0, 1], "block": "minecraft:oak_planks"},
+      {"pos": [1, 0, 2], "block": "minecraft:oak_planks"},
+      {"pos": [2, 0, 0], "block": "minecraft:oak_planks"},
+      {"pos": [2, 0, 1], "block": "minecraft:oak_planks"},
+      {"pos": [2, 0, 2], "block": "minecraft:oak_planks"},
+      {"pos": [1, 1, 0], "block": "minecraft:red_bed[facing=south,part=foot]"},
+      {"pos": [1, 1, 1], "block": "minecraft:red_bed[facing=south,part=head]"},
+      {"pos": [0, 1, 2], "block": "minecraft:campfire"}
+    ]},
+    {"at": 0, "hearts": 8},
+    {"at": 0, "caption": {"key": "reskilled.guide.building_hearth.1", "text": "You are within %s of your bed or respawn anchor.", "args": [{"effect": "near_home", "field": "radius", "as": "blocks"}]}},
+    {"at": 2, "effect": {"effect": "minecraft:regeneration", "at": [0.5, 0.4]}},
+    {"at": 2, "caption": {"key": "reskilled.guide.building_hearth.2", "text": "While you stay there, you have Regeneration."}},
+    {"at": 3, "hearts": 11},
+    {"at": 4.5, "hearts": 14},
+    {"at": 6, "hearts": 18}
+  ]
+}

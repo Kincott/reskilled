@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "perk": "reskilled:gathering_sapling_keeper",
+  "priority": 0,
+  "seconds": 8,
+  "view": {"center": [1.5, 1.0, 0.5], "yaw": 35, "pitch": 30, "scale": 24, "spin": 4},
+  "steps": [
+    {"at": 0, "place": [
+      {"pos": [0, 0, 0], "block": "minecraft:farmland[moisture=7]"},
+      {"pos": [1, 0, 0], "block": "minecraft:farmland[moisture=7]"},
+      {"pos": [2, 0, 0], "block": "minecraft:farmland[moisture=7]"},
+      {"pos": [0, 1, 0], "block": "minecraft:wheat[age=7]"},
+      {"pos": [1, 1, 0], "block": "minecraft:wheat[age=7]"},
+      {"pos": [2, 1, 0], "block": "minecraft:wheat[age=7]"}
+    ]},
+    {"at": 0, "caption": {"key": "reskilled.guide.gathering_sapling_keeper.1", "text": "A ripe crop is broken."}},
+    {"at": 3, "remove": [[1, 1, 0]]},
+    {"at": 3, "icon": {"item": "minecraft:wheat_seeds", "at": [0.62, 0.3]}},
+    {"at": 4, "place": [{"pos": [1, 1, 0], "block": "minecraft:wheat[age=0]"}]},
+    {"at": 4, "caption": {"key": "reskilled.guide.gathering_sapling_keeper.2", "text": "It is planted again with one of its own seeds."}}
+  ]
+}

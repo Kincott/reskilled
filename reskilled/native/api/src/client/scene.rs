@@ -81,6 +81,12 @@ pub fn scene_blocks(host: &dyn Host, frame: &Frame) -> Vec<([i32; 3], BlockState
     blocks
 }
 
+/// Takes `id` as what `state` names, as if it had been resolved: for tests whose host has no table of block states.
+#[cfg(test)]
+pub fn remember(state: &str, id: BlockStateId) {
+    lock(&RESOLVED).states.insert(state.to_string(), Some(id));
+}
+
 /// Every state of `block`: its default state first, then the rest by id.
 fn block_candidates(host: &dyn Host, block: &str) -> Vec<BlockStateId> {
     let default = host.default_state(block);

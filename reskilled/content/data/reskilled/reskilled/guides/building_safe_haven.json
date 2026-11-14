@@ -1,0 +1,38 @@
+{
+  "format": 1,
+  "perk": "reskilled:building_safe_haven",
+  "priority": 0,
+  "seconds": 8,
+  "view": {"center": [3.0, 1.0, 1.5], "yaw": 200, "pitch": 30, "scale": 18, "spin": 0},
+  "steps": [
+    {"at": 0, "place": [
+      {"pos": [0, 0, 0], "block": "minecraft:grass_block"},
+      {"pos": [0, 0, 1], "block": "minecraft:grass_block"},
+      {"pos": [0, 0, 2], "block": "minecraft:grass_block"},
+      {"pos": [1, 0, 0], "block": "minecraft:grass_block"},
+      {"pos": [1, 0, 1], "block": "minecraft:grass_block"},
+      {"pos": [1, 0, 2], "block": "minecraft:grass_block"},
+      {"pos": [2, 0, 0], "block": "minecraft:grass_block"},
+      {"pos": [2, 0, 1], "block": "minecraft:grass_block"},
+      {"pos": [2, 0, 2], "block": "minecraft:grass_block"},
+      {"pos": [3, 0, 0], "block": "minecraft:grass_block"},
+      {"pos": [3, 0, 1], "block": "minecraft:grass_block"},
+      {"pos": [3, 0, 2], "block": "minecraft:grass_block"},
+      {"pos": [4, 0, 0], "block": "minecraft:grass_block"},
+      {"pos": [4, 0, 1], "block": "minecraft:grass_block"},
+      {"pos": [4, 0, 2], "block": "minecraft:grass_block"},
+      {"pos": [5, 0, 0], "block": "minecraft:grass_block"},
+      {"pos": [5, 0, 1], "block": "minecraft:grass_block"},
+      {"pos": [5, 0, 2], "block": "minecraft:grass_block"},
+      {"pos": [0, 1, 1], "block": "minecraft:red_bed[facing=east,part=foot]"},
+      {"pos": [1, 1, 1], "block": "minecraft:red_bed[facing=east,part=head]"},
+      {"pos": [2, 1, 0], "block": "minecraft:torch"},
+      {"pos": [3, 1, 0], "block": "minecraft:oak_fence"},
+      {"pos": [3, 1, 1], "block": "minecraft:oak_fence"},
+      {"pos": [3, 1, 2], "block": "minecraft:oak_fence"}
+    ]},
+    {"at": 0, "caption": {"key": "reskilled.guide.building_safe_haven.1", "text": "No monster spawns on its own within %s of your bed.", "args": [{"effect": "safe_haven", "field": "radius", "as": "blocks"}]}},
+    {"at": 3.5, "caption": {"key": "reskilled.guide.building_safe_haven.2", "text": "This holds while you are online; farther out they spawn."}},
+    {"at": 4.5, "icon": {"item": "minecraft:zombie_spawn_egg", "at": [0.75, 0.4]}}
+  ]
+}

@@ -150,11 +150,15 @@ pub enum Paint {
     Background {
         rect: [f32; 4],
     },
-    /// A scene of blocks drawn into `rect` (x0, y0, x1, y1): each block's place and state id, and the view's turn.
+    /// A scene of blocks drawn into `rect` (x0, y0, x1, y1): each block's place and state id, and the view (its
+    /// centre, turn, tilt and pixels per block).
     Scene {
         rect: [f32; 4],
         blocks: Vec<([i32; 3], u32)>,
+        center: [f32; 3],
         yaw: f32,
+        pitch: f32,
+        scale: f32,
     },
     Tooltip {
         lines: Vec<String>,
@@ -584,7 +588,10 @@ impl Host for TestHost {
         self.painted.borrow_mut().push(Paint::Scene {
             rect,
             blocks: blocks.iter().map(|b| (b.pos, b.state.0)).collect(),
+            center: view.center,
             yaw: view.yaw,
+            pitch: view.pitch,
+            scale: view.scale,
         });
     }
 
