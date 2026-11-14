@@ -10,8 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::defs::{
-    CostCurve, DefError, DefFile, DefKind, FocusDef, LockEntry, LockFile, PerkDef, Settings,
-    SettingsPatch, SkillDef, parse_file,
+    CostCurve, DefError, DefFile, DefKind, FocusDef, GuideAction, GuideDef, LockEntry, LockFile,
+    PerkDef, Settings, SettingsPatch, SkillDef, effect_field, parse_file,
 };
 
 /// One data file as the game read it.
@@ -33,6 +33,8 @@ pub struct Defs {
     pub focus: BTreeMap<String, FocusDef>,
     pub locks: Vec<LockEntry>,
     pub settings: Settings,
+    /// Perk guides, keyed by the perk they explain.
+    pub guides: BTreeMap<String, GuideDef>,
 }
 
 impl Defs {
@@ -96,6 +98,7 @@ pub fn build(files: Vec<SourceFile>) -> (Defs, Vec<DefError>) {
     let mut focus = BTreeMap::new();
     let mut lock_files = Vec::new();
     let mut patches = Vec::new();
+    let mut guides = BTreeMap::new();
 
     for file in files {
         let parsed = match parse_file(file.kind, &file.json) {
@@ -119,6 +122,9 @@ pub fn build(files: Vec<SourceFile>) -> (Defs, Vec<DefError>) {
                 keep_highest(&mut focus, def.id.clone(), def.priority, def, &file)
             }
             DefFile::Lock(def) => lock_files.push(ranked(def, 0, &file)),
+            DefFile::Guide(def) => {
+                keep_highest(&mut guides, def.perk.clone(), def.priority, def, &file)
+            }
             DefFile::Settings(def) => {
                 let priority = def.priority;
                 patches.push(ranked(def, priority, &file));
@@ -129,6 +135,7 @@ pub fn build(files: Vec<SourceFile>) -> (Defs, Vec<DefError>) {
     let skills: BTreeMap<String, SkillDef> =
         skills.into_iter().map(|(id, r)| (id, r.def)).collect();
     let perks = resolve_perks(perks, &skills, &mut errors);
+    let guides = resolve_guides(guides, &perks, &mut errors);
     let focus = resolve_focus(focus, &skills, &mut errors);
     let locks = merge_locks(lock_files, &skills, &mut errors);
     let settings = merge_settings(patches);
@@ -139,6 +146,7 @@ pub fn build(files: Vec<SourceFile>) -> (Defs, Vec<DefError>) {
             focus,
             locks,
             settings,
+            guides,
         },
         errors,
     )
@@ -201,6 +209,38 @@ fn resolve_perks(
             return perks.into_iter().map(|(id, r)| (id, r.def)).collect();
         }
     }
+}
+
+/// Drops guides for a perk that is not there, and guides whose captions show a value the perk's effects lack.
+fn resolve_guides(
+    mut guides: BTreeMap<String, Ranked<GuideDef>>,
+    perks: &BTreeMap<String, PerkDef>,
+    errors: &mut Vec<DefError>,
+) -> BTreeMap<String, GuideDef> {
+    guides.retain(|id, guide| {
+        let Some(perk) = perks.get(id) else {
+            errors.push(guide.error(format!("guide names unknown perk {id:?}")));
+            return false;
+        };
+        let missing = guide
+            .def
+            .steps
+            .iter()
+            .filter_map(|step| match &step.action {
+                GuideAction::Caption(caption) => Some(&caption.args),
+                _ => None,
+            })
+            .flatten()
+            .find(|arg| effect_field(perk, &arg.effect, &arg.field).is_none());
+        if let Some(arg) = missing {
+            errors.push(guide.error(format!(
+                "guide for perk {id:?} shows {}.{}, but the perk has no effect {:?} with a number field {:?}",
+                arg.effect, arg.field, arg.effect, arg.field
+            )));
+        }
+        missing.is_none()
+    });
+    guides.into_iter().map(|(id, r)| (id, r.def)).collect()
 }
 
 /// Drops focus areas naming an unknown skill, then, in load order, any area claiming a skill an earlier one has.
@@ -288,7 +328,7 @@ fn merge_settings(mut patches: Vec<Ranked<SettingsPatch>>) -> Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::defs::{Action, Matcher, Target};
+    use crate::defs::{Action, GuideAction, Matcher, Target};
 
     fn source(path: &str, order: usize, kind: DefKind, json: &str) -> SourceFile {
         SourceFile {
@@ -695,5 +735,136 @@ mod tests {
         assert_eq!(defs.max_level(MELEE), defs.settings.max_level);
         assert_eq!(defs.cost_curve(MELEE), defs.settings.cost);
         assert_eq!(defs.points_every(MELEE), defs.settings.points_every);
+    }
+
+    const GROWTH_PERK: &str = "p:green_aura";
+
+    fn growth_perk(order: usize) -> SourceFile {
+        let json = format!(
+            r#"{{"format": 1, "id": "{GROWTH_PERK}", "skill": "{MINING}", "name": "n", "description": "d",
+                "cost": 1, "min_level": 1,
+                "effects": [{{"type": "crop_growth", "radius": 5, "interval_seconds": 10, "chance": 0.25}}]}}"#
+        );
+        source("p:reskilled/perks/green_aura", order, DefKind::Perk, &json)
+    }
+
+    fn guide(
+        path: &str,
+        order: usize,
+        perk: &str,
+        priority: i32,
+        caption: &str,
+        arg: &str,
+    ) -> SourceFile {
+        let json = format!(
+            r#"{{"format": 1, "perk": "{perk}", "priority": {priority}, "seconds": 4,
+                "view": {{"center": [0, 0, 0], "yaw": 0, "pitch": 0, "scale": 10}},
+                "steps": [{{"at": 0, "caption": {{"key": "k", "text": "{caption}", "args": [{arg}]}}}}]}}"#
+        );
+        source(path, order, DefKind::Guide, &json)
+    }
+
+    fn guides_world(guide_file: SourceFile) -> Vec<SourceFile> {
+        vec![
+            skill("s:reskilled/skills/mining", 0, MINING, 0, "minecraft:stone"),
+            growth_perk(1),
+            guide_file,
+        ]
+    }
+
+    #[test]
+    fn caption_args_must_name_a_real_value() {
+        // Given a guide naming crop growth's radius, and one naming a speed it does not have
+        let real = r#"{"effect": "crop_growth", "field": "radius", "as": "blocks"}"#;
+        let fake = r#"{"effect": "crop_growth", "field": "speed", "as": "number"}"#;
+
+        // When each is merged with a perk that has crop growth
+        let (kept, kept_errors) = build(guides_world(guide(
+            "p:reskilled/guides/a",
+            2,
+            GROWTH_PERK,
+            0,
+            "%s",
+            real,
+        )));
+        let (dropped, dropped_errors) = build(guides_world(guide(
+            "p:reskilled/guides/a",
+            2,
+            GROWTH_PERK,
+            0,
+            "%s",
+            fake,
+        )));
+
+        // Then the first is kept, and the second dropped with an error naming speed
+        assert_eq!(kept_errors, vec![]);
+        assert!(kept.guides.contains_key(GROWTH_PERK));
+        assert!(dropped.guides.is_empty());
+        assert_eq!(dropped_errors.len(), 1);
+        assert_eq!(dropped_errors[0].file, "p:reskilled/guides/a");
+        assert!(
+            dropped_errors[0].reason.contains("speed"),
+            "{}",
+            dropped_errors[0].reason
+        );
+    }
+
+    #[test]
+    fn a_guide_for_an_unknown_perk_is_dropped_with_error() {
+        // Given a guide for a perk nobody defines
+        let files = guides_world(guide("p:reskilled/guides/a", 2, "p:nothing", 0, "t", ""));
+
+        // When they are merged
+        let (defs, errors) = build(files);
+
+        // Then the guide is dropped, the error naming the perk
+        assert!(defs.guides.is_empty());
+        assert_eq!(errors.len(), 1);
+        assert!(
+            errors[0].reason.contains("\"p:nothing\""),
+            "{}",
+            errors[0].reason
+        );
+    }
+
+    #[test]
+    fn a_guide_for_a_perk_dropped_for_its_skill_is_dropped_too() {
+        // Given a perk whose skill is missing, with a guide
+        let files = vec![
+            growth_perk(0),
+            guide("p:reskilled/guides/a", 1, GROWTH_PERK, 0, "t", ""),
+        ];
+
+        // When they are merged
+        let (defs, errors) = build(files);
+
+        // Then both are dropped
+        assert!(defs.perks.is_empty() && defs.guides.is_empty());
+        assert_eq!(errors.len(), 2);
+    }
+
+    #[test]
+    fn a_higher_priority_guide_replaces_a_lower_one() {
+        // Given two guides for one perk, the higher priority one earlier in load order
+        let mut files = guides_world(guide(
+            "pack:reskilled/guides/a",
+            2,
+            GROWTH_PERK,
+            5,
+            "high",
+            "",
+        ));
+        files.push(guide("p:reskilled/guides/a", 3, GROWTH_PERK, 0, "low", ""));
+
+        // When they are merged
+        let (defs, errors) = build(files);
+
+        // Then the higher priority one stays
+        assert_eq!(errors, vec![]);
+        assert_eq!(defs.guides.len(), 1);
+        let GuideAction::Caption(caption) = &defs.guides[GROWTH_PERK].steps[0].action else {
+            panic!("expected a caption");
+        };
+        assert_eq!(caption.text, "high");
     }
 }

@@ -1,4 +1,4 @@
-//! The data files a pack maker writes: skills, perks, focus areas, locks and settings, one JSON object per file.
+//! The data files a pack maker writes: skills, perks, focus areas, locks, settings and perk guides, one JSON object per file.
 //!
 //! Every file carries `"format": 1`. [`parse_file`] reads one file and checks everything that can be checked
 //! without the other files (ids, ranges, which actions fit a target); references between files are the
@@ -387,6 +387,7 @@ pub enum DefKind {
     Focus,
     Lock,
     Settings,
+    Guide,
 }
 
 /// One parsed data file.
@@ -397,6 +398,7 @@ pub enum DefFile {
     Focus(FocusDef),
     Lock(LockFile),
     Settings(SettingsPatch),
+    Guide(GuideDef),
 }
 
 /// A data file, or an entry in one, that was skipped.
@@ -418,6 +420,7 @@ pub fn parse_file(kind: DefKind, json: &str) -> Result<DefFile, DefError> {
         DefKind::Focus => DefFile::Focus(serde_json::from_value(value).map_err(refused)?),
         DefKind::Lock => DefFile::Lock(serde_json::from_value(value).map_err(refused)?),
         DefKind::Settings => DefFile::Settings(serde_json::from_value(value).map_err(refused)?),
+        DefKind::Guide => DefFile::Guide(serde_json::from_value(value).map_err(refused)?),
     };
     file.validate().map_err(refused)?;
     Ok(file)
@@ -452,6 +455,7 @@ impl DefFile {
             DefFile::Focus(focus) => focus.validate(),
             DefFile::Lock(locks) => locks.entries.iter().try_for_each(LockEntry::validate),
             DefFile::Settings(patch) => patch.validate(),
+            DefFile::Guide(guide) => guide.validate(),
         }
     }
 }
@@ -746,6 +750,273 @@ impl SettingsPatch {
     }
 }
 
+/// The animated scene that explains a perk in the guide: a timeline of steps over a small diorama of blocks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuideDef {
+    /// The perk it explains.
+    pub perk: String,
+    #[serde(default)]
+    pub priority: i32,
+    /// The loop length; at the end the scene starts again from an empty diorama.
+    pub seconds: f32,
+    pub view: GuideView,
+    /// In time order.
+    pub steps: Vec<GuideStep>,
+}
+
+/// Where the scene is looked at from.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuideView {
+    /// The scene point the view is centered on.
+    pub center: [f32; 3],
+    /// Degrees.
+    pub yaw: f32,
+    /// Degrees.
+    pub pitch: f32,
+    /// How large a block draws, in pixels.
+    pub scale: f32,
+    /// Degrees a second the view turns; 0 holds still.
+    #[serde(default)]
+    pub spin: f32,
+}
+
+/// One thing that happens `at` a second of the scene. No `deny_unknown_fields`: serde cannot combine it with
+/// `flatten`, so an unknown action key is refused as "unknown variant" by the action instead.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GuideStep {
+    pub at: f32,
+    #[serde(flatten)]
+    pub action: GuideAction,
+}
+
+/// What a step does; the key that names it is the variant.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GuideAction {
+    /// Puts blocks in the scene.
+    Place(Vec<PlacedBlock>),
+    /// Empties these scene positions.
+    Remove(Vec<[i32; 3]>),
+    /// The line shown under the scene until the next caption.
+    Caption(Caption),
+    /// An item drawn flat over the scene box, until a step clears icons.
+    Icon(Overlay),
+    /// A potion effect's icon drawn the same way.
+    Effect(Overlay),
+    /// A heart bar over the box with this many half hearts.
+    Hearts(u32),
+    /// Takes overlays away.
+    Clear(ClearWhat),
+}
+
+/// A block at a scene position.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlacedBlock {
+    pub pos: [i32; 3],
+    /// A state string in the game's own form, `minecraft:wheat[age=7]`; see [`parse_state`].
+    pub block: String,
+}
+
+/// A line of the scene's text. It never states a perk's numbers: it has a `%s` for each of `args`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Caption {
+    /// Translation key.
+    pub key: String,
+    /// English fallback for clients that lack the key.
+    pub text: String,
+    /// Values of the perk's effects filling the `%s` of the text in order.
+    #[serde(default)]
+    pub args: Vec<CaptionArg>,
+}
+
+/// A value of one of the perk's effects, and how a caption shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CaptionArg {
+    /// The effect's `type`, such as `crop_growth`.
+    pub effect: String,
+    /// A numeric field of that effect, such as `chance`.
+    pub field: String,
+    #[serde(rename = "as")]
+    pub shown_as: ShownAs,
+}
+
+/// How a caption shows a number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShownAs {
+    Number,
+    /// 0.25 reads 25%.
+    Percent,
+    Seconds,
+    Blocks,
+    /// Health points halved.
+    Hearts,
+}
+
+/// An item or potion effect icon over the scene box.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Overlay {
+    pub item: Option<String>,
+    pub effect: Option<String>,
+    /// Fractions of the box, 0 to 1 from its top left.
+    pub at: [f32; 2],
+}
+
+/// What a clear step takes away.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClearWhat {
+    Icons,
+    Hearts,
+}
+
+impl GuideDef {
+    fn validate(&self) -> Result<(), String> {
+        check_id("perk", &self.perk)?;
+        check_positive("seconds", self.seconds)?;
+        let view = &self.view;
+        for (field, value) in [
+            ("view.yaw", view.yaw),
+            ("view.pitch", view.pitch),
+            ("view.spin", view.spin),
+        ] {
+            check_finite(field, value.into())?;
+        }
+        for value in view.center {
+            check_finite("view.center", value.into())?;
+        }
+        check_positive("view.scale", view.scale)?;
+        let mut last = 0.0;
+        for (index, step) in self.steps.iter().enumerate() {
+            let at = step.at;
+            check_finite("at", at.into())?;
+            if at < 0.0 || at > self.seconds {
+                return Err(format!(
+                    "step {index}: at {at} is outside the scene's 0 to {} seconds",
+                    self.seconds
+                ));
+            }
+            if at < last {
+                return Err(format!(
+                    "step {index}: at {at} is before the step above it ({last}); steps must be in time order"
+                ));
+            }
+            last = at;
+            step.action
+                .validate()
+                .map_err(|reason| format!("step {index}: {reason}"))?;
+        }
+        Ok(())
+    }
+}
+
+impl GuideAction {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            GuideAction::Place(blocks) => blocks.iter().try_for_each(PlacedBlock::validate),
+            GuideAction::Caption(caption) => caption.validate(),
+            GuideAction::Icon(overlay) => overlay.validate("item"),
+            GuideAction::Effect(overlay) => overlay.validate("effect"),
+            GuideAction::Remove(_) | GuideAction::Hearts(_) | GuideAction::Clear(_) => Ok(()),
+        }
+    }
+}
+
+impl PlacedBlock {
+    fn validate(&self) -> Result<(), String> {
+        parse_state(&self.block).map(|_| ()).ok_or_else(|| {
+            format!(
+                "block {:?} is not a block state (minecraft:wheat[age=7], lowercase)",
+                self.block
+            )
+        })
+    }
+}
+
+impl Caption {
+    fn validate(&self) -> Result<(), String> {
+        if self.key.is_empty() {
+            return Err("caption key must not be empty".into());
+        }
+        if self.text.is_empty() {
+            return Err("caption text must not be empty".into());
+        }
+        self.args.iter().try_for_each(|arg| {
+            if arg.effect.is_empty() || arg.field.is_empty() {
+                Err("a caption arg needs an effect and a field".to_string())
+            } else {
+                Ok(())
+            }
+        })
+    }
+}
+
+impl Overlay {
+    /// `needed` is the field this kind of overlay draws: `item` for an icon, `effect` for an effect.
+    fn validate(&self, needed: &str) -> Result<(), String> {
+        let (found, other) = match needed {
+            "item" => (&self.item, &self.effect),
+            _ => (&self.effect, &self.item),
+        };
+        match (found, other) {
+            (Some(id), None) => check_id(needed, id)?,
+            (None, _) => return Err(format!("{needed} is missing")),
+            (Some(_), Some(_)) => return Err("give an item or an effect, not both".into()),
+        }
+        for value in self.at {
+            if !(0.0..=1.0).contains(&value) {
+                return Err(format!(
+                    "at must be fractions of the box between 0 and 1, found {value}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Splits a block state string such as `minecraft:wheat[age=7,x=y]` into the block id and its properties, in
+/// order. `None` when it is not one: a bad id, an unclosed bracket, or a property without a name or a value.
+pub fn parse_state(state: &str) -> Option<(String, Vec<(String, String)>)> {
+    let (block, properties) = match state.split_once('[') {
+        None => (state, Vec::new()),
+        Some((block, rest)) => {
+            let inside = rest.strip_suffix(']')?;
+            let properties = inside
+                .split(',')
+                .map(|pair| {
+                    let (name, value) = pair.split_once('=')?;
+                    let word = |s: &str| {
+                        !s.is_empty()
+                            && s.bytes()
+                                .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'_'))
+                    };
+                    (word(name) && word(value)).then(|| (name.to_string(), value.to_string()))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            (block, properties)
+        }
+    };
+    is_id(block).then(|| (block.to_string(), properties))
+}
+
+/// The numeric `field` of the perk's first effect whose `type` is `effect` (`crop_growth`, `chance`), read as the
+/// effect is written in a data file. `None` when the perk has no such effect, or the field is missing or not a
+/// number.
+pub fn effect_field(perk: &PerkDef, effect: &str, field: &str) -> Option<f64> {
+    perk.effects.iter().find_map(|candidate| {
+        let value = serde_json::to_value(candidate).ok()?;
+        (value.get("type")?.as_str()? == effect)
+            .then(|| value.get(field)?.as_f64())
+            .flatten()
+    })
+}
+
 /// `namespace:path`, lowercase, as vanilla resource locations: `^[a-z0-9_.-]+:[a-z0-9_./-]+$`.
 fn is_id(value: &str) -> bool {
     let Some((namespace, path)) = value.split_once(':') else {
@@ -784,6 +1055,15 @@ fn check_at_least_one(field: &str, value: Option<u32>) -> Result<(), String> {
 
 fn check_cost(cost: Option<CostCurve>) -> Result<(), String> {
     check_at_least_one("cost.every", cost.map(|curve| curve.every))
+}
+
+fn check_positive(field: &str, value: f32) -> Result<(), String> {
+    check_finite(field, value.into())?;
+    if value > 0.0 {
+        Ok(())
+    } else {
+        Err(format!("{field} must be more than 0, found {value}"))
+    }
 }
 
 fn check_finite(field: &str, value: f64) -> Result<(), String> {
@@ -1482,6 +1762,159 @@ mod tests {
             drop_repairable.contains("repairable") && drop_repairable.contains("block"),
             "{drop_repairable}"
         );
+    }
+
+    const REPLANT_GUIDE: &str = r#"{
+      "format": 1,
+      "perk": "reskilled:gathering_sapling_keeper",
+      "priority": 0,
+      "seconds": 8,
+      "view": {"center": [1.5, 0.5, 1.5], "yaw": 35, "pitch": 30, "scale": 22, "spin": 8},
+      "steps": [
+        {"at": 0, "place": [{"pos": [0, 0, 0], "block": "minecraft:farmland"},
+                            {"pos": [0, 1, 0], "block": "minecraft:wheat[age=7]"}]},
+        {"at": 0, "caption": {"key": "reskilled.guide.replant.1", "text": "A ripe crop is broken."}},
+        {"at": 3, "remove": [[0, 1, 0]]},
+        {"at": 3, "icon": {"item": "minecraft:wheat_seeds", "at": [0.55, 0.4]}},
+        {"at": 4, "place": [{"pos": [0, 1, 0], "block": "minecraft:wheat[age=0]"}]},
+        {"at": 4, "caption": {"key": "reskilled.guide.replant.2",
+                              "text": "It is planted again with one of its own seeds."}}
+      ]
+    }"#;
+
+    #[test]
+    fn parses_a_guide() {
+        // Given the replant scene
+        // When it is parsed
+        let DefFile::Guide(guide) = parse_ok(DefKind::Guide, REPLANT_GUIDE) else {
+            panic!("expected a guide");
+        };
+
+        // Then it has its six steps, the first placing ripe wheat
+        assert_eq!(guide.perk, "reskilled:gathering_sapling_keeper");
+        assert_eq!(guide.seconds, 8.0);
+        assert_eq!(guide.view.spin, 8.0);
+        assert_eq!(guide.steps.len(), 6);
+        let GuideAction::Place(blocks) = &guide.steps[0].action else {
+            panic!("expected a place step, got {:?}", guide.steps[0]);
+        };
+        assert_eq!(blocks[1].pos, [0, 1, 0]);
+        assert_eq!(blocks[1].block, "minecraft:wheat[age=7]");
+    }
+
+    #[test]
+    fn a_guides_spin_defaults_to_zero() {
+        // Given a guide whose view names no spin
+        let json = REPLANT_GUIDE.replace(", \"spin\": 8", "");
+
+        // When it is parsed
+        let DefFile::Guide(guide) = parse_ok(DefKind::Guide, &json) else {
+            panic!("expected a guide");
+        };
+
+        // Then it holds still
+        assert_eq!(guide.view.spin, 0.0);
+    }
+
+    #[test]
+    fn guides_that_make_no_sense_are_refused() {
+        // Given scenes with a zero length, a step past the end, steps out of order, a zero scale, an overlay
+        // outside the box and a broken state string
+        let cases = [
+            (
+                REPLANT_GUIDE.replace("\"seconds\": 8", "\"seconds\": 0"),
+                "seconds",
+            ),
+            (
+                REPLANT_GUIDE.replace("{\"at\": 4, \"place\"", "{\"at\": 9, \"place\""),
+                "at",
+            ),
+            (
+                REPLANT_GUIDE.replace("{\"at\": 3, \"remove\"", "{\"at\": 5, \"remove\""),
+                "order",
+            ),
+            (
+                REPLANT_GUIDE.replace("\"scale\": 22", "\"scale\": 0"),
+                "scale",
+            ),
+            (REPLANT_GUIDE.replace("[0.55, 0.4]", "[1.5, 0.4]"), "at"),
+            (REPLANT_GUIDE.replace("wheat[age=7]", "wheat[age"), "block"),
+        ];
+
+        // When each is parsed
+        let reasons = cases
+            .clone()
+            .map(|(json, _)| refusal(DefKind::Guide, &json));
+
+        // Then each is refused, the reason naming the field
+        for (reason, (_, field)) in reasons.iter().zip(&cases) {
+            assert!(reason.contains(field), "{field}: {reason}");
+        }
+    }
+
+    #[test]
+    fn an_icon_needs_an_item_and_an_effect_needs_an_effect() {
+        // Given an icon step with only an effect, and an effect step with only an item
+        let icon = REPLANT_GUIDE.replace(
+            "\"item\": \"minecraft:wheat_seeds\"",
+            "\"effect\": \"minecraft:strength\"",
+        );
+        let effect = REPLANT_GUIDE.replace("\"icon\": {\"item\"", "\"effect\": {\"item\"");
+
+        // When they are parsed
+        let icon = refusal(DefKind::Guide, &icon);
+        let effect = refusal(DefKind::Guide, &effect);
+
+        // Then each is refused naming the missing field
+        assert!(icon.contains("item"), "{icon}");
+        assert!(effect.contains("effect"), "{effect}");
+    }
+
+    #[test]
+    fn parse_state_reads_block_and_properties() {
+        // Given states with properties, with none, and with a property lacking a value
+        // When they are read
+        let wheat = parse_state("minecraft:wheat[age=7,x=y]");
+        let stone = parse_state("minecraft:stone");
+        let bare = parse_state("minecraft:wheat[age]");
+
+        // Then the block and properties come out, or nothing for the broken one
+        assert_eq!(
+            wheat,
+            Some((
+                "minecraft:wheat".to_string(),
+                vec![
+                    ("age".to_string(), "7".to_string()),
+                    ("x".to_string(), "y".to_string())
+                ]
+            ))
+        );
+        assert_eq!(stone, Some(("minecraft:stone".to_string(), vec![])));
+        assert_eq!(bare, None);
+        assert_eq!(parse_state("Wheat"), None);
+        assert_eq!(parse_state("minecraft:wheat[]"), None);
+    }
+
+    #[test]
+    fn effect_field_reads_a_number_of_the_perks_first_matching_effect() {
+        // Given a perk with two crop growths and a last stand
+        let json = perk_with(
+            r#"{"type": "last_stand", "above": 6.0, "cooldown_seconds": 300},
+               {"type": "crop_growth", "radius": 5, "interval_seconds": 10, "chance": 0.25},
+               {"type": "crop_growth", "radius": 9, "interval_seconds": 10, "chance": 0.5}"#,
+        );
+        let DefFile::Perk(perk) = parse_ok(DefKind::Perk, &json) else {
+            panic!("expected a perk");
+        };
+
+        // When fields are read
+        // Then the first matching effect answers, and a missing effect or field gives nothing
+        assert_eq!(effect_field(&perk, "crop_growth", "radius"), Some(5.0));
+        assert_eq!(effect_field(&perk, "crop_growth", "chance"), Some(0.25));
+        assert_eq!(effect_field(&perk, "last_stand", "above"), Some(6.0));
+        assert_eq!(effect_field(&perk, "crop_growth", "speed"), None);
+        assert_eq!(effect_field(&perk, "replant", "radius"), None);
+        assert_eq!(effect_field(&perk, "crop_growth", "type"), None);
     }
 
     #[test]
