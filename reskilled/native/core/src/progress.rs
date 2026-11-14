@@ -411,7 +411,14 @@ fn points_to_next(level: u32) -> u32 {
 
 /// The XP points a player at `level` (and no progress past it) holds.
 pub fn total_points(level: u32) -> u32 {
-    (0..level).map(points_to_next).sum()
+    // The game's closed forms of the sum of `points_to_next` below the level, doubled to stay in whole numbers.
+    let l = u128::from(level);
+    let doubled = match level {
+        0..=16 => 2 * (l * l + 6 * l),
+        17..=31 => 5 * l * l + 720 - 81 * l,
+        _ => 9 * l * l + 4440 - 325 * l,
+    };
+    u32::try_from(doubled / 2).unwrap_or(u32::MAX)
 }
 
 /// How to take `points` from a player at `level`: whole levels from the top, and the points given back after; none
@@ -757,6 +764,26 @@ mod tests {
             skill: skill.into(),
             times,
         }
+    }
+
+    #[test]
+    fn total_points_follow_the_game_and_never_overflow() {
+        // Given every level up to 1000 summed one level at a time, as the game counts them
+        let summed: Vec<u64> = (0..=1000u32)
+            .scan(0u64, |sum, level| {
+                let here = *sum;
+                *sum += u64::from(points_to_next(level));
+                Some(here)
+            })
+            .collect();
+
+        // When the totals are read, and at levels no game reaches
+        let totals: Vec<u64> = (0..=1000).map(|l| u64::from(total_points(l))).collect();
+        let huge = total_points(u32::MAX);
+
+        // Then they match, and the huge one stops at the largest number instead of overflowing
+        assert_eq!(totals, summed);
+        assert_eq!(huge, u32::MAX);
     }
 
     #[test]

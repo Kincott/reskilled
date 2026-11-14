@@ -53,7 +53,10 @@ pub fn current(host: &mut dyn Host) -> Rules {
     if let Some(rules) = lock(&CURRENT).clone() {
         return rules;
     }
-    let rules = SAVED.get(host, Holder::Level).unwrap_or_default();
+    let rules = SAVED
+        .get(host, Holder::Level)
+        .unwrap_or_default()
+        .sanitized();
     *lock(&CURRENT) = Some(rules.clone());
     rules
 }
@@ -71,7 +74,10 @@ pub fn run_for(host: &mut dyn Host, player: u128) {
             .into_iter()
             .partition(|(p, _)| *p == player);
         *pending = others;
-        theirs.into_iter().map(|(_, rules)| rules).collect()
+        theirs
+            .into_iter()
+            .map(|(_, rules)| rules.sanitized())
+            .collect()
     };
     for rules in asked {
         if host.player_permission(player).unwrap_or(0) < OPERATOR_LEVEL {

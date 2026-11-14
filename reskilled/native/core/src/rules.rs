@@ -76,7 +76,23 @@ impl Default for Rules {
     }
 }
 
+/// The ranges rules from outside (an operator's client, a saved file) are kept in, wider than the screen's choices.
+const POINTS_PER_LEVEL: (u32, u32) = (1, 1000);
+const RESPEC_COST_MAX: u32 = 100;
+const EARN_RATE: (u32, u32) = (1, 1000);
+
 impl Rules {
+    /// These rules with every number inside its range: at least a point a level, a refund of at most 100 levels,
+    /// a pace from 1 to 1000 percent.
+    pub fn sanitized(mut self) -> Self {
+        self.points_per_level = self
+            .points_per_level
+            .clamp(POINTS_PER_LEVEL.0, POINTS_PER_LEVEL.1);
+        self.respec_cost = self.respec_cost.min(RESPEC_COST_MAX);
+        self.earn_rate = self.earn_rate.clamp(EARN_RATE.0, EARN_RATE.1);
+        self
+    }
+
     /// Whether skills can be bought with XP under these rules.
     pub fn buying(&self) -> bool {
         matches!(self.progression, Progression::Buy | Progression::Both)
@@ -91,6 +107,32 @@ impl Rules {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rules_from_outside_are_kept_in_safe_ranges() {
+        // Given rules a modified client could send: free points, a refund costing a fortune, an absurd pace
+        let wild = Rules {
+            points_per_level: 0,
+            respec_cost: u32::MAX,
+            earn_rate: u32::MAX,
+            ..Rules::default()
+        };
+        let slow = Rules {
+            earn_rate: 0,
+            ..Rules::default()
+        };
+
+        // When they are made safe
+        let (wild, slow) = (wild.sanitized(), slow.sanitized());
+
+        // Then each value is brought inside its range, and the defaults pass unchanged
+        assert_eq!(
+            (wild.points_per_level, wild.respec_cost, wild.earn_rate),
+            (1, 100, 1000)
+        );
+        assert_eq!(slow.earn_rate, 1);
+        assert_eq!(Rules::default().sanitized(), Rules::default());
+    }
 
     #[test]
     fn rules_round_trip_and_missing_fields_take_their_defaults() {
