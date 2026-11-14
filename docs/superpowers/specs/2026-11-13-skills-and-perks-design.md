@@ -254,6 +254,25 @@ Added on 2026-11-13 at the user's request: every new mod must be able to add its
   level in a skill, whether they own a perk, and whether they may use an ability (which also shows the usual
   "Needs Agility 10" line when they may not). The other mod calls it on the server before running its ability.
 
+### 7.11 Options and server rules (added 2026-11-14)
+
+The skills screen's gear opens Reskilled Options, a screen in the game's options style with two tabs. Display holds
+each player's own settings (warning panel place and time, padlock on/off, corner and dimming, tooltip options, the
+skill strip, each sound), saved to `config/reskilled-client.json`. Server rules holds the rules below, kept on the
+world (`Holder::Level`), sent to every player, and changed only by operators (checked in the player's own tick).
+
+- Raise cost: XP levels, or XP points (the level price times "points a level", 10, 20 or 50); points are taken as
+  whole levels from the top with the rest given back.
+- Perk switches: an owned perk can be switched off (still owned, no effect) and on.
+- Perk refunds: off, free, or for 1, 5 or 10 XP levels; a perk another owned perk needs is refunded last.
+- Enchantment locks: lock targets may name an enchantment from a level (`enchantment_level`); its locks add to the
+  item's when it is used, swung, dug with or worn. The anvil hook does not show its inputs, so applying a book is
+  not refused. Defaults lock strong Sharpness, Smite, Bane, Power, Protection, Fortune, Looting, Unbreaking, Mending.
+- Shared skills: off, by party (`/skills party`), or everyone online. Members are lifted to the group's highest
+  level per skill; levels never go down; perks stay personal.
+- Skills grow by: buying, doing (work noted per skill, level L takes ten actions times L at 100% pace), or both.
+- Skill strip: a display setting showing the player's skills and levels beside the inventory and crafting table.
+
 ## 8. Data
 
 All definitions are JSON files read by reload listeners from every namespace:
