@@ -123,7 +123,7 @@ fn flush(host: &mut dyn Host) {
     outbox.retain(|_, waiting| !waiting.is_empty());
 }
 
-#[cfg(test)]
+/// Forgets what this module keeps for the running world, as the server stops.
 pub(crate) fn reset() {
     TICKS.store(0, Ordering::Relaxed);
     lock(&JOBS).clear();

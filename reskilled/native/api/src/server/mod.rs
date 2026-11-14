@@ -31,3 +31,18 @@ pub(crate) fn uuid_text(uuid: u128) -> String {
         &hex[20..]
     )
 }
+
+/// The server stopped: forget everything kept for its world (rules in force, waiting requests, placed blocks,
+/// invites, players online), so the next world opened in this game plays by its own. The loaded data files are
+/// read again when the next server starts.
+pub fn forget_world() {
+    actions::reset();
+    earning::reset();
+    effects::reset();
+    enforce::reset();
+    focus::reset();
+    queue::reset();
+    rules::reset();
+    sharing::reset();
+    state::reset();
+}

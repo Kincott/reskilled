@@ -107,12 +107,11 @@ pub fn force(rules: Rules) {
 }
 
 /// Forgets the rules read from the world, as a server that stops does; the next read takes them from the world.
-#[cfg(test)]
 pub fn forget_cached() {
     *lock(&CURRENT) = None;
 }
 
-#[cfg(test)]
+/// Forgets what this module keeps for the running world, as the server stops.
 pub(crate) fn reset() {
     forget_cached();
     lock(&PENDING).clear();
@@ -146,6 +145,20 @@ mod tests {
             progression: Progression::Both,
             ..Rules::default()
         }
+    }
+
+    #[test]
+    fn a_world_opened_after_another_plays_by_its_own_rules() {
+        // Given a world whose rules were changed and are in force
+        let _serial = exclusive();
+        force(changed());
+
+        // When the server stops and another world (with no saved rules) opens
+        crate::server::forget_world();
+        let mut other = TestHost::default();
+
+        // Then the new world plays by its own rules, the defaults
+        assert_eq!(current(&mut other), Rules::default());
     }
 
     #[test]

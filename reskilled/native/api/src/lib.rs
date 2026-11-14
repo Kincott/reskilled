@@ -11,8 +11,8 @@ use horizon_client::mod_api::{
     PlayerCloneEvent, PlayerLoggedInEvent, PlayerLoggedOutEvent, PlayerSwapHandsEvent,
     PlayerTickEvent, PlayerXpChangeEvent, PrepareAnvilEvent, RegisterCommandsEvent,
     ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent, ScreenRenderPostEvent,
-    ServerDataLoadedEvent, ServerReloadListenerApplyEvent, TickEvent, TooltipColorEvent,
-    TooltipEvent, UseItemEvent, UseItemOnEvent,
+    ServerDataLoadedEvent, ServerReloadListenerApplyEvent, ServerStoppedEvent, TickEvent,
+    TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
 };
 use skills_core::defs::Action;
 
@@ -316,6 +316,10 @@ impl Hooks for Mod {
             server::earning::run_for(host, player.uuid);
             server::focus::pay(host, player.uuid);
         }
+    }
+
+    fn server_stopped(&self, _host: &mut dyn Host, _event: &mut ServerStoppedEvent) {
+        server::forget_world();
     }
 
     fn tick(&self, host: &mut dyn Host, _event: &mut TickEvent) {

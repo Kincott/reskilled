@@ -186,7 +186,7 @@ pub fn forget(player: u128) {
     lock(&PENDING).remove(&player);
 }
 
-#[cfg(test)]
+/// Forgets what this module keeps for the running world, as the server stops.
 pub(crate) fn reset() {
     lock(&PENDING).clear();
 }

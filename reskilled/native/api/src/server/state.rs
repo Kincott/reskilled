@@ -157,7 +157,7 @@ pub fn apply_death(host: &mut dyn Host, player: u128) {
     }
 }
 
-#[cfg(test)]
+/// Forgets what this module keeps for the running world, as the server stops.
 pub(crate) fn reset() {
     lock(&ONLINE).clear();
     lock(&STATUS_TOLD).clear();

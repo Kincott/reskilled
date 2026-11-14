@@ -693,7 +693,7 @@ fn drop_at(host: &mut dyn Host, entity: EntityRef, stack: ItemStack) -> Result<(
     }
 }
 
-#[cfg(test)]
+/// Forgets what this module keeps for the running world, as the server stops.
 pub(crate) fn reset() {
     lock(&LAST_REFUSAL).clear();
     lock(&EQUIPMENT_CLICKS).clear();

@@ -216,7 +216,7 @@ pub fn party(host: &mut dyn Host, player: u128, args: &[&str]) -> Vec<Text> {
     vec![line]
 }
 
-#[cfg(test)]
+/// Forgets what this module keeps for the running world, as the server stops.
 pub(crate) fn reset() {
     lock(&INVITES).clear();
 }
