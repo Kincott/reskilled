@@ -11,6 +11,7 @@ more. Everything is data, and the server's rules change in game.
 
 - **K** opens the skills screen (`/skills open` too). Click a skill to see its perks and what its next levels
   unlock; the gear opens Reskilled Options.
+- Shift-click a raise button to raise 5 levels at once, Ctrl-click to raise as many as your XP pays for.
 - Locked items show a padlock and their requirements in the tooltip. A refused action shows what it needs.
 - Focus areas (Fighting, Working, Roaming) give extra XP for their tasks; the first is free.
 - `/skills` lists your skills; `/skills raise <skill>`, `perk <perk>`, `focus <area>` and `party ...` do the

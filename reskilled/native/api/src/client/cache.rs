@@ -681,6 +681,7 @@ mod tests {
         // When the player raises it to 32, then a later sync arrives unchanged
         let raise = ToServer::Act(Request::Raise {
             skill: "reskilled:skill_0000".into(),
+            times: 1,
         });
         with(|cache| cache.asked_for(raise));
         synced(&mut host, 32, &[]);
@@ -711,6 +712,7 @@ mod tests {
         // When the player asks for a raise and it arrives
         let raise = ToServer::Act(Request::Raise {
             skill: "reskilled:skill_0000".into(),
+            times: 1,
         });
         with(|cache| cache.asked_for(raise));
         synced(&mut host, 5, &[]);
@@ -844,6 +846,7 @@ mod tests {
         // long after anything was asked
         let raise = ToServer::Act(Request::Raise {
             skill: "reskilled:skill_0000".into(),
+            times: 1,
         });
         with(|cache| cache.asked_for(raise));
         synced(&mut host, 5, &[]);

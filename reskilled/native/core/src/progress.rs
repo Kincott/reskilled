@@ -61,12 +61,24 @@ fn is_zero(n: &u32) -> bool {
     *n == 0
 }
 
+fn one() -> u32 {
+    1
+}
+
+fn is_one(n: &u32) -> bool {
+    *n == 1
+}
+
 /// What a player asks the server to do.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Raises the skill `times` times in a row (1 when not said), or as many as the player can pay for up to its
+    /// top level when that is more. Only the first may be refused; the rest stop where the XP or the skill runs out.
     Raise {
         skill: String,
+        #[serde(default = "one", skip_serializing_if = "is_one")]
+        times: u32,
     },
     BuyPerk {
         perk: String,
@@ -210,7 +222,9 @@ pub fn apply_under(
     req: &Request,
 ) -> Result<Outcome, Refusal> {
     match req {
-        Request::Raise { skill } => raise(defs, rules, state, xp_levels, skill),
+        Request::Raise { skill, times } => {
+            raise_times(defs, rules, state, xp_levels, skill, *times)
+        }
         Request::BuyPerk { perk } => buy_perk(defs, state, perk),
         Request::AddFocus { focus } => add_focus(defs, state, xp_levels, focus),
         Request::SwitchPerk { perk } => switch_perk(rules, state, perk),
@@ -288,12 +302,35 @@ fn refund_perk(
     })
 }
 
+/// [`raise`] up to `times` times: the first must be granted, then each next one while the XP left pays for it.
+fn raise_times(
+    defs: &Defs,
+    rules: &Rules,
+    state: &PlayerState,
+    xp_levels: u32,
+    skill: &str,
+    times: u32,
+) -> Result<Outcome, Refusal> {
+    let mut done = raise(defs, rules, state, xp_levels, skill, (0, 0))?;
+    for _ in 1..times.max(1) {
+        let spent = (done.levels_spent, done.points_spent);
+        match raise(defs, rules, &done.state, xp_levels, skill, spent) {
+            Ok(next) => done = next,
+            Err(_) => break,
+        }
+    }
+    Ok(done)
+}
+
+/// One raise for a player with `xp_levels` who already owes `spent` (levels, points) for raises before it in the
+/// same request; the outcome's costs include them.
 fn raise(
     defs: &Defs,
     rules: &Rules,
     state: &PlayerState,
     xp_levels: u32,
     skill: &str,
+    spent: (u32, u32),
 ) -> Result<Outcome, Refusal> {
     defs.skill(skill).ok_or(Refusal::UnknownSkill)?;
     if !rules.buying() {
@@ -302,17 +339,17 @@ fn raise(
     let cost = raise_cost(defs, state, skill).ok_or(Refusal::AtMax)?;
     let (levels_spent, points_spent) = match rules.cost_unit {
         CostUnit::Levels => {
-            if xp_levels < cost {
+            if xp_levels.saturating_sub(spent.0) < cost {
                 return Err(Refusal::NotEnoughLevels { needed: cost });
             }
-            (cost, 0)
+            (spent.0 + cost, spent.1)
         }
         CostUnit::Points => {
             let points = cost.saturating_mul(rules.points_per_level);
-            if total_points(xp_levels) < points {
+            if total_points(xp_levels).saturating_sub(spent.1) < points {
                 return Err(Refusal::NotEnoughXpPoints { needed: points });
             }
-            (0, points)
+            (spent.0, spent.1 + points)
         }
     };
     let mut next = state.clone();
@@ -561,9 +598,7 @@ mod tests {
     }
 
     fn raise(skill: &str) -> Request {
-        Request::Raise {
-            skill: skill.into(),
-        }
+        raise_times(skill, 1)
     }
 
     fn buy(perk: &str) -> Request {
@@ -715,6 +750,92 @@ mod tests {
         assert_eq!(outcome.levels_spent, 5);
         assert_eq!(level(&outcome.state, &defs, MINING), 6);
         assert_eq!(level(&outcome.state, &defs, MELEE), 3);
+    }
+
+    fn raise_times(skill: &str, times: u32) -> Request {
+        Request::Raise {
+            skill: skill.into(),
+            times,
+        }
+    }
+
+    #[test]
+    fn raise_five_times_takes_the_five_prices_at_once() {
+        // Given Mining at 5 (raises cost 5, 6, 7, 8, 9) and 100 XP levels
+        let defs = defs();
+
+        // When Mining is raised five times in one request
+        let outcome = apply(&defs, &at_level(MINING, 5), 100, &raise_times(MINING, 5)).unwrap();
+
+        // Then it is at 10 and the five prices are taken together
+        assert_eq!(level(&outcome.state, &defs, MINING), 10);
+        assert_eq!(outcome.levels_spent, 35);
+    }
+
+    #[test]
+    fn raising_many_times_stops_where_the_levels_or_the_skill_run_out() {
+        // Given Mining at 5 with 20 XP levels (5 + 6 + 7 = 18 fits, an 8 more does not), and Mining at 30
+        let defs = defs();
+
+        // When each asks for as many raises as they can get, and one with 4 levels asks for five
+        let short = apply(
+            &defs,
+            &at_level(MINING, 5),
+            20,
+            &raise_times(MINING, u32::MAX),
+        )
+        .unwrap();
+        let near_max = apply(
+            &defs,
+            &at_level(MINING, 30),
+            PLENTY,
+            &raise_times(MINING, u32::MAX),
+        )
+        .unwrap();
+        let refused = apply(&defs, &at_level(MINING, 5), 4, &raise_times(MINING, 5));
+
+        // Then the first gets three raises, the second stops at the max, and the last gets the usual refusal
+        assert_eq!(
+            (level(&short.state, &defs, MINING), short.levels_spent),
+            (8, 18)
+        );
+        assert_eq!(
+            (level(&near_max.state, &defs, MINING), near_max.levels_spent),
+            (32, 61)
+        );
+        assert_eq!(refused, Err(Refusal::NotEnoughLevels { needed: 5 }));
+    }
+
+    #[test]
+    fn raising_many_times_in_points_counts_every_point() {
+        // Given raises paid in points at 20 a level, Mining at 1 (costs 1, 2, 3: 20, 40, 60 points), and 100 points
+        let defs = defs();
+        let rules = Rules {
+            cost_unit: CostUnit::Points,
+            ..Rules::default()
+        };
+        let levels_for_100 = (0..).find(|l| total_points(*l) >= 100).unwrap();
+        let xp = levels_for_100 - u32::from(total_points(levels_for_100) > 100);
+
+        // When as many raises as they can get are asked for
+        let outcome = apply_under(
+            &defs,
+            &rules,
+            &at_level(MINING, 1),
+            xp,
+            &raise_times(MINING, u32::MAX),
+        )
+        .unwrap();
+
+        // Then they get the raises their points pay for, all priced together
+        let mut paid = 0;
+        let mut raises = 0;
+        while paid + (raises + 1) * 20 <= total_points(xp) {
+            raises += 1;
+            paid += raises * 20;
+        }
+        assert_eq!(level(&outcome.state, &defs, MINING), 1 + raises);
+        assert_eq!(outcome.points_spent, paid);
     }
 
     #[test]

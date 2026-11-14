@@ -313,6 +313,7 @@ mod tests {
         let to_server = vec![
             ToServer::Act(Request::Raise {
                 skill: MINING.into(),
+                times: 1,
             }),
             ToServer::Act(Request::BuyPerk {
                 perk: "reskilled:mining_sure_grip".into(),

@@ -21,10 +21,10 @@ use crate::MOD_ID;
 use crate::text::{
     ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
     FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
-    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_TO, REFUND,
-    REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL,
-    REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF,
-    VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say,
+    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_MANY,
+    RAISE_TO, REFUND, REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED,
+    REWARD_KILL, REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, SWITCHED_OFF, TITLE, UNLOCK,
+    VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say,
     skill_name,
 };
 
@@ -32,6 +32,8 @@ use crate::text::{
 pub const LEFT_BUTTON: i32 = 0;
 pub const RIGHT_BUTTON: i32 = 1;
 const ICON: f32 = 16.0;
+/// Raises one Shift-click asks for.
+const SHIFT_RAISES: u32 = 5;
 const BIG_ICON: f32 = 32.0;
 /// Where a header's text sits below the window's top, and its side margin.
 const HEADER_TEXT: f32 = 7.0;
@@ -427,6 +429,7 @@ fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     vec![
         say(&RAISE_TO, &[number(level(state, d, skill) + 1)]).with_color(WHITE),
         cost_line(pen.rules, cost).with_color(colour),
+        say(&RAISE_MANY, &[]).with_color(GRAY),
     ]
 }
 
@@ -780,7 +783,7 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
     }
     with(|cache| {
         let outcome = match &cache.defs {
-            Some(defs) => outcome(cache, defs, size, at, button),
+            Some(defs) => outcome(cache, defs, size, at, button, raises_wanted(host)),
             None => Outcome::Nothing,
         };
         let clicked = !matches!(outcome, Outcome::Nothing);
@@ -802,12 +805,25 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
     Flow::Cancel
 }
 
+/// How many raises a click on a raise button asks for: five with Shift held, as many as the player can pay for
+/// with Control, else one.
+fn raises_wanted(host: &dyn Host) -> u32 {
+    if host.has_control_down() {
+        u32::MAX
+    } else if host.has_shift_down() {
+        SHIFT_RAISES
+    } else {
+        1
+    }
+}
+
 fn outcome(
     cache: &ClientCache,
     defs: &ClientDefs,
     size: [f32; 2],
     at: [f32; 2],
     button: i32,
+    times: u32,
 ) -> Outcome {
     let (d, state, xp) = (&defs.defs, &cache.state, cache.xp_levels);
     let shown = shown(defs, cache.selected);
@@ -815,6 +831,7 @@ fn outcome(
         Some(skill) if can_raise(d, &cache.rules, state, xp, skill) => {
             Outcome::Ask(Request::Raise {
                 skill: (*skill).clone(),
+                times,
             })
         }
         _ => Outcome::Nothing,
@@ -1445,7 +1462,11 @@ mod tests {
         // Then the tooltip says what the raise gives and costs
         assert_eq!(
             tooltip(&host),
-            vec!["Raise to level 13", "Cost: 12 XP levels"]
+            vec![
+                "Raise to level 13",
+                "Cost: 12 XP levels",
+                "Shift: 5 levels. Ctrl: all you can pay for."
+            ]
         );
     }
 
@@ -1591,10 +1612,51 @@ mod tests {
         // Then both clicks are taken and ask the server, and the card's button does not open the skill
         let raise = ToServer::Act(Request::Raise {
             skill: MINING.into(),
+            times: 1,
         });
         assert_eq!(flow, Flow::Cancel);
         assert_eq!(still, View::Overview);
         assert_eq!(sent, vec![raise.clone(), raise]);
+    }
+
+    #[test]
+    fn shift_raises_five_and_control_raises_all_that_can_be_paid() {
+        // Given the screen open
+        let _serial = exclusive();
+        let mut host = screen_open();
+
+        // When Mining's raise is clicked with Shift held, then with Control held
+        host.shift = true;
+        click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
+        host.shift = false;
+        host.control = true;
+        click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
+        let sent = requests_sent(&mut host);
+
+        // Then the first asks for five raises and the second for as many as the server will grant
+        let raise = |times| {
+            ToServer::Act(Request::Raise {
+                skill: MINING.into(),
+                times,
+            })
+        };
+        assert_eq!(sent, vec![raise(5), raise(u32::MAX)]);
+    }
+
+    #[test]
+    fn the_raise_tip_says_what_shift_and_control_do() {
+        // Given the screen open
+        let _serial = exclusive();
+        let host = screen_open();
+
+        // When the mouse is over Mining's raise button
+        drawn(&host, inside(&cards()[1].raise));
+
+        // Then its tooltip ends with the hint
+        assert_eq!(
+            tooltip(&host).last().map(String::as_str),
+            Some("Shift: 5 levels. Ctrl: all you can pay for.")
+        );
     }
 
     #[test]
@@ -1739,6 +1801,7 @@ mod tests {
         // Then only the one they can pay for is asked
         let melee = ToServer::Act(Request::Raise {
             skill: MELEE.into(),
+            times: 1,
         });
         assert_eq!(requests_sent(&mut host), vec![melee]);
     }

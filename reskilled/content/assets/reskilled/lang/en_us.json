@@ -257,6 +257,7 @@
   "reskilled.ui.perks": "Perks",
   "reskilled.ui.progress": "Progress: %s/%s",
   "reskilled.ui.raise_to": "Raise to level %s",
+  "reskilled.ui.raise_many": "Shift: 5 levels. Ctrl: all you can pay for.",
   "reskilled.ui.refund": "Refund",
   "reskilled.ui.refund_cost": "Refund: %s XP levels",
   "reskilled.ui.refund_free": "Refund: free",

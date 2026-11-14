@@ -15,6 +15,9 @@ use horizon_client::mod_api::{
 /// Records what the server sends and answers the tag helpers from its tables.
 #[derive(Default)]
 pub struct TestHost {
+    /// Shift and Control held, as the client's keyboard says.
+    pub shift: bool,
+    pub control: bool,
     pub attachments: HashMap<Holder, Attachments>,
     pub sent: Vec<(u128, String, Vec<u8>)>,
     /// (item, tag) pairs, tags without `#`.
@@ -400,6 +403,14 @@ impl Host for TestHost {
 
     fn mod_screen(&self) -> Option<&str> {
         self.open_screen.as_deref()
+    }
+
+    fn has_shift_down(&self) -> bool {
+        self.shift
+    }
+
+    fn has_control_down(&self) -> bool {
+        self.control
     }
 
     fn playing(&self) -> bool {

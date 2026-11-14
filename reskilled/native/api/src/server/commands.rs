@@ -139,6 +139,7 @@ fn for_player(
             xp_levels,
             Request::Raise {
                 skill: full_id(skill),
+                times: 1,
             },
         ),
         ["perk", perk] => ask(

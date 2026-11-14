@@ -101,7 +101,7 @@ pub fn run_pending_for(host: &mut dyn Host, player: u128) {
 /// What a granted request did, in words.
 fn done_line(defs: &Defs, request: &Request, state: &PlayerState) -> Text {
     match request {
-        Request::Raise { skill } => say(
+        Request::Raise { skill, .. } => say(
             &RAISED,
             &[skill_name(defs, skill), number(level(state, defs, skill))],
         ),
@@ -278,6 +278,7 @@ mod tests {
     fn raise() -> Request {
         Request::Raise {
             skill: MINING.into(),
+            times: 1,
         }
     }
 
