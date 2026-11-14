@@ -23,12 +23,13 @@ use crate::test_host::{Paint, TestHost, exclusive, mods, spans_of};
 
 const SMALLEST: [u32; 2] = [320, 240];
 const USUAL: [u32; 2] = [427, 240];
-const FOLDERS: [(&str, DefKind); 5] = [
+const FOLDERS: [(&str, DefKind); 6] = [
     ("skills", DefKind::Skill),
     ("perks", DefKind::Perk),
     ("focus", DefKind::Focus),
     ("locks", DefKind::Lock),
     ("settings", DefKind::Settings),
+    ("guides", DefKind::Guide),
 ];
 const AWAY: [f32; 2] = [1.0, 1.0];
 
@@ -41,7 +42,11 @@ fn shipped() -> ClientDefs {
     let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../content/data/reskilled");
     let mut files = Vec::new();
     for (folder, kind) in FOLDERS {
-        for entry in fs::read_dir(data.join("reskilled").join(folder)).unwrap() {
+        // A folder the shipped data has no file for yet (guides) is simply empty.
+        let Ok(entries) = fs::read_dir(data.join("reskilled").join(folder)) else {
+            continue;
+        };
+        for entry in entries {
             let path = entry.unwrap().path();
             let name = path.file_stem().unwrap().to_str().unwrap().to_string();
             files.push(SourceFile {

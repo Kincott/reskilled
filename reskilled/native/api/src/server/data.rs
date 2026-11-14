@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
 use horizon_client::mod_api::{Host, ItemStack, NativeReloadListener};
 use serde_json::{Map, Value};
-use skills_core::defs::DefKind;
+use skills_core::defs::{DefKind, GuideAction, parse_state};
 use skills_core::locks::{Facts, LockCache, Requirements, TargetKind};
 use skills_core::registry::{Defs, SourceFile, build};
 use skills_core::wire::{ToClient, chunk_defs, client_defs_json};
@@ -18,12 +18,13 @@ use crate::{DEFS_CHANNEL, MAX_MESSAGE_BYTES, MSG_CHANNEL};
 
 const NAMESPACE: &str = "reskilled";
 /// The data folders under `data/<namespace>/reskilled/`, in the order their files are merged.
-const FOLDERS: [(&str, DefKind); 5] = [
+const FOLDERS: [(&str, DefKind); 6] = [
     ("skills", DefKind::Skill),
     ("perks", DefKind::Perk),
     ("focus", DefKind::Focus),
     ("locks", DefKind::Lock),
     ("settings", DefKind::Settings),
+    ("guides", DefKind::Guide),
 ];
 const REPAIRABLE: &str = "minecraft:repairable";
 const REPAIRABLE_ITEMS: &str = "items";
@@ -78,7 +79,7 @@ pub fn collect(listener: &NativeReloadListener, files: &[(String, Value)]) {
 
 /// Builds the definitions from the files collected for this load, logs each skipped file, and refreshes every
 /// online player.
-pub fn load() {
+pub fn load(host: &dyn Host) {
     let pending = std::mem::take(&mut *lock(&PENDING));
     let mut sources = Vec::new();
     for (folder, kind) in FOLDERS {
@@ -93,9 +94,12 @@ pub fn load() {
             });
         }
     }
-    let (defs, errors) = build(sources);
+    let (mut defs, errors) = build(sources);
     for error in &errors {
         log::warn!("Reskilled skipped {error}");
+    }
+    for problem in drop_unplaceable_guides(host, &mut defs) {
+        log::warn!("Reskilled skipped {problem}");
     }
     log::info!(
         "Reskilled loaded {} skills, {} perks, {} focus areas and {} lock entries",
@@ -116,6 +120,42 @@ pub fn load() {
     for player in online_players() {
         queue::refresh(player);
     }
+}
+
+/// Drops every guide that places a block the game does not know, or a property its default state lacks, and says
+/// why for each. Clients cannot draw such a scene, and only the server's game knows the blocks. Guides that place
+/// nothing are left alone.
+fn drop_unplaceable_guides(host: &dyn Host, defs: &mut Defs) -> Vec<String> {
+    let mut problems = Vec::new();
+    defs.guides.retain(|perk, guide| {
+        let problem = guide
+            .steps
+            .iter()
+            .filter_map(|step| match &step.action {
+                GuideAction::Place(blocks) => Some(blocks),
+                _ => None,
+            })
+            .flatten()
+            .find_map(|placed| unplaceable(host, &placed.block));
+        if let Some(problem) = &problem {
+            problems.push(format!("guide for perk {perk:?}: {problem}"));
+        }
+        problem.is_none()
+    });
+    problems
+}
+
+/// Why the game cannot place this state string, if it cannot. A string that does not parse was already refused
+/// when the file was read.
+fn unplaceable(host: &dyn Host, state: &str) -> Option<String> {
+    let (block, properties) = parse_state(state)?;
+    let Some(default) = host.default_state(&block) else {
+        return Some(format!("unknown block {block:?}"));
+    };
+    properties
+        .iter()
+        .find(|(key, _)| host.block_state_property(default, key).is_none())
+        .map(|(key, _)| format!("block {block:?} has no property {key:?}"))
 }
 
 /// Queues the current definitions for the player, replacing any older send still waiting.
@@ -267,7 +307,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn listens_to_the_five_data_folders() {
+    fn listens_to_the_six_data_folders() {
         // Given the mod
         let _serial = exclusive();
         let mut listeners = Vec::new();
@@ -288,6 +328,7 @@ pub(crate) mod tests {
                 ("reskilled:focus", "reskilled/focus"),
                 ("reskilled:locks", "reskilled/locks"),
                 ("reskilled:settings", "reskilled/settings"),
+                ("reskilled:guides", "reskilled/guides"),
             ]
         );
     }
@@ -330,6 +371,114 @@ pub(crate) mod tests {
         assert_eq!(warnings.len(), 1, "{warnings:?}");
         assert!(
             warnings[0].contains("reskilled:reskilled/skills/broken"),
+            "{}",
+            warnings[0]
+        );
+    }
+
+    const GREEN_AURA: &str = "reskilled:green_aura";
+
+    fn green_aura() -> Value {
+        json!({"format": 1, "id": GREEN_AURA, "skill": MINING, "name": "n", "description": "d",
+            "cost": 1, "min_level": 1,
+            "effects": [{"type": "crop_growth", "radius": 5, "interval_seconds": 10, "chance": 0.25}]})
+    }
+
+    fn guide_placing(block: &str) -> Value {
+        json!({"format": 1, "perk": GREEN_AURA, "seconds": 4,
+            "view": {"center": [0, 0, 0], "yaw": 0, "pitch": 0, "scale": 10},
+            "steps": [{"at": 0, "place": [{"pos": [0, 0, 0], "block": block}]}]})
+    }
+
+    /// A host that knows wheat, whose default state has an `age`.
+    fn host_with_wheat() -> TestHost {
+        let mut host = TestHost::default();
+        host.default_states.insert("minecraft:wheat".into(), 42);
+        host.state_properties.insert((42, "age".into()), "0".into());
+        host
+    }
+
+    fn load_guide(host: &mut TestHost, block: &str) {
+        load(
+            host,
+            &[
+                ("skills", vec![(MINING, skill(MINING))]),
+                ("perks", vec![(GREEN_AURA, green_aura())]),
+                ("guides", vec![("reskilled:replant", guide_placing(block))]),
+            ],
+        );
+    }
+
+    fn warnings() -> Vec<String> {
+        logged()
+            .into_iter()
+            .filter(|l| l.starts_with("WARN"))
+            .collect()
+    }
+
+    #[test]
+    fn guides_load_and_reach_clients() {
+        // Given a guide for a perk placing ripe wheat, on a server that knows the block and its age
+        let _serial = exclusive();
+        let mut host = host_with_wheat();
+        logged();
+
+        // When the data loads
+        load_guide(&mut host, "minecraft:wheat[age=7]");
+
+        // Then the guide is in the server's definitions and in what clients decode, and nothing is logged
+        let data = current().unwrap();
+        assert_eq!(
+            data.defs.guides.keys().collect::<Vec<_>>(),
+            vec![GREEN_AURA]
+        );
+        let client: skills_core::wire::ClientDefs =
+            serde_json::from_str(&data.client_defs).unwrap();
+        assert_eq!(client.defs.guides, data.defs.guides);
+        assert_eq!(warnings(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_guide_with_an_unknown_block_is_dropped() {
+        // Given a guide placing a block the game does not know
+        let _serial = exclusive();
+        let mut host = host_with_wheat();
+        logged();
+
+        // When the data loads
+        load_guide(&mut host, "minecraft:not_a_block");
+
+        // Then the guide is gone from the server and from clients, and one warning names the block
+        let data = current().unwrap();
+        assert!(data.defs.guides.is_empty());
+        let client: skills_core::wire::ClientDefs =
+            serde_json::from_str(&data.client_defs).unwrap();
+        assert!(client.defs.guides.is_empty());
+        let warnings = warnings();
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert!(
+            warnings[0].contains("minecraft:not_a_block") && warnings[0].contains(GREEN_AURA),
+            "{}",
+            warnings[0]
+        );
+    }
+
+    #[test]
+    fn a_guide_with_an_unknown_property_is_dropped() {
+        // Given a guide placing wheat with a colour, which wheat lacks
+        let _serial = exclusive();
+        let mut host = host_with_wheat();
+        logged();
+
+        // When the data loads
+        load_guide(&mut host, "minecraft:wheat[colour=red]");
+
+        // Then the guide is gone and one warning names the property
+        assert!(current().unwrap().defs.guides.is_empty());
+        let warnings = warnings();
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert!(
+            warnings[0].contains("colour") && warnings[0].contains(GREEN_AURA),
             "{}",
             warnings[0]
         );

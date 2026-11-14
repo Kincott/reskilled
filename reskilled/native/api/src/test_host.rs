@@ -109,6 +109,8 @@ pub struct TestHost {
     pub blocks_set: Vec<(String, [i32; 3], horizon_client::mod_api::BlockStateId)>,
     /// Each block's default state, as `default_state` gives it.
     pub default_states: HashMap<String, u32>,
+    /// The properties of each default state, by state id and name, as `block_state_property` gives them.
+    pub state_properties: HashMap<(u32, String), String>,
 }
 
 /// A block's properties, as pairs of name and value.
@@ -412,6 +414,16 @@ impl Host for TestHost {
         self.default_states
             .get(block)
             .map(|id| horizon_client::mod_api::BlockStateId(*id))
+    }
+
+    fn block_state_property(
+        &self,
+        state: horizon_client::mod_api::BlockStateId,
+        key: &str,
+    ) -> Option<&str> {
+        self.state_properties
+            .get(&(state.0, key.to_string()))
+            .map(String::as_str)
     }
 
     fn set_block_property(&mut self, pos: [i32; 3], key: &str, value: &str) -> bool {

@@ -68,8 +68,8 @@ impl Hooks for Mod {
         server::data::collect(event.listener, event.files);
     }
 
-    fn server_data_loaded(&self, _host: &mut dyn Host, _event: &mut ServerDataLoadedEvent) {
-        server::data::load();
+    fn server_data_loaded(&self, host: &mut dyn Host, _event: &mut ServerDataLoadedEvent) {
+        server::data::load(host);
     }
 
     fn player_logged_in(&self, _host: &mut dyn Host, event: &mut PlayerLoggedInEvent<'_>) {
