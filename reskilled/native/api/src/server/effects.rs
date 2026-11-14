@@ -73,7 +73,7 @@ static MOUNTED: Mutex<BTreeMap<u128, (String, Vec<AttributeMod>)>> = Mutex::new(
 
 /// Vanilla 26.3's damage type tags `is_projectile`, `is_fall`, `is_fire` and `is_explosion`, and the melee types,
 /// read from the prepared game data (`damage-tags.json`, `damage-types.json`) on 2026-11-13.
-const DAMAGE_KINDS: [(DamageKind, &[&str]); 6] = [
+const DAMAGE_KINDS: [(DamageKind, &[&str]); 7] = [
     (
         DamageKind::Melee,
         &[
@@ -122,6 +122,7 @@ const DAMAGE_KINDS: [(DamageKind, &[&str]); 6] = [
         ],
     ),
     (DamageKind::EnderPearl, &["ender_pearl"]),
+    (DamageKind::Magic, &["magic", "indirect_magic"]),
 ];
 
 /// The kinds a vanilla damage type counts as; a mod's types count as none, so only `any` rules apply to them.
@@ -904,7 +905,7 @@ mod tests {
 
     #[test]
     fn damage_kinds_follow_vanilla_tags() {
-        // Given damage types from each of vanilla's tags, one in two, and one in none
+        // Given damage types from each of vanilla's tags, one in two, magic and an ender pearl
         // When they are classified
         let kinds = [
             "minecraft:spear",
@@ -929,7 +930,7 @@ mod tests {
                 vec![Fire],
                 vec![Explosion],
                 vec![Projectile, Fire],
-                vec![],
+                vec![Magic],
                 vec![Fall, EnderPearl]
             ]
         );

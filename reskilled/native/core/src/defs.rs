@@ -122,7 +122,36 @@ pub enum Effect {
     },
     /// Breaking one of these crops ripe plants it again, taking one seed from what it drops.
     Replant { crops: Vec<ReplantCrop> },
+    /// Melee hits with an enchanted weapon deal `per_enchantment` more for each enchantment on it, up to `max`.
+    EnchantedWeapon { per_enchantment: f64, max: f64 },
+    /// Each enchantment on the worn armor cuts damage taken by `per_enchantment`, up to `max`.
+    EnchantedArmor { per_enchantment: f64, max: f64 },
+    /// These potion effects, when they come on the player, last `multiplier` of their time.
+    ShorterEffects {
+        effects: Vec<String>,
+        multiplier: f64,
+    },
+    /// Every `interval_seconds`, each enchanted item worn or held loses `points` of damage.
+    RuneRepair { interval_seconds: u32, points: u32 },
+    /// Blocks the player placed drop themselves when they break them.
+    Salvage,
+    /// Waking from a full sleep heals the player and takes these effects off them.
+    RestfulSleep { clears: Vec<String> },
+    /// Within `radius` blocks of their respawn point the player has `effect`.
+    NearHome {
+        radius: u32,
+        effect: String,
+        amplifier: u8,
+    },
+    /// Explosions within `radius` blocks of the player's respawn point break no blocks, while they are online.
+    HomeWard { radius: u32 },
+    /// Monsters do not spawn naturally within `radius` blocks of the player's respawn point, while they are
+    /// online.
+    SafeHaven { radius: u32 },
 }
+
+/// The widest radius of an effect around the player's home, in blocks.
+const HOME_RADIUS_MAX: u32 = 64;
 
 /// A crop [`Effect::Replant`] plants again: its block, the seed it takes from the drops, and the `age` it is ripe at.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -163,6 +192,8 @@ pub enum DamageKind {
     Explosion,
     /// The fall at the end of an ender pearl's flight.
     EnderPearl,
+    /// Magic: harming potions, witches, evoker fangs, guardian beams.
+    Magic,
     Any,
 }
 
@@ -511,6 +542,55 @@ impl Effect {
                 check_id("block", &crop.block)?;
                 check_id("seed", &crop.seed)
             }),
+            Effect::EnchantedWeapon {
+                per_enchantment,
+                max,
+            }
+            | Effect::EnchantedArmor {
+                per_enchantment,
+                max,
+            } => {
+                check_finite("per_enchantment", *per_enchantment)?;
+                check_finite("max", *max)?;
+                if !(0.0..=1.0).contains(per_enchantment) || !(0.0..=1.0).contains(max) {
+                    return Err(format!(
+                        "per_enchantment and max must be between 0 and 1, found {per_enchantment} and max {max}"
+                    ));
+                }
+                Ok(())
+            }
+            Effect::ShorterEffects {
+                effects,
+                multiplier,
+            } => {
+                effects.iter().try_for_each(|e| check_id("effects", e))?;
+                if (0.0..=1.0).contains(multiplier) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "multiplier must be between 0 and 1, found {multiplier}"
+                    ))
+                }
+            }
+            Effect::RuneRepair {
+                interval_seconds, ..
+            } => {
+                if *interval_seconds == 0 {
+                    return Err("interval_seconds must be at least 1".into());
+                }
+                Ok(())
+            }
+            Effect::Salvage => Ok(()),
+            Effect::RestfulSleep { clears } => {
+                clears.iter().try_for_each(|e| check_id("clears", e))
+            }
+            Effect::NearHome { radius, effect, .. } => {
+                check_id("effect", effect)?;
+                check_home_radius(*radius)
+            }
+            Effect::HomeWard { radius } | Effect::SafeHaven { radius } => {
+                check_home_radius(*radius)
+            }
             Effect::Damage { multiplier, .. }
             | Effect::XpGain { multiplier }
             | Effect::AnvilCost { multiplier } => {
@@ -524,6 +604,16 @@ impl Effect {
                 }
             }
         }
+    }
+}
+
+fn check_home_radius(radius: u32) -> Result<(), String> {
+    if radius <= HOME_RADIUS_MAX {
+        Ok(())
+    } else {
+        Err(format!(
+            "radius must be at most {HOME_RADIUS_MAX}, found {radius}"
+        ))
     }
 }
 
@@ -1222,6 +1312,50 @@ mod tests {
             }
         ));
         assert!(matches!(&perk.effects[3], Effect::Replant { crops } if crops[0].ripe_age == 7));
+    }
+
+    #[test]
+    fn parses_the_rune_and_home_effects() {
+        // Given a perk with every rune and home effect, and a magic damage rule
+        let json = perk_with(
+            r#"{"type": "enchanted_weapon", "per_enchantment": 0.03, "max": 0.15},
+               {"type": "enchanted_armor", "per_enchantment": 0.01, "max": 0.08},
+               {"type": "shorter_effects", "effects": ["minecraft:poison"], "multiplier": 0.6},
+               {"type": "rune_repair", "interval_seconds": 30, "points": 10},
+               {"type": "salvage"},
+               {"type": "restful_sleep", "clears": ["minecraft:poison"]},
+               {"type": "near_home", "radius": 16, "effect": "minecraft:regeneration", "amplifier": 0},
+               {"type": "home_ward", "radius": 24},
+               {"type": "safe_haven", "radius": 32},
+               {"type": "damage", "direction": "taken", "kind": "magic", "multiplier": 0.7}"#,
+        );
+
+        // When it is parsed
+        let DefFile::Perk(perk) = parse_ok(DefKind::Perk, &json) else {
+            panic!("a perk");
+        };
+
+        // Then all ten are there
+        assert_eq!(perk.effects.len(), 10);
+        assert!(matches!(perk.effects[4], Effect::Salvage));
+    }
+
+    #[test]
+    fn rune_and_home_effects_that_make_no_sense_are_refused() {
+        // Given a weapon bonus capped below its step, a shortening that lengthens, and a ward of 200 blocks
+        let cap = perk_with(r#"{"type": "enchanted_weapon", "per_enchantment": 0.5, "max": -1.0}"#);
+        let longer = perk_with(
+            r#"{"type": "shorter_effects", "effects": ["minecraft:poison"], "multiplier": 1.5}"#,
+        );
+        let wide = perk_with(r#"{"type": "home_ward", "radius": 200}"#);
+
+        // When they are parsed
+        let [cap, longer, wide] = [cap, longer, wide].map(|json| refusal(DefKind::Perk, &json));
+
+        // Then each is refused, saying why
+        assert!(cap.contains("max"), "{cap}");
+        assert!(longer.contains("multiplier"), "{longer}");
+        assert!(wide.contains("radius"), "{wide}");
     }
 
     #[test]

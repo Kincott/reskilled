@@ -45,6 +45,21 @@ pub struct ActiveEffects {
     pub crop_growth: Option<(u32, u32, f64)>,
     /// Crops broken ripe are planted again.
     pub replant: Vec<ReplantCrop>,
+    /// The biggest enchanted weapon bonus: per enchantment, most.
+    pub enchanted_weapon: Option<(f64, f64)>,
+    /// The biggest enchanted armor ward: per enchantment, most.
+    pub enchanted_armor: Option<(f64, f64)>,
+    /// Potion effects that wear off sooner, each with the shortest multiplier.
+    pub shorter_effects: Vec<(String, f64)>,
+    /// The quickest rune repair: interval in seconds, points.
+    pub rune_repair: Option<(u32, u32)>,
+    pub salvage: bool,
+    /// Effects a full sleep clears; empty when sleep does nothing.
+    pub restful_sleep: Vec<String>,
+    /// Effects near home: radius, effect, amplifier.
+    pub near_home: Vec<(u32, String, u8)>,
+    pub home_ward: Option<u32>,
+    pub safe_haven: Option<u32>,
 }
 
 impl Default for ActiveEffects {
@@ -61,8 +76,29 @@ impl Default for ActiveEffects {
             on_kill: Vec::new(),
             crop_growth: None,
             replant: Vec::new(),
+            enchanted_weapon: None,
+            enchanted_armor: None,
+            shorter_effects: Vec::new(),
+            rune_repair: None,
+            salvage: false,
+            restful_sleep: Vec::new(),
+            near_home: Vec::new(),
+            home_ward: None,
+            safe_haven: None,
         }
     }
+}
+
+/// The bigger of two (per enchantment, most) pairs, by their most.
+fn bigger(now: Option<(f64, f64)>, new: (f64, f64)) -> Option<(f64, f64)> {
+    match now {
+        Some(old) if old.1 >= new.1 => Some(old),
+        _ => Some(new),
+    }
+}
+
+fn wider(now: Option<u32>, new: u32) -> Option<u32> {
+    Some(now.map_or(new, |old| old.max(new)))
 }
 
 /// Gathers the effects of every active perk. Modifier ids are `reskilled:<perk namespace>/<perk path>/<effect
@@ -141,6 +177,63 @@ pub fn active_effects(defs: &Defs, state: &PlayerState) -> ActiveEffects {
                             effects.replant.push(crop.clone());
                         }
                     }
+                }
+                Effect::EnchantedWeapon {
+                    per_enchantment,
+                    max,
+                } => {
+                    effects.enchanted_weapon =
+                        bigger(effects.enchanted_weapon, (*per_enchantment, *max))
+                }
+                Effect::EnchantedArmor {
+                    per_enchantment,
+                    max,
+                } => {
+                    effects.enchanted_armor =
+                        bigger(effects.enchanted_armor, (*per_enchantment, *max))
+                }
+                Effect::ShorterEffects {
+                    effects: ids,
+                    multiplier,
+                } => {
+                    for id in ids {
+                        match effects.shorter_effects.iter_mut().find(|(e, _)| e == id) {
+                            Some((_, m)) => *m = m.min(*multiplier),
+                            None => effects.shorter_effects.push((id.clone(), *multiplier)),
+                        }
+                    }
+                }
+                Effect::RuneRepair {
+                    interval_seconds,
+                    points,
+                } => {
+                    let quicker = effects
+                        .rune_repair
+                        .is_none_or(|(i, p)| (*points, *interval_seconds) > (p, i));
+                    if quicker {
+                        effects.rune_repair = Some((*interval_seconds, *points));
+                    }
+                }
+                Effect::Salvage => effects.salvage = true,
+                Effect::RestfulSleep { clears } => {
+                    for id in clears {
+                        if !effects.restful_sleep.contains(id) {
+                            effects.restful_sleep.push(id.clone());
+                        }
+                    }
+                }
+                Effect::NearHome {
+                    radius,
+                    effect,
+                    amplifier,
+                } => effects
+                    .near_home
+                    .push((*radius, effect.clone(), *amplifier)),
+                Effect::HomeWard { radius } => {
+                    effects.home_ward = wider(effects.home_ward, *radius)
+                }
+                Effect::SafeHaven { radius } => {
+                    effects.safe_haven = wider(effects.safe_haven, *radius)
                 }
             }
         }
@@ -273,6 +366,64 @@ mod tests {
             amount,
             operation,
         }
+    }
+
+    #[test]
+    fn rune_and_home_effects_are_gathered() {
+        // Given perks with a weapon bonus, an armor ward, a shortening, rune repair and every home effect
+        let perks = vec![perk(
+            "reskilled:a",
+            1,
+            vec![
+                Effect::EnchantedWeapon {
+                    per_enchantment: 0.03,
+                    max: 0.15,
+                },
+                Effect::EnchantedArmor {
+                    per_enchantment: 0.01,
+                    max: 0.08,
+                },
+                Effect::ShorterEffects {
+                    effects: vec!["minecraft:poison".into()],
+                    multiplier: 0.6,
+                },
+                Effect::RuneRepair {
+                    interval_seconds: 30,
+                    points: 10,
+                },
+                Effect::Salvage,
+                Effect::RestfulSleep {
+                    clears: vec!["minecraft:poison".into()],
+                },
+                Effect::NearHome {
+                    radius: 16,
+                    effect: "minecraft:regeneration".into(),
+                    amplifier: 0,
+                },
+                Effect::HomeWard { radius: 24 },
+                Effect::SafeHaven { radius: 32 },
+            ],
+        )];
+        let (defs, state) = owning(perks, 1);
+
+        // When the active effects are gathered
+        let e = active_effects(&defs, &state);
+
+        // Then each is there
+        assert_eq!(e.enchanted_weapon, Some((0.03, 0.15)));
+        assert_eq!(e.enchanted_armor, Some((0.01, 0.08)));
+        assert_eq!(
+            e.shorter_effects,
+            vec![("minecraft:poison".to_string(), 0.6)]
+        );
+        assert_eq!(e.rune_repair, Some((30, 10)));
+        assert!(e.salvage);
+        assert_eq!(e.restful_sleep, vec!["minecraft:poison".to_string()]);
+        assert_eq!(
+            e.near_home,
+            vec![(16, "minecraft:regeneration".to_string(), 0)]
+        );
+        assert_eq!((e.home_ward, e.safe_haven), (Some(24), Some(32)));
     }
 
     #[test]
