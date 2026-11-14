@@ -4,7 +4,7 @@
 use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
 use skills_core::defs::{PerkDef, Reward};
 use skills_core::progress::{
-    PlayerState, Request, apply_under, earn_threshold, focus_cost, level, mastered,
+    PlayerState, Request, apply_under, earn_threshold, focus_cost, level, mastered, own_level,
     points_available, raise_cost, switched_off, total_points,
 };
 use skills_core::registry::Defs;
@@ -22,10 +22,10 @@ use crate::text::{
     ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
     FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
     NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_BY,
-    RAISE_CTRL, RAISE_SHIFT, RAISE_TO, REFUND, REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP,
-    REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS,
-    SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number,
-    perk_description, perk_name, say, skill_name,
+    RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT, RAISE_TO, REFUND, REFUND_COST,
+    REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT,
+    REWARD_TAME, REWARD_TRAVEL, SETTINGS, SHARED_OWN, SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF, VAL_ON,
+    WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -437,7 +437,7 @@ fn raises_price(
         CostUnit::Levels => outcome.levels_spent,
         CostUnit::Points => outcome.points_spent,
     };
-    Some((level(&outcome.state, d, skill), price))
+    Some((own_level(&outcome.state, d, skill), price))
 }
 
 fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
@@ -445,7 +445,8 @@ fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     let Some(cost) = price(d, pen.rules, state, skill) else {
         return vec![say(&AT_TOP, &[]).with_color(GOLD)];
     };
-    let now = level(state, d, skill);
+    let now = own_level(state, d, skill);
+    let lifted = now < level(state, d, skill);
     let held = raises_wanted(pen.host);
     if held > 1 {
         let xp = pen.xp.unwrap_or(0);
@@ -462,7 +463,11 @@ fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
         };
         let (reach, price, paid) = priced.unwrap_or((now + 1, cost, false));
         return vec![
-            say(&RAISE_BY, &[number(reach), number(reach - now)]).with_color(WHITE),
+            say(
+                if lifted { &RAISE_OWN_BY } else { &RAISE_BY },
+                &[number(reach), number(reach - now)],
+            )
+            .with_color(WHITE),
             cost_line(pen.rules, price).with_color(if paid { GREEN } else { RED }),
         ];
     }
@@ -472,7 +477,11 @@ fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
         RED
     };
     vec![
-        say(&RAISE_TO, &[number(level(state, d, skill) + 1)]).with_color(WHITE),
+        say(
+            if lifted { &RAISE_OWN_TO } else { &RAISE_TO },
+            &[number(now + 1)],
+        )
+        .with_color(WHITE),
         cost_line(pen.rules, cost).with_color(colour),
         say(&RAISE_SHIFT, &[]).with_color(GRAY),
         say(&RAISE_CTRL, &[]).with_color(GRAY),
@@ -483,12 +492,20 @@ fn skill_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
     let levels = [number(level(state, d, skill)), number(d.max_level(skill))];
     let points = points_available(d, state, skill);
+    let own = own_level(state, d, skill);
+    let shared =
+        (own < level(state, d, skill)).then(|| say(&SHARED_OWN, &[number(own)]).with_color(GREEN));
     vec![
         skill_name(d, skill).with_color(GOLD),
         say(&LEVEL_OF, &levels).with_color(WHITE),
+    ]
+    .into_iter()
+    .chain(shared)
+    .chain([
         say(&PERK_POINTS, &[number(points)]).with_color(if points > 0 { GOLD } else { GRAY }),
         say(&OPEN_HINT, &[]).with_color(DIM),
-    ]
+    ])
+    .collect()
 }
 
 /// A focus area's tooltip: its name, each task it gives XP for (once), and what a click does.
@@ -1514,6 +1531,31 @@ mod tests {
                 "Shift: +5 levels",
                 "Ctrl: all you can pay for"
             ]
+        );
+    }
+
+    #[test]
+    fn a_lifted_skill_raises_and_names_the_own_level() {
+        // Given Mining shown at 12 through a party, the player's own at 4 (a raise from 4 costs 4)
+        let _serial = exclusive();
+        let host = screen_open();
+        with(|cache| cache.state.skills.get_mut(MINING).unwrap().own = Some(4));
+
+        // When the mouse is over Mining's raise button, then over its card
+        drawn(&host, inside(&cards()[1].raise));
+        let raise = tooltip(&host);
+        host.painted.borrow_mut().clear();
+        drawn(&host, inside(&cards()[1].rect));
+        let card = tooltip(&host);
+
+        // Then the raise is from the own level at its price, and the card says the 12 is shared
+        assert_eq!(
+            raise[..2],
+            ["Raise your own level to 5", "Cost: 4 XP levels"]
+        );
+        assert!(
+            card.contains(&"Shared by your group. Your own level: 4".to_string()),
+            "{card:?}"
         );
     }
 

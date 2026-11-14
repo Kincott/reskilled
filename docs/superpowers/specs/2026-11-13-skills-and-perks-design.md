@@ -268,8 +268,10 @@ world (`Holder::Level`), sent to every player, and changed only by operators (ch
 - Enchantment locks: lock targets may name an enchantment from a level (`enchantment_level`); its locks add to the
   item's when it is used, swung, dug with or worn. The anvil hook does not show its inputs, so applying a book is
   not refused. Defaults lock strong Sharpness, Smite, Bane, Power, Protection, Fortune, Looting, Unbreaking, Mending.
-- Shared skills: off, by party (`/skills party`), or everyone online. Members are lifted to the group's highest
-  level per skill; levels never go down; perks stay personal.
+- Shared skills: off, by party (`/skills party`), or everyone. While sharing, each member is shown the highest
+  level any member reached by themselves; their own level is kept apart and is theirs again when they leave or
+  sharing is turned off (so levels cannot be carried out of a party). Raising, earning, perk points and perks use
+  the own level; a death lowers the own level, and the group's shared level with it when that member was best.
 - Skills grow by: buying, doing (work noted per skill, level L takes ten actions times L at 100% pace), or both.
 - Skill strip: a display setting showing the player's skills and levels beside the inventory and crafting table.
 

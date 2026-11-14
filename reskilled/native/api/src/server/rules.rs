@@ -91,7 +91,8 @@ pub fn run_for(host: &mut dyn Host, player: u128) {
         *lock(&CURRENT) = Some(rules);
         for online in state::online_players() {
             queue::queue(Job::SendRules(online));
-            // Enchantment locks may have just been turned on.
+            // Sharing may have changed, and enchantment locks may have just been turned on.
+            queue::queue(Job::LiftShared(online));
             queue::recheck(online);
         }
     }

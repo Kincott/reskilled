@@ -155,7 +155,11 @@ pub fn apply_death(host: &mut dyn Host, player: u128) {
     let applied = state_of(host, player)
         .and_then(|state| set_state(host, player, on_death(&data.defs, &state)));
     match applied {
-        Ok(()) => queue::recheck(player),
+        Ok(()) => {
+            // The group learns the lower own level, and the death's levels are not lent back.
+            queue::queue(queue::Job::LiftShared(player));
+            queue::recheck(player);
+        }
         Err(error) => {
             log::warn!("Reskilled could not apply the death penalty to {player:032x}: {error:?}")
         }
@@ -311,7 +315,11 @@ mod tests {
         );
         assert_eq!(
             after_run,
-            vec![Job::SyncAttributes(PLAYER), Job::CheckEquipment(PLAYER)]
+            vec![
+                Job::LiftShared(PLAYER),
+                Job::SyncAttributes(PLAYER),
+                Job::CheckEquipment(PLAYER)
+            ]
         );
         assert_eq!(take_queued(), vec![Job::SyncAttributes(PLAYER)]);
     }

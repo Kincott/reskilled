@@ -79,6 +79,9 @@ messages! {
     RAISE_SHIFT = "reskilled.ui.raise_shift" => "Shift: +5 levels";
     RAISE_CTRL = "reskilled.ui.raise_ctrl" => "Ctrl: all you can pay for";
     RAISE_BY = "reskilled.ui.raise_by" => "Raise to level %s (+%s)";
+    RAISE_OWN_TO = "reskilled.ui.raise_own_to" => "Raise your own level to %s";
+    RAISE_OWN_BY = "reskilled.ui.raise_own_by" => "Raise your own level to %s (+%s)";
+    SHARED_OWN = "reskilled.ui.shared_own" => "Shared by your group. Your own level: %s";
     COST = "reskilled.ui.cost" => "Cost: %s XP levels";
     COST_POINTS = "reskilled.ui.cost_points" => "Cost: %s XP points";
     AT_TOP = "reskilled.ui.at_top" => "Max level";

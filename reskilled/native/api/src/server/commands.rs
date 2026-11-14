@@ -222,6 +222,7 @@ fn operate(
     };
     let line = change(state, defs, &spelled).and_then(|(state, done)| {
         set_state(host, target, state).map_err(|_| say(&UNAVAILABLE, &[]))?;
+        queue::queue(queue::Job::LiftShared(target));
         queue::recheck(target);
         Ok(done)
     });
@@ -533,7 +534,11 @@ mod tests {
         );
         assert_eq!(
             take_queued(),
-            vec![Job::SyncAttributes(ANN), Job::CheckEquipment(ANN)]
+            vec![
+                Job::LiftShared(ANN),
+                Job::SyncAttributes(ANN),
+                Job::CheckEquipment(ANN)
+            ]
         );
     }
 

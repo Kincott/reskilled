@@ -55,6 +55,23 @@ pub struct SkillProgress {
     /// Progress earned by doing the skill's work toward its next level, in hundredths of an action.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub earned: u32,
+    /// The level the player reached themselves, while a group they share skills with lifts `level` above it. What
+    /// they pay, earn and buy perks with; `level` (what locks check) is this one again when the lift ends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own: Option<u32>,
+}
+
+impl SkillProgress {
+    /// Sets the level the player reached themselves: the shown level follows, unless a lift keeps it higher.
+    pub fn set_own(&mut self, own: u32) {
+        match self.own {
+            Some(_) if own < self.level => self.own = Some(own),
+            _ => {
+                self.level = own;
+                self.own = None;
+            }
+        }
+    }
 }
 
 fn is_zero(n: &u32) -> bool {
@@ -149,10 +166,20 @@ pub fn level(state: &PlayerState, defs: &Defs, skill: &str) -> u32 {
     saved.clamp(MIN_LEVEL, defs.max_level(skill).max(MIN_LEVEL))
 }
 
-/// XP levels the next level of the skill costs; `None` at the maximum or for an unknown skill.
+/// The skill's level the player reached themselves, below a level a group lifts them to; as [`level`] otherwise.
+pub fn own_level(state: &PlayerState, defs: &Defs, skill: &str) -> u32 {
+    let saved = state
+        .skills
+        .get(skill)
+        .map_or(MIN_LEVEL, |progress| progress.own.unwrap_or(progress.level));
+    saved.clamp(MIN_LEVEL, defs.max_level(skill).max(MIN_LEVEL))
+}
+
+/// XP levels the next level of the skill costs, at the player's own level; `None` at the maximum or for an unknown
+/// skill.
 pub fn raise_cost(defs: &Defs, state: &PlayerState, skill: &str) -> Option<u32> {
     defs.skill(skill)?;
-    let current = level(state, defs, skill);
+    let current = own_level(state, defs, skill);
     if current >= defs.max_level(skill) {
         return None;
     }
@@ -185,7 +212,7 @@ pub fn active_rewards<'a>(defs: &'a Defs, state: &PlayerState) -> Vec<&'a Reward
 /// Whether the skill is mastered: at its top level with every one of its perks bought.
 pub fn mastered(defs: &Defs, state: &PlayerState, skill: &str) -> bool {
     defs.skill(skill).is_some()
-        && level(state, defs, skill) >= defs.max_level(skill)
+        && own_level(state, defs, skill) >= defs.max_level(skill)
         && defs
             .perks
             .values()
@@ -195,7 +222,7 @@ pub fn mastered(defs: &Defs, state: &PlayerState, skill: &str) -> bool {
 
 /// Perk points earned by the skill's level, plus granted ones, minus spent ones.
 pub fn points_available(defs: &Defs, state: &PlayerState, skill: &str) -> u32 {
-    let earned = level(state, defs, skill) / defs.points_every(skill);
+    let earned = own_level(state, defs, skill) / defs.points_every(skill);
     let (spent, bonus) = state
         .skills
         .get(skill)
@@ -353,7 +380,11 @@ fn raise(
         }
     };
     let mut next = state.clone();
-    next.skills.entry(skill.to_string()).or_default().level = level(state, defs, skill) + 1;
+    let own = own_level(state, defs, skill) + 1;
+    next.skills
+        .entry(skill.to_string())
+        .or_default()
+        .set_own(own);
     Ok(Outcome {
         state: next,
         levels_spent,
@@ -365,7 +396,7 @@ fn raise(
 /// None at its top level.
 pub fn earn_threshold(defs: &Defs, state: &PlayerState, skill: &str) -> Option<u32> {
     defs.skill(skill)?;
-    let now = level(state, defs, skill);
+    let now = own_level(state, defs, skill);
     (now < defs.max_level(skill)).then_some(now.saturating_mul(ACTIONS_PER_LEVEL * HUNDREDTHS))
 }
 
@@ -389,7 +420,11 @@ pub fn earn(defs: &Defs, state: &PlayerState, skill: &str, hundredths: u32) -> (
         }
         pool -= needed;
         gained += 1;
-        next.skills.entry(skill.to_string()).or_default().level = level(&next, defs, skill) + 1;
+        let own = own_level(&next, defs, skill) + 1;
+        next.skills
+            .entry(skill.to_string())
+            .or_default()
+            .set_own(own);
     }
     if earn_threshold(defs, &next, skill).is_none() {
         pool = 0;
@@ -437,7 +472,7 @@ fn buy_perk(defs: &Defs, state: &PlayerState, id: &str) -> Result<Outcome, Refus
     if owns(state, id) {
         return Err(Refusal::AlreadyOwned);
     }
-    if level(state, defs, &perk.skill) < perk.min_level {
+    if own_level(state, defs, &perk.skill) < perk.min_level {
         return Err(Refusal::BelowMinLevel {
             needed: perk.min_level,
         });
@@ -509,9 +544,10 @@ pub fn on_death(defs: &Defs, state: &PlayerState) -> PlayerState {
     let mut next = state.clone();
     for (skill, progress) in &mut next.skills {
         if defs.skill(skill).is_some() {
-            progress.level = level(state, defs, skill)
+            let own = own_level(state, defs, skill)
                 .saturating_sub(penalty)
                 .max(MIN_LEVEL);
+            progress.set_own(own);
         }
     }
     next
@@ -524,7 +560,7 @@ pub fn active_perks<'a>(defs: &'a Defs, state: &PlayerState) -> Vec<&'a PerkDef>
         .filter(|perk| {
             owns(state, &perk.id)
                 && !switched_off(state, &perk.id)
-                && level(state, defs, &perk.skill) >= perk.min_level
+                && own_level(state, defs, &perk.skill) >= perk.min_level
         })
         .collect()
 }
@@ -606,6 +642,70 @@ mod tests {
 
     fn raise(skill: &str) -> Request {
         raise_times(skill, 1)
+    }
+
+    /// Mining shown at `shared` because a group shares it, the player's own level being `own`.
+    fn lifted(shared: u32, own: u32) -> PlayerState {
+        let mut state = at_level(MINING, shared);
+        state.skills.get_mut(MINING).unwrap().own = Some(own);
+        state
+    }
+
+    #[test]
+    fn raising_while_lifted_raises_the_own_level_at_its_price() {
+        // Given Mining shown at 20 through a party, the player's own at 5 (a raise from 5 costs 5)
+        let defs = defs();
+
+        // When they raise it
+        let outcome = apply(&defs, &lifted(20, 5), PLENTY, &raise(MINING)).unwrap();
+
+        // Then it costs the own level's price, the own level is 6, and the shown level stays 20
+        assert_eq!(outcome.levels_spent, 5);
+        assert_eq!(own_level(&outcome.state, &defs, MINING), 6);
+        assert_eq!(level(&outcome.state, &defs, MINING), 20);
+    }
+
+    #[test]
+    fn raising_the_own_level_up_to_the_shared_one_ends_the_lift() {
+        // Given Mining shown at 6 through a party, the player's own at 5
+        let defs = defs();
+
+        // When they raise it
+        let outcome = apply(&defs, &lifted(6, 5), PLENTY, &raise(MINING)).unwrap();
+
+        // Then their own level is 6, shown as it is, with nothing lifted any more
+        assert_eq!(level(&outcome.state, &defs, MINING), 6);
+        assert_eq!(outcome.state.skills[MINING].own, None);
+    }
+
+    #[test]
+    fn perks_hang_on_the_own_level() {
+        // Given Mining shown at 20 through a party, the player's own at 2 (a point every 2 levels), owning Sure Grip
+        // (from level 1) and wanting Deep Veins (from level 8)
+        let defs = defs();
+        let state = lifted(20, 2);
+
+        // When perk points and the minimum level are checked
+        let points = points_available(&defs, &state, MINING);
+        let deep_veins = apply(&defs, &state, PLENTY, &buy(DEEP_VEINS));
+
+        // Then the points come from level 2 and Deep Veins waits for the own level 8
+        assert_eq!(points, 1);
+        assert_eq!(deep_veins, Err(Refusal::BelowMinLevel { needed: 8 }));
+    }
+
+    #[test]
+    fn death_lowers_the_own_level_under_a_lift() {
+        // Given a 2-level death penalty and Mining shown at 20 through a party, the player's own at 10
+        let mut defs = defs();
+        defs.settings.death_penalty_levels = 2;
+
+        // When they die
+        let after = on_death(&defs, &lifted(20, 10));
+
+        // Then their own level is 8; the shared level is left for the group to decide
+        assert_eq!(own_level(&after, &defs, MINING), 8);
+        assert_eq!(level(&after, &defs, MINING), 20);
     }
 
     fn buy(perk: &str) -> Request {
