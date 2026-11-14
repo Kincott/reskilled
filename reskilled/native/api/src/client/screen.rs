@@ -111,7 +111,6 @@ fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
     }
 }
 
-/// Whether the player has the XP levels to raise the skill.
 /// Progress earned by doing toward the skill's next level, in actions: what is earned and what the level takes.
 fn earned_of(d: &Defs, state: &PlayerState, skill: &str) -> Option<(u32, u32)> {
     let need = earn_threshold(d, state, skill)?;
