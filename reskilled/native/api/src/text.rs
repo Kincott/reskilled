@@ -28,6 +28,7 @@ messages! {
     UNKNOWN_FOCUS = "reskilled.msg.unknown_focus" => "There is no such focus.";
     AT_MAX = "reskilled.msg.at_max" => "That skill is already at its highest level.";
     NOT_ENOUGH_LEVELS = "reskilled.msg.not_enough_levels" => "Needs %s XP levels.";
+    NOT_ENOUGH_XP_POINTS = "reskilled.msg.not_enough_xp_points" => "Needs %s XP points.";
     NOT_ENOUGH_POINTS = "reskilled.msg.not_enough_points" => "Needs %s perk points.";
     BELOW_MIN_LEVEL = "reskilled.msg.below_min_level" => "Needs %s %s first.";
     MISSING_PERK = "reskilled.msg.missing_perk" => "Get %s first.";
@@ -65,6 +66,7 @@ messages! {
     LEVEL_UP = "reskilled.ui.level_up" => "Level up";
     RAISE_TO = "reskilled.ui.raise_to" => "Raise to level %s";
     COST = "reskilled.ui.cost" => "Cost: %s XP levels";
+    COST_POINTS = "reskilled.ui.cost_points" => "Cost: %s XP points";
     AT_TOP = "reskilled.ui.at_top" => "Max level";
     PERK_POINTS = "reskilled.ui.perk_points" => "Perk points: %s";
     PERKS = "reskilled.ui.perks" => "Perks";
@@ -274,6 +276,7 @@ pub fn refusal(defs: &Defs, refusal: &Refusal, request: &Request) -> Text {
         Refusal::AtMax => say(&AT_MAX, &[]),
         Refusal::NotEnoughLevels { needed } => say(&NOT_ENOUGH_LEVELS, &[number(*needed)]),
         Refusal::NotEnoughPoints { needed } => say(&NOT_ENOUGH_POINTS, &[number(*needed)]),
+        Refusal::NotEnoughXpPoints { needed } => say(&NOT_ENOUGH_XP_POINTS, &[number(*needed)]),
         Refusal::BelowMinLevel { needed } => {
             let skill = match request {
                 Request::BuyPerk { perk } => {

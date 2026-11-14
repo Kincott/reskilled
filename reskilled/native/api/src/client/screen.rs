@@ -5,9 +5,10 @@ use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
 use skills_core::defs::{PerkDef, Reward};
 use skills_core::progress::{
     PlayerState, Request, focus_cost, level, mastered, points_available, raise_cost, switched_off,
+    total_points,
 };
 use skills_core::registry::Defs;
-use skills_core::rules::{Respec, Rules};
+use skills_core::rules::{CostUnit, Respec, Rules};
 use skills_core::wire::{ClientDefs, ToServer};
 
 use super::cache::{CLICK_SOUND, ClientCache, View, with};
@@ -18,12 +19,13 @@ use super::layout::{
 use super::paint::{self, DIM, GOLD, GRAY, GREEN, Look, RED, WHITE};
 use crate::MOD_ID;
 use crate::text::{
-    ALL_UNLOCKED, AT_TOP, BACK, COST, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE, FOCUS_GIVES,
-    GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS, NOT_ENOUGH_POINTS,
-    OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, RAISE_TO, REFUND, REFUND_COST, REFUND_FREE,
-    REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
-    REWARD_TRAVEL, SETTINGS, SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF, VAL_ON, WAITING, XP, focus_name,
-    label_name, number, perk_description, perk_name, say, skill_name,
+    ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
+    FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
+    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, RAISE_TO, REFUND,
+    REFUND_COST, REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL,
+    REWARD_SMELT, REWARD_TAME, REWARD_TRAVEL, SETTINGS, SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF,
+    VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say,
+    skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -108,8 +110,30 @@ fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
 }
 
 /// Whether the player has the XP levels to raise the skill.
-fn can_raise(d: &Defs, state: &PlayerState, xp: Option<u32>, skill: &str) -> bool {
-    raise_cost(d, state, skill).is_some_and(|cost| xp.is_some_and(|xp| xp >= cost))
+fn can_raise(d: &Defs, rules: &Rules, state: &PlayerState, xp: Option<u32>, skill: &str) -> bool {
+    let affordable = |xp: u32, price: u32| match rules.cost_unit {
+        CostUnit::Levels => xp >= price,
+        CostUnit::Points => total_points(xp) >= price,
+    };
+    price(d, rules, state, skill).is_some_and(|price| xp.is_some_and(|xp| affordable(xp, price)))
+}
+
+/// What the next raise of the skill costs, in the rules' unit: XP levels, or XP points.
+fn price(d: &Defs, rules: &Rules, state: &PlayerState, skill: &str) -> Option<u32> {
+    let cost = raise_cost(d, state, skill)?;
+    Some(match rules.cost_unit {
+        CostUnit::Levels => cost,
+        CostUnit::Points => cost.saturating_mul(rules.points_per_level),
+    })
+}
+
+/// "Cost: ..." in the rules' unit.
+fn cost_line(rules: &Rules, price: u32) -> Text {
+    let unit = match rules.cost_unit {
+        CostUnit::Levels => &COST,
+        CostUnit::Points => &COST_POINTS,
+    };
+    say(unit, &[number(price)])
 }
 
 /// What a draw needs: where to draw, where the mouse is, and what the player has.
@@ -328,8 +352,8 @@ fn draw_card(pen: &mut Pen<'_>, card: &Card, skill: &str) {
         let diamonds = paint::POINT.repeat(points.min(MOST_POINTS));
         pen.text(&diamonds, card.bar.x, card.bar.y + 7.0, GOLD);
     }
-    if let Some(cost) = raise_cost(d, state, skill) {
-        let look = if can_raise(d, state, pen.xp, skill) {
+    if let Some(cost) = price(d, pen.rules, state, skill) {
+        let look = if can_raise(d, pen.rules, state, pen.xp, skill) {
             Look::Go
         } else {
             Look::Off
@@ -374,17 +398,17 @@ fn draw_mastery(pen: &mut Pen<'_>, card: &Card) {
 
 fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
-    let Some(cost) = raise_cost(d, state, skill) else {
+    let Some(cost) = price(d, pen.rules, state, skill) else {
         return vec![say(&AT_TOP, &[]).with_color(GOLD)];
     };
-    let colour = if can_raise(d, state, pen.xp, skill) {
+    let colour = if can_raise(d, pen.rules, state, pen.xp, skill) {
         GREEN
     } else {
         RED
     };
     vec![
         say(&RAISE_TO, &[number(level(state, d, skill) + 1)]).with_color(WHITE),
-        say(&COST, &[number(cost)]).with_color(colour),
+        cost_line(pen.rules, cost).with_color(colour),
     ]
 }
 
@@ -515,7 +539,7 @@ fn draw_summary(pen: &mut Pen<'_>, view: &Detail, skill: &str) {
         view.bar.y + 11.0,
         if points > 0 { GOLD } else { GRAY },
     );
-    let Some(cost) = raise_cost(d, state, skill) else {
+    let Some(cost) = price(d, pen.rules, state, skill) else {
         if mastered(d, state, skill) {
             let label = say(&MASTERED, &[]).plain();
             paint::text_centred(pen.host, pen.batch, &label, &view.raise, GOLD);
@@ -532,7 +556,7 @@ fn draw_summary(pen: &mut Pen<'_>, view: &Detail, skill: &str) {
         }
         return;
     };
-    let can = can_raise(d, state, pen.xp, skill);
+    let can = can_raise(d, pen.rules, state, pen.xp, skill);
     let hover = pen.over(&view.raise);
     let look = if can { Look::Go } else { Look::Off };
     let label = say(&LEVEL_UP, &[]).plain();
@@ -542,7 +566,7 @@ fn draw_summary(pen: &mut Pen<'_>, view: &Detail, skill: &str) {
         h: paint::GLYPH,
         ..view.raise
     };
-    let cost = say(&COST, &[number(cost)]).plain();
+    let cost = cost_line(pen.rules, cost).plain();
     paint::text_centred(
         pen.host,
         pen.batch,
@@ -744,9 +768,11 @@ fn outcome(
     let (d, state, xp) = (&defs.defs, &cache.state, cache.xp_levels);
     let shown = shown(defs, cache.selected);
     let raise = |skill: Option<&&String>| match skill {
-        Some(skill) if can_raise(d, state, xp, skill) => Outcome::Ask(Request::Raise {
-            skill: (*skill).clone(),
-        }),
+        Some(skill) if can_raise(d, &cache.rules, state, xp, skill) => {
+            Outcome::Ask(Request::Raise {
+                skill: (*skill).clone(),
+            })
+        }
         _ => Outcome::Nothing,
     };
     let hit = match (cache.view, button) {
@@ -1586,6 +1612,27 @@ mod tests {
                 1.0
             )]
         );
+    }
+
+    #[test]
+    fn under_the_points_rule_prices_read_in_xp_points() {
+        // Given raises paid in XP points (20 a level of cost), Mining at 12 (a raise of 12 levels' worth: 240)
+        let _serial = exclusive();
+        let host = screen_open();
+        with(|cache| cache.rules.cost_unit = skills_core::rules::CostUnit::Points);
+
+        // When the overview is drawn, then Mining's page
+        let overview = drawn(&host, AWAY);
+        host.drawn.borrow_mut().clear();
+        with(|cache| {
+            cache.selected = 1;
+            cache.view = View::Skill;
+        });
+        let page = drawn(&host, AWAY);
+
+        // Then Mining's card asks 240 and its page says the cost is 240 XP points
+        contains(&overview, &["240"]);
+        contains(&page, &["Cost: 240 XP points"]);
     }
 
     #[test]

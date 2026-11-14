@@ -100,6 +100,12 @@ pub fn send(host: &mut dyn Host, player: u128) {
     queue::send(player, MSG_CHANNEL, data);
 }
 
+/// Puts rules in force without an operator or a world, for tests.
+#[cfg(test)]
+pub fn force(rules: Rules) {
+    *lock(&CURRENT) = Some(rules);
+}
+
 /// Forgets the rules read from the world, as a server that stops does; the next read takes them from the world.
 #[cfg(test)]
 pub fn forget_cached() {

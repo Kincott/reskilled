@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use horizon_client::mod_api::{Host, Text};
 use skills_core::locks::{Requirements, TargetKind};
-use skills_core::progress::{PlayerState, Request, apply_under, level};
+use skills_core::progress::{PlayerState, Request, apply_under, level, levels_for_points};
 use skills_core::registry::Defs;
 use skills_core::wire::{ToClient, ToServer};
 
@@ -148,7 +148,12 @@ pub fn act(
     let rules = super::rules::current(host);
     let outcome = apply_under(&data.defs, &rules, &state, xp_levels, request)
         .map_err(|r| refusal(&data.defs, &r, request))?;
-    let cost = i32::try_from(outcome.levels_spent).unwrap_or(i32::MAX);
+    let (taken, given_back) = if outcome.points_spent > 0 {
+        levels_for_points(xp_levels, outcome.points_spent).ok_or_else(unavailable)?
+    } else {
+        (outcome.levels_spent, 0)
+    };
+    let cost = i32::try_from(taken).unwrap_or(i32::MAX);
     if cost > 0 && !change_levels(host, player, -cost) {
         log::warn!("Reskilled could not take {cost} levels from {player:032x}");
         return Err(unavailable());
@@ -161,6 +166,9 @@ pub fn act(
             change_levels(host, player, cost);
         }
         return Err(unavailable());
+    }
+    if given_back > 0 && !host.give_experience(player, given_back) {
+        log::warn!("Reskilled could not give {player:032x} back {given_back} XP points of a raise");
     }
     queue::queue(Job::SyncAttributes(player));
     Ok(outcome.state)
@@ -384,6 +392,27 @@ mod tests {
             host.told_to(PLAYER),
             vec!["Mining is now level 2.", "Needs 2 XP levels."]
         );
+    }
+
+    #[test]
+    fn under_the_points_rule_a_raise_takes_whole_levels_and_gives_back_the_rest() {
+        // Given raises paid in XP points (20 a level of cost), Mining at 1, and a player at level 10, the top level
+        // of which holds 25 points
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        with_mining(&mut host);
+        crate::server::rules::force(skills_core::rules::Rules {
+            cost_unit: skills_core::rules::CostUnit::Points,
+            ..Default::default()
+        });
+
+        // When they raise Mining
+        let result = act(&mut host, PLAYER, 10, &raise());
+
+        // Then one level is taken and the 5 points over the price come back
+        assert!(result.is_ok());
+        assert_eq!(host.levels_given.get(&PLAYER), Some(&-1));
+        assert_eq!(host.experience_given.get(&PLAYER), Some(&5));
     }
 
     #[test]

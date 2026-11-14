@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::defs::{PerkDef, Reward};
 use crate::registry::Defs;
-use crate::rules::{Respec, Rules};
+use crate::rules::{CostUnit, Respec, Rules};
 
 /// The save format of [`PlayerState`]: 2 keeps several focus areas.
 pub const STATE_FORMAT: u32 = 2;
@@ -88,6 +88,9 @@ pub enum Refusal {
     NotEnoughLevels {
         needed: u32,
     },
+    NotEnoughXpPoints {
+        needed: u32,
+    },
     NotEnoughPoints {
         needed: u32,
     },
@@ -113,6 +116,8 @@ pub enum Refusal {
 pub struct Outcome {
     pub state: PlayerState,
     pub levels_spent: u32,
+    /// XP points to take, under the rule that raises are paid in points.
+    pub points_spent: u32,
 }
 
 /// The skill's level: 1 when never raised, and never above the skill's current maximum.
@@ -197,7 +202,7 @@ pub fn apply_under(
     req: &Request,
 ) -> Result<Outcome, Refusal> {
     match req {
-        Request::Raise { skill } => raise(defs, state, xp_levels, skill),
+        Request::Raise { skill } => raise(defs, rules, state, xp_levels, skill),
         Request::BuyPerk { perk } => buy_perk(defs, state, perk),
         Request::AddFocus { focus } => add_focus(defs, state, xp_levels, focus),
         Request::SwitchPerk { perk } => switch_perk(rules, state, perk),
@@ -230,6 +235,7 @@ fn switch_perk(rules: &Rules, state: &PlayerState, perk: &str) -> Result<Outcome
     Ok(Outcome {
         state: next,
         levels_spent: 0,
+        points_spent: 0,
     })
 }
 
@@ -270,26 +276,66 @@ fn refund_perk(
     Ok(Outcome {
         state: next,
         levels_spent: cost,
+        points_spent: 0,
     })
 }
 
 fn raise(
     defs: &Defs,
+    rules: &Rules,
     state: &PlayerState,
     xp_levels: u32,
     skill: &str,
 ) -> Result<Outcome, Refusal> {
     defs.skill(skill).ok_or(Refusal::UnknownSkill)?;
     let cost = raise_cost(defs, state, skill).ok_or(Refusal::AtMax)?;
-    if xp_levels < cost {
-        return Err(Refusal::NotEnoughLevels { needed: cost });
-    }
+    let (levels_spent, points_spent) = match rules.cost_unit {
+        CostUnit::Levels => {
+            if xp_levels < cost {
+                return Err(Refusal::NotEnoughLevels { needed: cost });
+            }
+            (cost, 0)
+        }
+        CostUnit::Points => {
+            let points = cost.saturating_mul(rules.points_per_level);
+            if total_points(xp_levels) < points {
+                return Err(Refusal::NotEnoughXpPoints { needed: points });
+            }
+            (0, points)
+        }
+    };
     let mut next = state.clone();
     next.skills.entry(skill.to_string()).or_default().level = level(state, defs, skill) + 1;
     Ok(Outcome {
         state: next,
-        levels_spent: cost,
+        levels_spent,
+        points_spent,
     })
+}
+
+/// The XP points it takes to go from `level` to the next, as vanilla counts them.
+fn points_to_next(level: u32) -> u32 {
+    match level {
+        0..=15 => 2 * level + 7,
+        16..=30 => 5 * level - 38,
+        _ => 9 * level - 158,
+    }
+}
+
+/// The XP points a player at `level` (and no progress past it) holds.
+pub fn total_points(level: u32) -> u32 {
+    (0..level).map(points_to_next).sum()
+}
+
+/// How to take `points` from a player at `level`: whole levels from the top, and the points given back after; none
+/// when they hold fewer.
+pub fn levels_for_points(level: u32, points: u32) -> Option<(u32, u32)> {
+    let mut taken = (0, 0);
+    while taken.1 < points {
+        let below = level.checked_sub(taken.0 + 1)?;
+        taken = (taken.0 + 1, taken.1 + points_to_next(below));
+    }
+    Some((taken.0, taken.1 - points))
 }
 
 fn buy_perk(defs: &Defs, state: &PlayerState, id: &str) -> Result<Outcome, Refusal> {
@@ -317,6 +363,7 @@ fn buy_perk(defs: &Defs, state: &PlayerState, id: &str) -> Result<Outcome, Refus
     Ok(Outcome {
         state: next,
         levels_spent: 0,
+        points_spent: 0,
     })
 }
 
@@ -342,6 +389,7 @@ fn add_focus(
     Ok(Outcome {
         state: next,
         levels_spent: cost,
+        points_spent: 0,
     })
 }
 
@@ -391,7 +439,7 @@ pub fn active_perks<'a>(defs: &'a Defs, state: &PlayerState) -> Vec<&'a PerkDef>
 mod tests {
     use super::*;
     use crate::defs::{CostCurve, FocusDef, PerkDef, Reward, SkillDef};
-    use crate::rules::{Respec, Rules};
+    use crate::rules::{CostUnit, Respec, Rules};
 
     const MINING: &str = "reskilled:mining";
     const MELEE: &str = "reskilled:melee";
@@ -840,6 +888,47 @@ mod tests {
         );
         assert_eq!(off, Err(Refusal::RefundsOff));
         assert_eq!(not_owned, Err(Refusal::NotOwned));
+    }
+
+    #[test]
+    fn xp_points_follow_vanilla_s_level_curve() {
+        // Given levels 0, 1, 15, 16, 30, 31 and 32
+        // When the XP points they hold are read
+        let points = [0, 1, 15, 16, 30, 31, 32].map(total_points);
+
+        // Then they are vanilla's: 7 for the first level, 2n + 7 to 16, 5n - 38 to 31, 9n - 158 after
+        assert_eq!(points, [0, 7, 315, 352, 1395, 1507, 1628]);
+    }
+
+    #[test]
+    fn taking_points_takes_whole_levels_from_the_top_and_gives_back_the_rest() {
+        // Given a player at level 10 (levels 9 to 10 hold 25 points, 8 to 9 hold 23)
+        // When 30 points are to be taken, then 25, then more than they have
+        let thirty = levels_for_points(10, 30);
+        let exact = levels_for_points(10, 25);
+        let too_many = levels_for_points(10, total_points(10) + 1);
+
+        // Then two levels go and 18 points come back; one level goes exactly; and too many is none
+        assert_eq!(thirty, Some((2, 18)));
+        assert_eq!(exact, Some((1, 0)));
+        assert_eq!(too_many, None);
+    }
+
+    #[test]
+    fn under_the_points_rule_a_raise_costs_points_the_same_at_any_level() {
+        // Given raises paid in XP points, 20 a level of cost; Mining at 1 (a raise costs 1, so 20 points)
+        let defs = defs();
+        let rules = rules(|r| r.cost_unit = CostUnit::Points);
+        let state = at_level(MINING, 1);
+
+        // When a player at level 2 (16 points) and one at level 3 (27 points) raise it
+        let short = apply_under(&defs, &rules, &state, 2, &raise(MINING));
+        let paid = apply_under(&defs, &rules, &state, 3, &raise(MINING)).unwrap();
+
+        // Then the first lacks points, and the second pays 20 points and no levels as such
+        assert_eq!(short, Err(Refusal::NotEnoughXpPoints { needed: 20 }));
+        assert_eq!((paid.levels_spent, paid.points_spent), (0, 20));
+        assert_eq!(level(&paid.state, &defs, MINING), 2);
     }
 
     #[test]
