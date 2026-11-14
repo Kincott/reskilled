@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::defs::{DamageKind, Direction, Effect, Matcher, Operation, Reward};
+use crate::defs::{DamageKind, Direction, Effect, Matcher, Operation, ReplantCrop, Reward};
 use crate::progress::{PlayerState, active_perks, active_rewards};
 use crate::registry::Defs;
 
@@ -37,6 +37,14 @@ pub struct ActiveEffects {
     pub drops: Vec<(Matcher, f64)>,
     /// What the active focus areas give XP for.
     pub rewards: Vec<Reward>,
+    /// The readiest last stand: the lowest health it needs and the shortest rest.
+    pub last_stand: Option<(f32, u32)>,
+    /// Potion effects for kills: effect, seconds, amplifier, which mobs.
+    pub on_kill: Vec<(String, u32, u8, Matcher)>,
+    /// The widest crop growth: radius, interval in seconds, chance.
+    pub crop_growth: Option<(u32, u32, f64)>,
+    /// Crops broken ripe are planted again.
+    pub replant: Vec<ReplantCrop>,
 }
 
 impl Default for ActiveEffects {
@@ -49,6 +57,10 @@ impl Default for ActiveEffects {
             damage: Vec::new(),
             drops: Vec::new(),
             rewards: Vec::new(),
+            last_stand: None,
+            on_kill: Vec::new(),
+            crop_growth: None,
+            replant: Vec::new(),
         }
     }
 }
@@ -95,6 +107,41 @@ pub fn active_effects(defs: &Defs, state: &PlayerState) -> ActiveEffects {
                 } => effects.damage.push((*direction, *kind, *multiplier)),
                 Effect::XpGain { multiplier } => effects.xp_gain *= multiplier,
                 Effect::AnvilCost { multiplier } => effects.anvil_cost *= multiplier,
+                Effect::LastStand {
+                    above,
+                    cooldown_seconds,
+                } => {
+                    let (above, rest) = match effects.last_stand {
+                        Some((a, r)) => (a.min(*above), r.min(*cooldown_seconds)),
+                        None => (*above, *cooldown_seconds),
+                    };
+                    effects.last_stand = Some((above, rest));
+                }
+                Effect::EffectOnKill {
+                    effect,
+                    seconds,
+                    amplifier,
+                    mobs,
+                } => effects
+                    .on_kill
+                    .push((effect.clone(), *seconds, *amplifier, mobs.clone())),
+                Effect::CropGrowth {
+                    radius,
+                    interval_seconds,
+                    chance,
+                } => {
+                    let wider = effects.crop_growth.is_none_or(|(r, _, _)| *radius > r);
+                    if wider {
+                        effects.crop_growth = Some((*radius, *interval_seconds, *chance));
+                    }
+                }
+                Effect::Replant { crops } => {
+                    for crop in crops {
+                        if !effects.replant.contains(crop) {
+                            effects.replant.push(crop.clone());
+                        }
+                    }
+                }
             }
         }
     }
@@ -226,6 +273,60 @@ mod tests {
             amount,
             operation,
         }
+    }
+
+    #[test]
+    fn mechanic_effects_are_gathered() {
+        // Given two perks with last stands (one readier), a kill effect, crop growth and replanting
+        let crop = crate::defs::ReplantCrop {
+            block: "minecraft:wheat".into(),
+            seed: "minecraft:wheat_seeds".into(),
+            ripe_age: 7,
+        };
+        let perks = vec![
+            perk(
+                "reskilled:a",
+                1,
+                vec![Effect::LastStand {
+                    above: 6.0,
+                    cooldown_seconds: 300,
+                }],
+            ),
+            perk(
+                "reskilled:b",
+                1,
+                vec![
+                    Effect::LastStand {
+                        above: 4.0,
+                        cooldown_seconds: 120,
+                    },
+                    Effect::EffectOnKill {
+                        effect: "minecraft:strength".into(),
+                        seconds: 5,
+                        amplifier: 0,
+                        mobs: crate::defs::Matcher::Id("minecraft:zombie".into()),
+                    },
+                    Effect::CropGrowth {
+                        radius: 5,
+                        interval_seconds: 10,
+                        chance: 0.25,
+                    },
+                    Effect::Replant {
+                        crops: vec![crop.clone()],
+                    },
+                ],
+            ),
+        ];
+        let (defs, state) = owning(perks, 1);
+
+        // When the active effects are gathered
+        let effects = active_effects(&defs, &state);
+
+        // Then the readier last stand is kept, and the others are all there
+        assert_eq!(effects.last_stand, Some((4.0, 120)));
+        assert_eq!(effects.on_kill.len(), 1);
+        assert_eq!(effects.crop_growth, Some((5, 10, 0.25)));
+        assert_eq!(effects.replant, vec![crop]);
     }
 
     #[test]

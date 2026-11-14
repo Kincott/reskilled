@@ -104,7 +104,37 @@ pub enum Effect {
         amount: f64,
         operation: Operation,
     },
+    /// A blow that would kill the player, taken while their health was at least `above`, leaves them at half a
+    /// heart instead; then it rests `cooldown_seconds`.
+    LastStand { above: f32, cooldown_seconds: u32 },
+    /// Killing one of `mobs` gives the player the potion effect `effect` (`minecraft:strength`) for `seconds`.
+    EffectOnKill {
+        effect: String,
+        seconds: u32,
+        amplifier: u8,
+        mobs: Matcher,
+    },
+    /// Every `interval_seconds`, each crop within `radius` blocks grows a stage with `chance`.
+    CropGrowth {
+        radius: u32,
+        interval_seconds: u32,
+        chance: f64,
+    },
+    /// Breaking one of these crops ripe plants it again, taking one seed from what it drops.
+    Replant { crops: Vec<ReplantCrop> },
 }
+
+/// A crop [`Effect::Replant`] plants again: its block, the seed it takes from the drops, and the `age` it is ripe at.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReplantCrop {
+    pub block: String,
+    pub seed: String,
+    pub ripe_age: u32,
+}
+
+/// The widest [`Effect::CropGrowth`] radius, in blocks.
+const CROP_RADIUS_MAX: u32 = 16;
 
 /// An attribute modifier's operation, named as vanilla's `/attribute` command names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -131,6 +161,8 @@ pub enum DamageKind {
     Fall,
     Fire,
     Explosion,
+    /// The fall at the end of an ender pearl's flight.
+    EnderPearl,
     Any,
 }
 
@@ -445,6 +477,40 @@ impl Effect {
                     Err(format!("chance must be between 0 and 1, found {chance}"))
                 }
             }
+            Effect::LastStand { above, .. } => {
+                check_finite("above", f64::from(*above))?;
+                if *above >= 0.0 {
+                    Ok(())
+                } else {
+                    Err(format!("above must not be negative, found {above}"))
+                }
+            }
+            Effect::EffectOnKill { effect, mobs, .. } => {
+                check_id("effect", effect)?;
+                mobs.validate(TargetKind::Entity)
+            }
+            Effect::CropGrowth {
+                radius,
+                interval_seconds,
+                chance,
+            } => {
+                if !(0.0..=1.0).contains(chance) {
+                    return Err(format!("chance must be between 0 and 1, found {chance}"));
+                }
+                if *radius > CROP_RADIUS_MAX {
+                    return Err(format!(
+                        "radius must be at most {CROP_RADIUS_MAX}, found {radius}"
+                    ));
+                }
+                if *interval_seconds == 0 {
+                    return Err("interval_seconds must be at least 1".into());
+                }
+                Ok(())
+            }
+            Effect::Replant { crops } => crops.iter().try_for_each(|crop| {
+                check_id("block", &crop.block)?;
+                check_id("seed", &crop.seed)
+            }),
             Effect::Damage { multiplier, .. }
             | Effect::XpGain { multiplier }
             | Effect::AnvilCost { multiplier } => {
@@ -1119,6 +1185,66 @@ mod tests {
                 lock_message_cooldown_ticks: 20,
             }
         );
+    }
+
+    fn perk_with(effects: &str) -> String {
+        format!(
+            r#"{{"format": 1, "id": "reskilled:p", "skill": "reskilled:defense", "name": "n", "description": "d",
+                "cost": 1, "min_level": 1, "effects": [{effects}]}}"#
+        )
+    }
+
+    #[test]
+    fn parses_the_mechanic_effects() {
+        // Given a perk with a last stand, an effect on kill, crop growth, replanting and an ender pearl rule
+        let json = perk_with(
+            r#"{"type": "last_stand", "above": 6.0, "cooldown_seconds": 300},
+               {"type": "effect_on_kill", "effect": "minecraft:strength", "seconds": 5, "amplifier": 0,
+                "mobs": {"any_of": [{"id": "minecraft:zombie"}]}},
+               {"type": "crop_growth", "radius": 5, "interval_seconds": 10, "chance": 0.25},
+               {"type": "replant", "crops": [{"block": "minecraft:wheat", "seed": "minecraft:wheat_seeds",
+                "ripe_age": 7}]},
+               {"type": "damage", "direction": "taken", "kind": "ender_pearl", "multiplier": 0.0}"#,
+        );
+
+        // When it is parsed
+        let DefFile::Perk(perk) = parse_ok(DefKind::Perk, &json) else {
+            panic!("a perk");
+        };
+
+        // Then each effect is there
+        assert_eq!(perk.effects.len(), 5);
+        assert!(matches!(
+            perk.effects[0],
+            Effect::LastStand {
+                cooldown_seconds: 300,
+                ..
+            }
+        ));
+        assert!(matches!(&perk.effects[3], Effect::Replant { crops } if crops[0].ripe_age == 7));
+    }
+
+    #[test]
+    fn mechanic_effects_that_make_no_sense_are_refused() {
+        // Given a crop growth chance of 2, a radius of 40, and a kill effect on a tag of mobs
+        let chance = perk_with(
+            r#"{"type": "crop_growth", "radius": 5, "interval_seconds": 10, "chance": 2.0}"#,
+        );
+        let radius = perk_with(
+            r#"{"type": "crop_growth", "radius": 40, "interval_seconds": 10, "chance": 0.5}"#,
+        );
+        let tag = perk_with(
+            r##"{"type": "effect_on_kill", "effect": "minecraft:strength", "seconds": 5, "amplifier": 0,
+                "mobs": {"tag": "#minecraft:undead"}}"##,
+        );
+
+        // When they are parsed
+        let [chance, radius, tag] = [chance, radius, tag].map(|json| refusal(DefKind::Perk, &json));
+
+        // Then each is refused, saying why
+        assert!(chance.contains("chance"), "{chance}");
+        assert!(radius.contains("radius"), "{radius}");
+        assert!(tag.contains("tag"), "{tag}");
     }
 
     #[test]
