@@ -283,8 +283,22 @@ pub fn on_damage(victim: i32, damage_type: &str, causing: i32, amount: &mut f32)
     }
 }
 
+/// Players the mod is giving XP back to (a raise's change), which XP-gain perks leave as it is.
+static UNSCALED: Mutex<BTreeSet<u128>> = Mutex::new(BTreeSet::new());
+
+/// Runs `give` with the player's XP gains unscaled: what the mod hands back is not new XP to multiply.
+pub fn unscaled<R>(player: u128, give: impl FnOnce() -> R) -> R {
+    lock(&UNSCALED).insert(player);
+    let result = give();
+    lock(&UNSCALED).remove(&player);
+    result
+}
+
 /// Scales XP points gained, carrying the fraction to the next gain so small orbs add up.
 pub fn on_xp(player: u128, amount: &mut i32) {
+    if lock(&UNSCALED).contains(&player) {
+        return;
+    }
     let Some(effects) = effects_of(player).filter(|e| e.xp_gain != 1.0) else {
         return;
     };
@@ -661,6 +675,25 @@ mod tests {
 
         // Then the tenth orb carries the fractions to an eleventh point, a loss is untouched, and others get 1
         assert_eq!((orbs, loss, other), (11, -3, 1));
+    }
+
+    #[test]
+    fn xp_given_back_by_the_mod_is_not_scaled() {
+        // Given a synced player with Lore (XP x1.1)
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        world(&mut host);
+        owning(&mut host, 1, &["lore"]);
+
+        // When the mod gives them back 100 points of change from a raise
+        let given = unscaled(PLAYER, || {
+            let (mut amount, mut cancel) = (100, false);
+            dispatch_player_xp_change(&mut host, &mods(), PLAYER, "Ann", &mut amount, &mut cancel);
+            amount
+        });
+
+        // Then they get exactly 100
+        assert_eq!(given, 100);
     }
 
     #[test]

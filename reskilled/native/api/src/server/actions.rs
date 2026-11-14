@@ -203,7 +203,10 @@ fn act_taking(
         return Err(unavailable());
     }
     super::sharing::record(host, player, &outcome.state);
-    if given_back > 0 && !host.give_experience(player, given_back) {
+    // Through Horizon's orb path, so damaged Mending gear takes its repair from it first; XP perks leave it alone.
+    if given_back > 0
+        && !super::effects::unscaled(player, || host.give_experience(player, given_back))
+    {
         log::warn!("Reskilled could not give {player:032x} back {given_back} XP points of a raise");
     }
     queue::queue(Job::SyncAttributes(player));
