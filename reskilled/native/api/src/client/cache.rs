@@ -127,7 +127,7 @@ impl ClientSettings {
     }
 }
 
-/// The screen's two views.
+/// The screen's views.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum View {
     /// Every skill as a card.
@@ -137,6 +137,8 @@ pub enum View {
     Skill,
     /// The player's display settings.
     Settings,
+    /// One perk of the shown skill, played as a scene or shown as a card.
+    Guide,
 }
 
 /// A lock just refused an action: what the warning over the HUD says, and for how many more ticks.
@@ -173,6 +175,13 @@ pub struct ClientCache {
     /// The first row of skill cards on show, and the first perk row, when there are more than fit.
     pub first_row: usize,
     pub first_perk: usize,
+    /// The perk row under the mouse when the skill view was last drawn, by its place in the skill's perks.
+    pub hovered_perk: Option<usize>,
+    /// The guide page's perk, by its place in the shown skill's perks, and the client tick its scene started at.
+    pub guide_perk: usize,
+    pub guide_started: u64,
+    /// The client player's values of the attributes the guide page's card shows, read each tick it is up.
+    pub attributes: BTreeMap<String, f64>,
     /// Requests the screen made, sent on the next tick (its hooks cannot send).
     pub outgoing: Vec<ToServer>,
     /// The lock warning on show, if one is.
@@ -394,6 +403,9 @@ pub fn on_tick(host: &mut dyn Host) {
     }
     if with(|cache| cache.defs.is_none()) {
         return;
+    }
+    if with(|cache| cache.view) == View::Guide {
+        super::guide::read_attributes(host);
     }
     let carried: Vec<String> = host
         .own_inventory()

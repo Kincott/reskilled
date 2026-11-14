@@ -2,13 +2,13 @@
 
 pub mod badge;
 pub mod cache;
+pub mod guide;
 pub mod keys;
 pub mod layout;
 pub mod options;
 pub mod paint;
 #[cfg(test)]
 mod preview;
-#[expect(dead_code, reason = "the guide screen draws it, in a later task")]
 pub mod scene;
 pub mod screen;
 pub mod settings;

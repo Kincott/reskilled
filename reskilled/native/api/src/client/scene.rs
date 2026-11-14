@@ -56,11 +56,17 @@ pub fn scene_blocks(host: &dyn Host, frame: &Frame) -> Vec<([i32; 3], BlockState
         let id = match cached {
             Some(id) => id,
             None => {
-                let id = resolve(
-                    state,
-                    |block| block_candidates(host, block),
-                    |id, key| host.block_state_property(id, key).map(str::to_owned),
-                );
+                let id = match parse_state(state) {
+                    // A bare block is its default state: no need to search every state.
+                    Some((block, properties)) if properties.is_empty() => {
+                        host.default_state(&block)
+                    }
+                    _ => resolve(
+                        state,
+                        |block| block_candidates(host, block),
+                        |id, key| host.block_state_property(id, key).map(str::to_owned),
+                    ),
+                };
                 if id.is_none() && lock(&WARNED).insert(state.clone()) {
                     log::warn!("a perk guide shows {state}, which names no block state");
                 }

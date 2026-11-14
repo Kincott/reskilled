@@ -273,6 +273,76 @@ fn gear(panel: &Rect) -> Rect {
 /// How far from the window's right edge the header's XP text ends when the gear is there.
 pub const GEAR_ROOM: f32 = SMALL_BUTTON + 6.0;
 
+/// The guide page: the header's Back and its arrows to the skill's previous and next perk, the scene box (a perk
+/// without a scene shows its card there), the caption under it, the card lines below, and the Replay button beside
+/// the progress bar. The footer's needs line sits at `footer_y`.
+///
+/// ```text
+///  [Back] Replant                          [<] [>]
+///  [            3D scene, slowly turning         ]
+///  Breaking a ripe crop plants it again.
+///  =========--------------------------   [Replay]
+///  Card lines, as many as fit
+///  -----------------------------------------------
+///  Cost: 2 perk points  Needs Gathering 16
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GuidePage {
+    pub window: Rect,
+    pub scene: Rect,
+    pub caption: Rect,
+    pub lines: Rect,
+    pub back: Rect,
+    pub replay: Rect,
+    pub prev: Rect,
+    pub next: Rect,
+}
+
+const GUIDE_BACK_W: f32 = 36.0;
+const GUIDE_SCENE_TOP: f32 = 25.0;
+const GUIDE_SCENE_H: f32 = 98.0;
+const GUIDE_CAPTION_TOP: f32 = 126.0;
+/// Two caption lines of 9 pixels.
+const GUIDE_CAPTION_H: f32 = 18.0;
+const GUIDE_REPLAY_TOP: f32 = 145.0;
+const GUIDE_REPLAY_W: f32 = 48.0;
+const GUIDE_REPLAY_H: f32 = 13.0;
+const GUIDE_LINES_TOP: f32 = 161.0;
+/// Three card lines of 9 pixels.
+const GUIDE_LINES_H: f32 = 27.0;
+/// Where the footer's rule and its text sit below the window's top.
+pub const GUIDE_RULE_Y: f32 = 190.0;
+pub const GUIDE_FOOTER_Y: f32 = 194.0;
+
+/// The guide page for a screen of `size`, in the same window as the other views.
+pub fn page(size: [f32; 2]) -> GuidePage {
+    let window = panel(size);
+    let next = window.at(
+        PANEL_W - 6.0 - SMALL_BUTTON,
+        4.0,
+        SMALL_BUTTON,
+        SMALL_BUTTON,
+    );
+    GuidePage {
+        window,
+        scene: window.at(PAD, GUIDE_SCENE_TOP, INNER_W, GUIDE_SCENE_H),
+        caption: window.at(PAD, GUIDE_CAPTION_TOP, INNER_W, GUIDE_CAPTION_H),
+        lines: window.at(PAD, GUIDE_LINES_TOP, INNER_W, GUIDE_LINES_H),
+        back: window.at(6.0, 4.0, GUIDE_BACK_W, SMALL_BUTTON),
+        replay: window.at(
+            PANEL_W - PAD - GUIDE_REPLAY_W,
+            GUIDE_REPLAY_TOP,
+            GUIDE_REPLAY_W,
+            GUIDE_REPLAY_H,
+        ),
+        prev: Rect {
+            x: next.x - BUTTON_GAP - SMALL_BUTTON,
+            ..next
+        },
+        next,
+    }
+}
+
 /// What a click asks for. Skills and perks are named by their place in the lists the screen shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Button {
