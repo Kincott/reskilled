@@ -22,7 +22,8 @@
         "attack"
       ],
       "requires": {
-        "reskilled:melee": 12
+        "reskilled:melee": 12,
+        "reskilled:arcane": 12
       },
       "label": "reskilled.lock.ench.sharp_3"
     },
@@ -47,7 +48,8 @@
         "attack"
       ],
       "requires": {
-        "reskilled:melee": 20
+        "reskilled:melee": 20,
+        "reskilled:arcane": 20
       },
       "label": "reskilled.lock.ench.sharp_5"
     },
@@ -62,7 +64,8 @@
         "use"
       ],
       "requires": {
-        "reskilled:ranged": 12
+        "reskilled:ranged": 12,
+        "reskilled:arcane": 12
       },
       "label": "reskilled.lock.ench.power_3"
     },
@@ -77,7 +80,8 @@
         "use"
       ],
       "requires": {
-        "reskilled:ranged": 20
+        "reskilled:ranged": 20,
+        "reskilled:arcane": 20
       },
       "label": "reskilled.lock.ench.power_5"
     },
@@ -105,7 +109,8 @@
         "equip"
       ],
       "requires": {
-        "reskilled:defense": 12
+        "reskilled:defense": 12,
+        "reskilled:arcane": 12
       },
       "label": "reskilled.lock.ench.protection_3"
     },
@@ -133,7 +138,8 @@
         "equip"
       ],
       "requires": {
-        "reskilled:defense": 20
+        "reskilled:defense": 20,
+        "reskilled:arcane": 20
       },
       "label": "reskilled.lock.ench.protection_4"
     },
@@ -148,7 +154,8 @@
         "break"
       ],
       "requires": {
-        "reskilled:mining": 20
+        "reskilled:mining": 20,
+        "reskilled:arcane": 20
       },
       "label": "reskilled.lock.ench.fortune_3"
     },
@@ -163,7 +170,8 @@
         "attack"
       ],
       "requires": {
-        "reskilled:melee": 20
+        "reskilled:melee": 20,
+        "reskilled:arcane": 20
       },
       "label": "reskilled.lock.ench.looting_3"
     },

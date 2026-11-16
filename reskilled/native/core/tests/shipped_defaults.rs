@@ -626,6 +626,28 @@ fn strong_enchantments_need_their_skill() {
 }
 
 #[test]
+fn strong_enchantments_also_need_arcane_at_the_same_level() {
+    // Given the shipped data
+    let defs = defaults();
+
+    // When each enchantment lock is read
+    // Then every one asks Arcane, and one that asks another skill asks Arcane at that skill's level
+    let enchantment_locks: Vec<_> = defs
+        .locks
+        .iter()
+        .filter(|e| matches!(e.target, skills_core::defs::Target::Enchantment(_)))
+        .collect();
+    assert_eq!(enchantment_locks.len(), 10);
+    for entry in enchantment_locks {
+        let arcane = entry.requires.get(ARCANE).copied();
+        assert!(arcane.is_some(), "{:?} asks no Arcane", entry.label);
+        for (skill, level) in &entry.requires {
+            assert_eq!(Some(*level), arcane, "{:?}: {skill}", entry.label);
+        }
+    }
+}
+
+#[test]
 fn advanced_blocks_need_building_to_place_and_arcane_to_use() {
     // Given the shipped data
     let defs = defaults();
