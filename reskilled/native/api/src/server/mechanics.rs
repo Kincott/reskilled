@@ -1,7 +1,7 @@
 //! Perks that do something rather than change a number: a last stand against a lethal blow, a potion effect for a
 //! kill, crops growing around the player, and ripe crops planted again from their own seeds.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 use horizon_client::mod_api::{
@@ -47,6 +47,12 @@ type Salvage = (u128, String, [i32; 3], String);
 static SALVAGE: Mutex<Vec<Salvage>> = Mutex::new(Vec::new());
 /// The tick each player got into bed.
 static IN_BED: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
+/// Players in bed when a night was skipped by sleep.
+static SLEPT_THROUGH: Mutex<BTreeSet<u128>> = Mutex::new(BTreeSet::new());
+/// A time skip's cause when sleep skipped the night.
+const SLEEP_SKIP: &str = "sleep";
+/// The ticks after getting into bed before being up counts as leaving it.
+const SETTLE_TICKS: u64 = 3;
 /// Players who woke from a full sleep, rested on their next tick.
 static RESTED: Mutex<Vec<u128>> = Mutex::new(Vec::new());
 /// Players who just got into bed, whose effects lift on their next tick.
@@ -79,9 +85,9 @@ struct Replant {
     at: u64,
 }
 
-/// The player's own tick, at `feet` in `dimension` with `health` and hotbar slot `selected`: their health and
-/// armor runes are noted, kill effects given, harmful effects shortened, enchanted gear mended, crops around them
-/// grown and their replants planted.
+/// The player's own tick, at `feet` in `dimension` with `health` and hotbar slot `selected`, `asleep` or not: their
+/// health and armor runes are noted, kill effects given, harmful effects shortened, a sleeper who got up noticed,
+/// enchanted gear mended, crops around them grown and their replants planted.
 pub fn run_for(
     host: &mut dyn Host,
     player: u128,
@@ -89,8 +95,10 @@ pub fn run_for(
     feet: [f64; 3],
     health: f32,
     selected: usize,
+    asleep: bool,
 ) {
     lock(&HEALTH).insert(player, health);
+    notice_getting_up(player, asleep);
     for effect in lock(&KILL_EFFECTS).remove(&player).unwrap_or_default() {
         host.add_effect(player, &effect);
     }
@@ -191,11 +199,37 @@ pub fn on_bed_enter(player: u128) {
     lock(&TO_CLEANSE).push(player);
 }
 
-/// The player left their bed: after a full night's sleep they rest on their next tick.
+/// The player left their bed: when they slept through the night (a night skipped by sleep while they lay there,
+/// or a full sleep's ticks), they rest on their next tick.
 pub fn on_bed_leave(player: u128) {
-    let entered = lock(&IN_BED).remove(&player);
-    if entered.is_some_and(|at| queue::now() >= at + FULL_SLEEP_TICKS) {
+    let Some(entered) = lock(&IN_BED).remove(&player) else {
+        return;
+    };
+    let skipped = lock(&SLEPT_THROUGH).remove(&player);
+    if skipped || queue::now() >= entered + FULL_SLEEP_TICKS {
         lock(&RESTED).push(player);
+    }
+}
+
+/// Time was skipped: by sleep, everyone in bed slept through the night. Horizon wakes a single-player world's owner
+/// with no event, so this, not the leaving, is what says they slept.
+pub fn on_time_skip(cause: &str) {
+    if cause != SLEEP_SKIP {
+        return;
+    }
+    let sleepers: Vec<u128> = lock(&IN_BED).keys().copied().collect();
+    lock(&SLEPT_THROUGH).extend(sleepers);
+}
+
+/// A player the bed noted who is up again leaves it, whether or not Horizon said so. Their first ticks are let pass:
+/// the pose turns to sleeping a moment after the event.
+fn notice_getting_up(player: u128, asleep: bool) {
+    let up = !asleep
+        && lock(&IN_BED)
+            .get(&player)
+            .is_some_and(|at| queue::now() >= at + SETTLE_TICKS);
+    if up {
+        on_bed_leave(player);
     }
 }
 
@@ -246,11 +280,13 @@ fn rest(host: &mut dyn Host, player: u128) {
 pub fn respawned(player: u128) {
     lock(&LIFTED).remove(&player);
     lock(&IN_BED).remove(&player);
+    lock(&SLEPT_THROUGH).remove(&player);
 }
 
 /// The player left the game: they are out of bed, and their lifted effects come back on their next tick.
 pub fn left_game(player: u128) {
     lock(&IN_BED).remove(&player);
+    lock(&SLEPT_THROUGH).remove(&player);
     lock(&TO_CLEANSE).retain(|p| *p != player);
 }
 
@@ -619,6 +655,7 @@ pub(crate) fn reset() {
     lock(&RESTED).clear();
     lock(&TO_CLEANSE).clear();
     lock(&LIFTED).clear();
+    lock(&SLEPT_THROUGH).clear();
     lock(&HOME_DUE).clear();
 }
 
@@ -670,7 +707,13 @@ mod tests {
     /// The player's own tick at `FEET` with `health`.
     fn tick(host: &mut TestHost, health: f32) {
         run(host, Vec::new());
-        run_for(host, PLAYER, OVERWORLD, FEET, health, 0);
+        run_for(host, PLAYER, OVERWORLD, FEET, health, 0, false);
+    }
+
+    /// A tick of the player lying asleep in bed.
+    fn asleep(host: &mut TestHost) {
+        run(host, Vec::new());
+        run_for(host, PLAYER, OVERWORLD, FEET, 10.0, 0, true);
     }
 
     #[test]
@@ -1052,10 +1095,10 @@ mod tests {
 
         // When they get into bed and their tick runs, then leave after a 10-tick nap
         on_bed_enter(PLAYER);
-        tick(&mut host, 10.0);
+        asleep(&mut host);
         let in_bed = ids(&host);
         for _ in 0..9 {
-            tick(&mut host, 10.0);
+            asleep(&mut host);
         }
         on_bed_leave(PLAYER);
         tick(&mut host, 10.0);
@@ -1069,7 +1112,7 @@ mod tests {
         // And then get into bed again and sleep 100 ticks
         on_bed_enter(PLAYER);
         for _ in 0..100 {
-            tick(&mut host, 10.0);
+            asleep(&mut host);
         }
         on_bed_leave(PLAYER);
         tick(&mut host, 10.0);
@@ -1081,6 +1124,98 @@ mod tests {
         assert_eq!(poison_back, Some(400));
         assert_eq!(ids(&host), vec!["minecraft:speed"]);
         assert_eq!(host.health_set, vec![(PLAYER, 24.0)]);
+    }
+
+    /// Restful sleep clearing poison, and a player with 400 ticks of poison.
+    fn poisoned_sleeper() -> TestHost {
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "restful_sleep", "clears": ["minecraft:poison"]}]),
+        );
+        host.active_effects = vec![NativeEffect {
+            id: "minecraft:poison".into(),
+            amplifier: 0,
+            duration: 400,
+            ambient: false,
+            particles: true,
+        }];
+        host
+    }
+
+    #[test]
+    fn a_night_skipped_by_sleep_rests_the_owner_who_gets_no_leave_event() {
+        // Given a poisoned player in bed in a single-player world, where Horizon sends the owner no event on waking
+        let _serial = exclusive();
+        let mut host = poisoned_sleeper();
+        on_bed_enter(PLAYER);
+        for _ in 0..100 {
+            asleep(&mut host);
+        }
+
+        // When the night is skipped by sleep, and their next ticks find them up
+        on_time_skip("sleep");
+        for _ in 0..3 {
+            tick(&mut host, 10.0);
+        }
+
+        // Then the poison is gone for good and they are healed
+        assert!(host.active_effects.is_empty());
+        assert_eq!(host.health_set, vec![(PLAYER, 24.0)]);
+    }
+
+    #[test]
+    fn getting_up_early_with_no_leave_event_brings_the_effects_back() {
+        // Given a poisoned player who got into bed and slept 20 ticks
+        let _serial = exclusive();
+        let mut host = poisoned_sleeper();
+        on_bed_enter(PLAYER);
+        for _ in 0..20 {
+            asleep(&mut host);
+        }
+
+        // When their ticks find them up with no event and no night skipped
+        for _ in 0..3 {
+            tick(&mut host, 10.0);
+        }
+
+        // Then the poison is back, and nothing healed them
+        assert_eq!(host.active_effects.len(), 1);
+        assert!(host.health_set.is_empty());
+    }
+
+    #[test]
+    fn the_first_ticks_in_bed_do_not_count_as_getting_up() {
+        // Given a poisoned player who just got into bed, whose pose has not turned to sleeping yet
+        let _serial = exclusive();
+        let mut host = poisoned_sleeper();
+        on_bed_enter(PLAYER);
+
+        // When their first two ticks still find them standing, then they sleep
+        tick(&mut host, 10.0);
+        tick(&mut host, 10.0);
+        asleep(&mut host);
+
+        // Then the poison stays lifted: they never got up
+        assert!(host.active_effects.is_empty());
+    }
+
+    #[test]
+    fn a_skip_for_another_cause_rests_nobody() {
+        // Given a poisoned player asleep in bed
+        let _serial = exclusive();
+        let mut host = poisoned_sleeper();
+        on_bed_enter(PLAYER);
+        asleep(&mut host);
+
+        // When time is skipped by a command, and they get up
+        on_time_skip("command");
+        for _ in 0..3 {
+            tick(&mut host, 10.0);
+        }
+
+        // Then the poison comes back
+        assert_eq!(host.active_effects.len(), 1);
     }
 
     #[test]
@@ -1100,7 +1235,7 @@ mod tests {
             particles: true,
         }];
         on_bed_enter(PLAYER);
-        tick(&mut host, 10.0);
+        asleep(&mut host);
 
         // When they die there and respawn
         respawned(PLAYER);
@@ -1127,7 +1262,7 @@ mod tests {
             particles: true,
         }];
         on_bed_enter(PLAYER);
-        tick(&mut host, 10.0);
+        asleep(&mut host);
 
         // When they leave the game without leaving the bed, then come back
         left_game(PLAYER);
@@ -1156,7 +1291,15 @@ mod tests {
         host.effects_given.clear();
         for _ in 0..40 {
             run(&mut host, Vec::new());
-            run_for(&mut host, PLAYER, OVERWORLD, [40.5, 64.0, 0.5], 20.0, 0);
+            run_for(
+                &mut host,
+                PLAYER,
+                OVERWORLD,
+                [40.5, 64.0, 0.5],
+                20.0,
+                0,
+                false,
+            );
         }
 
         // Then they had regeneration at home and none away

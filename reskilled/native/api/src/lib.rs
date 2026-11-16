@@ -14,9 +14,13 @@ use horizon_client::mod_api::{
     PlayerTickEvent, PlayerXpChangeEvent, PotentialSpawnsEvent, PrepareAnvilEvent,
     RegisterCommandsEvent, ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent,
     ScreenRenderPostEvent, ServerDataLoadedEvent, ServerReloadListenerApplyEvent,
-    ServerStoppedEvent, TickEvent, TooltipColorEvent, TooltipEvent, UseItemEvent, UseItemOnEvent,
+    ServerStoppedEvent, TickEvent, TimeSkipEvent, TooltipColorEvent, TooltipEvent, UseItemEvent,
+    UseItemOnEvent,
 };
 use skills_core::defs::Action;
+
+/// A player's eye height asleep is 0.2 (1.62 standing, 0.4 swimming): below this they lie in bed.
+const ASLEEP_EYE_HEIGHT: f32 = 0.3;
 
 mod client;
 pub mod integration;
@@ -331,6 +335,7 @@ impl Hooks for Mod {
                 player.position,
                 player.health,
                 usize::from(player.selected_slot),
+                player.eye_height < ASLEEP_EYE_HEIGHT,
             );
         }
     }
@@ -350,6 +355,11 @@ impl Hooks for Mod {
         event: &mut PlayerSpawnPointSetEvent<'_>,
     ) -> Flow {
         server::homes::set(host, event.player, event.dimension, event.pos, event.cause);
+        Flow::Continue
+    }
+
+    fn time_skip(&self, _host: &mut dyn Host, event: &mut TimeSkipEvent<'_>) -> Flow {
+        server::mechanics::on_time_skip(event.cause);
         Flow::Continue
     }
 
