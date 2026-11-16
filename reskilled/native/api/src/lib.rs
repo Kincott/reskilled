@@ -404,6 +404,7 @@ impl Hooks for Mod {
     fn tick(&self, host: &mut dyn Host, _event: &mut TickEvent) {
         if host.window() {
             client::cache::on_tick(host);
+            client::anvil::on_tick(host);
         } else {
             server_tick(host);
         }
@@ -456,6 +457,8 @@ impl Hooks for Mod {
         let size = [event.batch.width, event.batch.height];
         client::screen::draw(host, event.batch, size, event.screen.mouse);
         let screen = event.screen;
+        client::anvil::note_screen(screen.menu);
+        client::anvil::draw(host, event.batch, screen.menu, screen.rect, screen.mouse);
         client::strip::draw_beside(
             host,
             event.batch,
@@ -471,10 +474,16 @@ impl Hooks for Mod {
         host: &dyn Host,
         event: &mut ScreenMouseButtonPressedPreEvent<'_>,
     ) -> Flow {
+        let screen = event.screen;
+        if client::anvil::click(host, screen.menu, screen.rect, screen.mouse, event.button)
+            == Flow::Cancel
+        {
+            return Flow::Cancel;
+        }
         let Some(size) = host.client_state().map(|state| state.gui_size) else {
             return Flow::Continue;
         };
-        client::screen::click(host, size, event.screen.mouse, event.button)
+        client::screen::click(host, size, screen.mouse, event.button)
     }
 
     fn screen_mouse_scrolled_pre(

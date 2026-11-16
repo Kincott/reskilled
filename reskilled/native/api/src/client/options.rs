@@ -494,7 +494,7 @@ mod tests {
 
         // Then the usual size has every display row left of every rule row, all inside the body, nothing
         // overlapping and no scroll bar
-        assert_eq!((usual.display.len(), usual.rules.len()), (11, 7));
+        assert_eq!((usual.display.len(), usual.rules.len()), (12, 7));
         let mut boxes: Vec<Rect> = usual.display.iter().map(|(_, r)| *r).collect();
         boxes.extend(usual.rules.iter().map(|(_, r)| *r));
         boxes.extend([usual.help, usual.defaults, usual.done]);

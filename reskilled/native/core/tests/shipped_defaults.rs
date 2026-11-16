@@ -608,7 +608,13 @@ fn using_a_tool_on_a_block_needs_its_tier() {
 
     // When each tier's axe, shovel and hoe is checked for its use (stripping, paths, tilling)
     // Then the use needs the same Gathering level as breaking with it
-    for (metal, level) in [("golden", 2), ("copper", 4), ("iron", 8), ("diamond", 16), ("netherite", 24)] {
+    for (metal, level) in [
+        ("golden", 2),
+        ("copper", 4),
+        ("iron", 8),
+        ("diamond", 16),
+        ("netherite", 24),
+    ] {
         for tool in ["axe", "shovel", "hoe"] {
             let id = format!("minecraft:{metal}_{tool}");
             assert_eq!(

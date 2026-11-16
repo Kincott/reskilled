@@ -7,15 +7,15 @@ use skills_core::rules::{CostUnit, Progression, Rules, Sharing};
 
 use super::cache::{ClientSettings, Corner, WarningPlace};
 use crate::text::{
-    HELP_CHIMES, HELP_CLICKS, HELP_CORNER, HELP_COST, HELP_DIM, HELP_EARN_RATE, HELP_ENCHANT,
-    HELP_HIDE_MET, HELP_OWN, HELP_PLACE, HELP_POINTS, HELP_PROGRESSION, HELP_REFUSAL, HELP_SHARING,
-    HELP_SHOW, HELP_STRIP, HELP_SWITCHES, HELP_TIME, Message, OPT_CHIMES, OPT_CLICKS, OPT_CORNER,
-    OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL, OPT_SHOW, OPT_STRIP, OPT_TIME,
-    RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS, RULE_PROGRESSION, RULE_SHARING,
-    RULE_SWITCHES, SECTION_ICON, SECTION_SOUNDS, SECTION_STRIP, SECTION_TOOLTIPS, SECTION_WARNING,
-    VAL_ABOVE, VAL_BOTH, VAL_BOTTOM_LEFT, VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN, VAL_EVERYONE,
-    VAL_LEVELS, VAL_OFF, VAL_ON, VAL_PARTY, VAL_POINTS, VAL_SECONDS, VAL_TOP, VAL_TOP_LEFT,
-    VAL_TOP_RIGHT, number, say,
+    HELP_ANVIL, HELP_CHIMES, HELP_CLICKS, HELP_CORNER, HELP_COST, HELP_DIM, HELP_EARN_RATE,
+    HELP_ENCHANT, HELP_HIDE_MET, HELP_OWN, HELP_PLACE, HELP_POINTS, HELP_PROGRESSION, HELP_REFUSAL,
+    HELP_SHARING, HELP_SHOW, HELP_STRIP, HELP_SWITCHES, HELP_TIME, Message, OPT_ANVIL, OPT_CHIMES,
+    OPT_CLICKS, OPT_CORNER, OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL, OPT_SHOW,
+    OPT_STRIP, OPT_TIME, RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS, RULE_PROGRESSION,
+    RULE_SHARING, RULE_SWITCHES, SECTION_LOCKS, SECTION_SOUNDS, SECTION_TOOLTIPS, VAL_ABOVE,
+    VAL_BOTH, VAL_BOTTOM_LEFT, VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN, VAL_EVERYONE, VAL_LEVELS,
+    VAL_OFF, VAL_ON, VAL_PARTY, VAL_POINTS, VAL_SECONDS, VAL_TOP, VAL_TOP_LEFT, VAL_TOP_RIGHT,
+    number, say,
 };
 
 /// The warning's lengths a click goes through, in seconds.
@@ -29,6 +29,7 @@ pub enum Choice {
     LockIcon,
     LockCorner,
     DimLocked,
+    AnvilWarning,
     HideMet,
     OwnLevel,
     SkillStrip,
@@ -38,12 +39,13 @@ pub enum Choice {
 }
 
 /// The display settings, in the options' first tab's order.
-pub const CHOICES: [Choice; 11] = [
+pub const CHOICES: [Choice; 12] = [
     Choice::WarningPlace,
     Choice::WarningSeconds,
     Choice::LockIcon,
     Choice::LockCorner,
     Choice::DimLocked,
+    Choice::AnvilWarning,
     Choice::HideMet,
     Choice::OwnLevel,
     Choice::SkillStrip,
@@ -55,10 +57,13 @@ pub const CHOICES: [Choice; 11] = [
 /// The section of the options a setting sits in.
 pub fn section(choice: Choice) -> &'static Message {
     match choice {
-        Choice::WarningPlace | Choice::WarningSeconds => &SECTION_WARNING,
-        Choice::LockIcon | Choice::LockCorner | Choice::DimLocked => &SECTION_ICON,
-        Choice::HideMet | Choice::OwnLevel => &SECTION_TOOLTIPS,
-        Choice::SkillStrip => &SECTION_STRIP,
+        Choice::WarningPlace
+        | Choice::WarningSeconds
+        | Choice::LockIcon
+        | Choice::LockCorner
+        | Choice::DimLocked
+        | Choice::AnvilWarning => &SECTION_LOCKS,
+        Choice::HideMet | Choice::OwnLevel | Choice::SkillStrip => &SECTION_TOOLTIPS,
         Choice::ClickSounds | Choice::ProgressSounds | Choice::RefusalSound => &SECTION_SOUNDS,
     }
 }
@@ -75,6 +80,7 @@ impl Choice {
             Choice::LockIcon => &OPT_SHOW,
             Choice::LockCorner => &OPT_CORNER,
             Choice::DimLocked => &OPT_DIM,
+            Choice::AnvilWarning => &OPT_ANVIL,
             Choice::HideMet => &OPT_HIDE_MET,
             Choice::OwnLevel => &OPT_OWN,
             Choice::SkillStrip => &OPT_STRIP,
@@ -92,6 +98,7 @@ impl Choice {
             Choice::LockIcon => &HELP_SHOW,
             Choice::LockCorner => &HELP_CORNER,
             Choice::DimLocked => &HELP_DIM,
+            Choice::AnvilWarning => &HELP_ANVIL,
             Choice::HideMet => &HELP_HIDE_MET,
             Choice::OwnLevel => &HELP_OWN,
             Choice::SkillStrip => &HELP_STRIP,
@@ -124,6 +131,7 @@ impl Choice {
                 &[],
             ),
             Choice::DimLocked => on_off(s.dim_locked),
+            Choice::AnvilWarning => on_off(s.anvil_warning),
             Choice::HideMet => on_off(s.hide_met_requirements),
             Choice::OwnLevel => on_off(s.show_own_level),
             Choice::SkillStrip => on_off(s.skill_strip),
@@ -158,6 +166,7 @@ impl Choice {
                 }
             }
             Choice::DimLocked => s.dim_locked = !s.dim_locked,
+            Choice::AnvilWarning => s.anvil_warning = !s.anvil_warning,
             Choice::HideMet => s.hide_met_requirements = !s.hide_met_requirements,
             Choice::OwnLevel => s.show_own_level = !s.show_own_level,
             Choice::SkillStrip => s.skill_strip = !s.skill_strip,

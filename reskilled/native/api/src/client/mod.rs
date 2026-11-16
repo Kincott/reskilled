@@ -1,5 +1,6 @@
 //! The client half: the definitions and requirements the server sends, tooltips, and the skills screen.
 
+pub mod anvil;
 pub mod areas;
 pub mod badge;
 pub mod cache;

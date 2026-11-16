@@ -58,6 +58,8 @@ pub struct ClientSettings {
     pub progress_sounds: bool,
     /// The low note when a lock refuses something.
     pub refusal_sound: bool,
+    /// Whether taking an anvil's result the player cannot use yet asks first.
+    pub anvil_warning: bool,
     /// The perks whose area the player chose to see in the world (Home Ward's, Safe Haven's...).
     pub shown_areas: std::collections::BTreeSet<String>,
 }
@@ -76,6 +78,7 @@ impl Default for ClientSettings {
             click_sounds: true,
             progress_sounds: true,
             refusal_sound: true,
+            anvil_warning: true,
             shown_areas: std::collections::BTreeSet::new(),
         }
     }
@@ -182,6 +185,12 @@ pub struct ClientCache {
     pub return_tab: Tab,
     /// The GUI's size when the screen was last drawn, for the wheel.
     pub gui_size: [f32; 2],
+    /// The menu type of the screen last drawn (`minecraft:anvil`), for the tick to read an anvil's result.
+    pub open_menu: Option<String>,
+    /// The anvil's result as the server last synced it.
+    pub anvil_result: Option<ItemStack>,
+    /// The anvil result the player was warned about: a second click on it takes it.
+    pub anvil_prompt: Option<ItemStack>,
     /// The perk the skill page's dock tells about, chosen with a click.
     pub selected_perk: Option<String>,
     /// How far a long road is scrolled, in GUI pixels.

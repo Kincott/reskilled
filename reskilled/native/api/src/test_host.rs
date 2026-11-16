@@ -83,6 +83,8 @@ pub struct TestHost {
     pub open_screen: Option<String>,
     /// Whether the player is playing, with no screen over the world.
     pub playing: bool,
+    /// The stacks of the menu the server opened for the window, by slot.
+    pub menu: Option<Vec<Option<ItemStack>>>,
     /// Keys the player bound for mods, by key name.
     pub mod_keys: HashMap<String, String>,
     /// Text drawn: the string, where, and its colour.
@@ -451,6 +453,10 @@ impl Host for TestHost {
 
     fn window(&self) -> bool {
         !self.server
+    }
+
+    fn menu_stacks(&mut self) -> Option<Vec<Option<ItemStack>>> {
+        self.menu.clone()
     }
 
     fn net_send_to_server(&mut self, channel: &str, data: &[u8]) -> Result<(), String> {
