@@ -10,6 +10,7 @@ pub mod options;
 pub mod paint;
 #[cfg(test)]
 mod preview;
+pub mod road;
 pub mod screen;
 pub mod settings;
 pub mod steve;

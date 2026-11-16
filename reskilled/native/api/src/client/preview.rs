@@ -16,7 +16,6 @@ use skills_core::registry::{SourceFile, build};
 use skills_core::wire::{ClientDefs, client_defs_json};
 
 use super::cache::{Tab, WARNING_TICKS, Warning, with};
-use super::layout::{detail, panel};
 use super::screen::draw;
 use crate::MOD_ID;
 use crate::test_host::{Paint, TestHost, exclusive, mods, spans_of};
@@ -37,7 +36,7 @@ fn skill(path: &str) -> String {
 }
 
 /// What the server would send a client of the shipped data files.
-fn shipped() -> ClientDefs {
+pub(crate) fn shipped() -> ClientDefs {
     let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../content/data/reskilled");
     let mut files = Vec::new();
     for (folder, kind) in FOLDERS {
@@ -63,7 +62,7 @@ fn shipped() -> ClientDefs {
 
 /// A player a few hours in: Mining 12 with a perk, Melee 9 with a perk, Defense 3, Gathering 6, Arcane 32 (the
 /// top), focused on Working, with 23 XP levels. The screen is open and the shipped English is loaded.
-fn player(size: [u32; 2]) -> TestHost {
+pub(crate) fn player(size: [u32; 2]) -> TestHost {
     crate::text::shipped_english::load();
     let at = |level: u32, perks: &[&str]| SkillProgress {
         level,
@@ -153,12 +152,6 @@ fn save(host: &TestHost, name: &str, size: [u32; 2]) -> Vec<Paint> {
     painted
 }
 
-/// Every text and icon lies inside the old views' window, clear of its frame.
-fn assert_inside_window(host: &TestHost, painted: &[Paint], size: [u32; 2], what: &str) {
-    let window = panel([size[0] as f32, size[1] as f32]).shrunk(3.0);
-    assert_inside(host, painted, &window, what);
-}
-
 /// Every text and icon below the tab row lies inside `window`.
 fn assert_inside(host: &TestHost, painted: &[Paint], window: &super::layout::Rect, what: &str) {
     for paint in painted {
@@ -242,7 +235,8 @@ fn every_shipped_skill_view_fits_the_window() {
             let painted = scene(&host, &format!("skill_{path}_{}", size[0]), size, AWAY);
 
             // Then it is inside the window, no text over another
-            assert_inside_window(&host, &painted, size, path);
+            let body = super::window::window([size[0] as f32, size[1] as f32], 8, 0).body;
+            assert_inside(&host, &painted, &body, path);
             assert_no_text_overlap(&host, &painted, path);
         }
     }
@@ -278,7 +272,15 @@ fn hovering_shows_one_tooltip() {
         &host,
         "hover_perk",
         USUAL,
-        over(&detail(size, 5, 0).rows[1].rect),
+        over(
+            &with(|cache| {
+                let defs = cache.defs.as_ref().unwrap();
+                let body = super::window::window(size, 8, 0).body;
+                super::road::road_of(defs, &cache.state, "reskilled:mining", &body, 0.0)
+            })
+            .nodes[1]
+                .1,
+        ),
     );
     with(|cache| cache.tab = Tab::Options);
     let page = super::options::page(size, 11);

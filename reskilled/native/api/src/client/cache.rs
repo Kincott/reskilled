@@ -182,6 +182,10 @@ pub struct ClientCache {
     pub return_tab: Tab,
     /// The GUI's size when the screen was last drawn, for the wheel.
     pub gui_size: [f32; 2],
+    /// The perk the skill page's dock tells about, chosen with a click.
+    pub selected_perk: Option<String>,
+    /// How far a long road is scrolled, in GUI pixels.
+    pub road_scroll: f32,
     /// The first row of skill cards on show, and the first perk row, when there are more than fit.
     pub first_row: usize,
     pub first_perk: usize,

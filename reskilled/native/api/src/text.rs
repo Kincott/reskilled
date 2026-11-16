@@ -69,10 +69,8 @@ messages! {
     REQUIREMENTS = "reskilled.ui.requirements" => "Requirements";
     YOU_HAVE = "reskilled.ui.you_have" => "(you: %s)";
     TITLE = "reskilled.ui.title" => "Reskilled";
-    XP = "reskilled.ui.xp" => "XP levels: %s";
     LEVEL = "reskilled.ui.level" => "%s/%s";
     LEVEL_OF = "reskilled.ui.level_of" => "Level %s of %s";
-    LEVEL_UP = "reskilled.ui.level_up" => "Level up";
     PROGRESS = "reskilled.ui.progress" => "Progress: %s/%s";
     RAISE_TO = "reskilled.ui.raise_to" => "Raise to level %s";
     LAST_STAND = "reskilled.msg.last_stand" => "Last stand! You cling on at half a heart.";
@@ -86,7 +84,6 @@ messages! {
     COST_POINTS = "reskilled.ui.cost_points" => "Cost: %s XP points";
     AT_TOP = "reskilled.ui.at_top" => "Max level";
     PERK_POINTS = "reskilled.ui.perk_points" => "Perk points: %s";
-    PERKS = "reskilled.ui.perks" => "Perks";
     SWITCHED_OFF = "reskilled.ui.switched_off" => "Off: no effect until switched on.";
     PERK_COST = "reskilled.ui.perk_cost" => "%s perk points";
     PERK_OF = "reskilled.ui.perk_of" => "%s perk";
@@ -96,11 +93,7 @@ messages! {
     AREA_SHOWN = "reskilled.ui.area_shown" => "Area shown in the world.";
     AREA_HIDDEN = "reskilled.ui.area_hidden" => "Click Area to see it in the world.";
     GET = "reskilled.ui.get" => "Unlock";
-    NEXT_UNLOCKS = "reskilled.ui.next_unlocks" => "Next unlocks";
-    UNLOCK = "reskilled.ui.unlock" => "Level %s: %s";
-    ALL_UNLOCKED = "reskilled.ui.all_unlocked" => "Everything here is unlocked.";
     OPEN_HINT = "reskilled.ui.open_hint" => "Click for perks.";
-    BACK = "reskilled.ui.back" => "Back";
     FOCUS = "reskilled.ui.focus" => "Focus";
     FOCUS_GIVES = "reskilled.ui.focus_gives" => "Gives XP for:";
     REWARD_KILL = "reskilled.ui.reward.kill" => "Kills: %s more XP";
@@ -127,6 +120,11 @@ messages! {
     BONUS_BLOCK_XP = "reskilled.ui.bonus.block_xp" => "+%s ore XP";
     BONUS_TRAVEL = "reskilled.ui.bonus.travel" => "travel XP";
     BONUS_BREAK = "reskilled.ui.bonus.break" => "work XP";
+    LEVEL_UP_COST = "reskilled.ui.level_up_cost" => "Level up \u{b7} %s XP";
+    PERK_POINTS_N = "reskilled.ui.perk_points_n" => "\u{25c6} %s perk points";
+    PERK_AT = "reskilled.ui.perk_at" => "%s perk \u{b7} level %s";
+    AT_LEVEL = "reskilled.ui.at_level" => "Level %s";
+    XP_CHIP = "reskilled.ui.xp_chip" => "%s XP";
     OPTIONS_TITLE = "reskilled.ui.options_title" => "Reskilled Options";
     TAB_DISPLAY = "reskilled.ui.tab.display" => "Display";
     TAB_RULES = "reskilled.ui.tab.rules" => "Server rules";

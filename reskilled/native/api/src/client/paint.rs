@@ -13,8 +13,6 @@ pub const FRAME: u32 = 0xFFA8_7F32;
 pub const FRAME_DARK: u32 = 0xFF6B_4E1C;
 pub const BODY: u32 = 0xFF1C_1F27;
 pub const HEADER: u32 = 0xFF27_2B36;
-pub const CARD: u32 = 0xFF2A_2F3B;
-pub const CARD_HOVER: u32 = 0xFF37_3E4F;
 pub const CARD_EDGE: u32 = 0xFF41_485A;
 pub const INSET: u32 = 0xFF12_1419;
 pub const BAR_FILL: u32 = 0xFF5F_C63A;
@@ -407,45 +405,7 @@ pub fn stone(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
     }
     fill(host, batch, r, STONE_SHADE);
 }
-/// The bright core of the glint that runs along a mastered bar, and its softer edges.
-pub const GLINT: u32 = 0xFFFF_FBEA;
-const GLINT_HALO: u32 = 0x99FF_F2C4;
-const BAR_GOLD_LIGHT: u32 = 0xFFFF_E79A;
-const BAR_GOLD_DARK: u32 = 0xFFB3_7F22;
 const PLAQUE: u32 = 0xFF4A_3A1B;
-
-/// A full bar in bevelled gold, with a glint `along` of the way (0 to 1) through its run. The glint enters from the
-/// left, crosses, and leaves on the right, so for part of the run none shows.
-pub fn mastered_bar(host: &dyn Host, batch: &mut HudBatch, r: &Rect, along: f32) {
-    fill(host, batch, r, OUTLINE);
-    let inner = r.shrunk(1.0);
-    fill(host, batch, &inner, BAR_FULL);
-    host.fill(batch, [inner.x, inner.y, inner.w, 1.0], BAR_GOLD_LIGHT);
-    if inner.h > 2.0 {
-        host.fill(
-            batch,
-            [inner.x, inner.y + inner.h - 1.0, inner.w, 1.0],
-            BAR_GOLD_DARK,
-        );
-    }
-    // The glint takes the first 60% of the run and rests for the rest.
-    let travel = (along / 0.6).min(2.0);
-    if travel >= 1.0 {
-        return;
-    }
-    let centre = (inner.x - 2.0 + travel * (inner.w + 4.0)).round();
-    for (offset, width, colour) in [
-        (-2.0, 1.0, GLINT_HALO),
-        (-1.0, 2.0, GLINT),
-        (1.0, 1.0, GLINT_HALO),
-    ] {
-        let left = (centre + offset).max(inner.x);
-        let right = (centre + offset + width).min(inner.x + inner.w);
-        if right > left {
-            host.fill(batch, [left, inner.y, right - left, inner.h], colour);
-        }
-    }
-}
 
 /// A raised gold plaque, for a label of honour.
 pub fn plaque(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {

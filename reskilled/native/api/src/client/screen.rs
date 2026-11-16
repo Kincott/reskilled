@@ -1,31 +1,28 @@
-//! The skills screen: a window over the world when the mod's own screen is open. It has two views, every skill as a
-//! card and one skill with its perks; its clicks become requests the next tick sends (the screen hooks cannot send).
+//! The skills screen: a window over the world when the mod's own screen is open, with tabs for Home, each skill's
+//! road and Options; its clicks become requests the next tick sends (the screen hooks cannot send).
 
 use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
 use skills_core::area::area_of;
 use skills_core::defs::{PerkDef, Reward};
 use skills_core::progress::{
-    PlayerState, Request, apply_under, earn_threshold, focus_cost, level, mastered, missing_skill,
-    own_level, points_available, raise_cost, switched_off, total_points,
+    PlayerState, Request, apply_under, earn_threshold, focus_cost, level, missing_skill, own_level,
+    points_available, raise_cost, switched_off, total_points,
 };
 use skills_core::registry::Defs;
 use skills_core::rules::{CostUnit, Rules};
 use skills_core::wire::{ClientDefs, ToServer};
 
 use super::cache::{CLICK_SOUND, ClientCache, Tab, with};
-use super::layout::{
-    Button, Detail, HEADER_H, PerkRow, Rect, Scroll, detail, hit_detail, last_first_perk, panel,
-};
+use super::layout::{HEADER_H, Rect, Scroll, panel};
 use super::paint::{self, DIM, GOLD, GRAY, GREEN, Look, RED, WHITE};
 use crate::MOD_ID;
 use crate::text::{
-    ALL_UNLOCKED, AREA, AREA_HIDDEN, AREA_SHOWN, AT_TOP, BACK, COST, COST_POINTS, FOCUS_ACTIVE,
-    FOCUS_ADD, FOCUS_ADD_FREE, FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK,
-    NEEDS, NEXT_UNLOCKS, NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_OF, PERK_POINTS,
-    PERKS, PROGRESS, RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT, RAISE_TO,
-    REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
-    REWARD_TRAVEL, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, UNLOCK, VAL_OFF, VAL_ON, WAITING, XP,
-    focus_name, label_name, number, perk_description, perk_name, say, skill_name,
+    AREA_HIDDEN, AREA_SHOWN, AT_TOP, COST, COST_POINTS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
+    FOCUS_GIVES, LEVEL_OF, MASTERED, MISSING_PERK, NEEDS, NOT_ENOUGH_POINTS, OPEN_HINT, OWNED,
+    PERK_COST, PERK_OF, PERK_POINTS, RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT,
+    RAISE_TO, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
+    REWARD_TRAVEL, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, WAITING, focus_name, label_name,
+    number, perk_description, perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -33,23 +30,14 @@ pub const LEFT_BUTTON: i32 = 0;
 pub const RIGHT_BUTTON: i32 = 1;
 /// Raises one Shift-click asks for.
 const SHIFT_RAISES: u32 = 5;
-const BIG_ICON: f32 = 32.0;
 /// Where a header's text sits below the window's top, and its side margin.
 const HEADER_TEXT: f32 = 7.0;
 const MARGIN: f32 = 8.0;
-/// Where a skill's name starts in the skill view's header, after the back button.
-const NAME_AFTER_BACK: f32 = 26.0;
-/// The glint on a mastered bar runs once every this many ticks, and the twinkles pulse at the same pace.
-const SHINE_TICKS: f64 = 60.0;
 /// A perk's description wraps at this width in its tooltip.
 const TIP_WIDTH: f32 = 190.0;
-/// The unlock preview's heading takes 10 pixels, each line 9; two lines fit.
-const PREVIEW_HEADING: f32 = 10.0;
-const PREVIEW_LINE: f32 = 9.0;
-const PREVIEW_LINES: usize = 2;
 
 /// A perk as the screen shows it.
-enum PerkStatus {
+pub(super) enum PerkStatus {
     Owned,
     Buyable,
     Locked(Text),
@@ -66,7 +54,7 @@ pub(super) fn owns(state: &PlayerState, perk: &str) -> bool {
     state.skills.values().any(|p| p.perks.contains(perk))
 }
 
-fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
+pub(super) fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
     if owns(state, &perk.id) {
         return PerkStatus::Owned;
     }
@@ -90,21 +78,12 @@ fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
 struct Shown<'a> {
     skills: Vec<&'a String>,
     selected: usize,
-    perks: Vec<&'a PerkDef>,
 }
 
 fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
     let skills: Vec<&String> = defs.defs.skills.keys().collect();
     let selected = selected.min(skills.len().saturating_sub(1));
-    let perks = skills
-        .get(selected)
-        .map(|s| perks_of(&defs.defs, s))
-        .unwrap_or_default();
-    Shown {
-        skills,
-        selected,
-        perks,
-    }
+    Shown { skills, selected }
 }
 
 /// Progress earned by doing toward the skill's next level, in actions: what is earned and what the level takes.
@@ -162,8 +141,6 @@ pub(super) struct Pen<'a> {
     pub(super) xp: Option<u32>,
     /// The tooltip to draw last, over everything.
     pub(super) tip: Option<Vec<Text>>,
-    /// Client ticks run, for the mastery glint and twinkles.
-    pub(super) ticks: u64,
     /// The server's rules: whether perks may be switched, how raises are paid.
     pub(super) rules: &'a Rules,
     /// The perks whose area the player chose to see in the world.
@@ -192,30 +169,8 @@ impl Pen<'_> {
         paint::button(self.host, self.batch, r, label, look, hover);
     }
 
-    /// How far through its run the mastery glint is, 0 to 1, from the client's tick and the frame's part of it.
-    fn sweep(&self) -> f32 {
-        let partial = self
-            .host
-            .client_state()
-            .map_or(0.0, |s| s.world_partial_tick);
-        let ticks = self.ticks as f64 + partial;
-        (ticks.rem_euclid(SHINE_TICKS) / SHINE_TICKS) as f32
-    }
-
     pub(super) fn width(&self, text: &str) -> f32 {
         self.host.text_width(text)
-    }
-
-    /// The window with its title and, at its right, the player's XP levels.
-    /// The window with its title and, at its right (`right_room` in from the edge), the player's XP levels.
-    fn window(&mut self, window: &Rect, title: &str, title_x: f32, right_room: f32) {
-        paint::panel(self.host, self.batch, window, HEADER_H);
-        self.text(title, window.x + title_x, window.y + HEADER_TEXT, GOLD);
-        if let Some(xp) = self.xp {
-            let xp = say(&XP, &[number(xp)]).plain();
-            let right = window.x + window.w - MARGIN - right_room;
-            self.text_right(&xp, right, window.y + HEADER_TEXT, GREEN);
-        }
     }
 
     pub(super) fn scroll(&mut self, scroll: Option<Scroll>) {
@@ -250,7 +205,8 @@ fn open_tab(cache: &mut ClientCache, tab: Tab) {
     match tab {
         Tab::Skill(i) => {
             cache.selected = i;
-            cache.first_perk = 0;
+            cache.selected_perk = None;
+            cache.road_scroll = 0.0;
         }
         Tab::Options => cache.return_tab = cache.tab,
         Tab::Home => cache.first_row = 0,
@@ -327,7 +283,6 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
             state: &cache.state,
             xp: cache.xp_levels,
             tip: None,
-            ticks: cache.ticks,
             rules: &cache.rules,
             shown_areas: &cache.settings.shown_areas,
         };
@@ -339,7 +294,15 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
                 let l = super::home::home(&body, &groups, cache.first_row);
                 super::home::draw(&mut pen, &l, &shown.skills, cache.my_name.as_deref());
             }
-            Tab::Skill(_) => draw_skill(&mut pen, size, cache, defs, &shown),
+            Tab::Skill(_) => {
+                if let Some(skill) = shown.skills.get(shown.selected) {
+                    let body = window_now(size, cache).body;
+                    let r =
+                        super::road::road_of(defs, &cache.state, skill, &body, cache.road_scroll);
+                    let chosen = cache.selected_perk.as_deref();
+                    super::road::draw(&mut pen, defs, skill, &r, chosen);
+                }
+            }
             Tab::Options => {}
         }
         if let Some(lines) = pen.tip.take() {
@@ -349,7 +312,7 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
 }
 
 /// A mastered skill's page: a gold plaque with the crown and "Mastered" where the raise button was.
-fn draw_mastered_plaque(pen: &mut Pen<'_>, r: &Rect) {
+pub(super) fn draw_mastered_plaque(pen: &mut Pen<'_>, r: &Rect) {
     paint::plaque(pen.host, pen.batch, r);
     let label = say(&MASTERED, &[]).plain();
     let width = paint::CROWN_SIZE[0] + 3.0 + pen.width(&label);
@@ -499,199 +462,9 @@ fn reward_line(reward: &Reward) -> Text {
     }
 }
 
-fn draw_skill(
-    pen: &mut Pen<'_>,
-    size: [f32; 2],
-    cache: &ClientCache,
-    defs: &ClientDefs,
-    shown: &Shown<'_>,
-) {
-    let Some(skill) = shown.skills.get(shown.selected).map(|s| s.as_str()) else {
-        return;
-    };
-    let (d, state) = (pen.d, pen.state);
-    let view = detail(size, shown.perks.len(), cache.first_perk);
-    pen.window(
-        &view.panel,
-        &skill_name(d, skill).plain(),
-        NAME_AFTER_BACK,
-        0.0,
-    );
-    pen.button(&view.back, "<", Look::Plain);
-    if pen.over(&view.back) {
-        pen.tip = Some(vec![say(&BACK, &[]).with_color(WHITE)]);
-    }
-    draw_summary(pen, &view, skill);
-    let heading = view.panel.y + 72.0;
-    pen.text(
-        &say(&PERKS, &[]).plain(),
-        view.panel.x + MARGIN,
-        heading,
-        GOLD,
-    );
-    let rule = [
-        view.panel.x + MARGIN,
-        heading + 10.0,
-        view.panel.w - 2.0 * MARGIN,
-        1.0,
-    ];
-    pen.host.fill(pen.batch, rule, paint::CARD_EDGE);
-    for row in &view.rows {
-        draw_perk(pen, row, shown.perks[row.index]);
-    }
-    draw_preview(pen, defs, level(state, d, skill), skill, &view);
-    pen.scroll(view.scroll);
-}
-
-/// The top of the skill view: the big icon, the level and its bar, the perk points, and the raise button.
-fn draw_summary(pen: &mut Pen<'_>, view: &Detail, skill: &str) {
-    let (d, state) = (pen.d, pen.state);
-    paint::slot(pen.host, pen.batch, &view.slot);
-    if let Some(icon) = d.skill(skill).map(|s| s.icon_at(level(state, d, skill))) {
-        pen.host.item(
-            pen.batch,
-            icon,
-            [view.slot.x + 2.0, view.slot.y + 2.0],
-            BIG_ICON,
-        );
-    }
-    let (now, most) = (level(state, d, skill), d.max_level(skill));
-    let levels = say(&LEVEL_OF, &[number(now), number(most)]).plain();
-    pen.text(&levels, view.bar.x, view.slot.y + 2.0, WHITE);
-    if mastered(d, state, skill) {
-        let along = pen.sweep();
-        paint::mastered_bar(pen.host, pen.batch, &view.bar, along);
-    } else {
-        paint::bar(pen.host, pen.batch, &view.bar, now, most);
-    }
-    let points = points_available(d, state, skill);
-    let line = say(&PERK_POINTS, &[number(points)]).plain();
-    pen.text(
-        &line,
-        view.bar.x,
-        view.bar.y + 11.0,
-        if points > 0 { GOLD } else { GRAY },
-    );
-    let earned = earned_of(d, state, skill).filter(|_| pen.rules.earning());
-    if let (Some((have, need)), false) = (earned, pen.rules.buying()) {
-        let bar = Rect {
-            y: view.raise.y + 6.0,
-            h: 6.0,
-            ..view.raise
-        };
-        paint::bar(pen.host, pen.batch, &bar, have, need);
-        let under = Rect {
-            y: view.raise.y + view.raise.h + 3.0,
-            h: paint::GLYPH,
-            ..view.raise
-        };
-        let line = say(&PROGRESS, &[number(have), number(need)]).plain();
-        paint::text_centred(pen.host, pen.batch, &line, &under, GRAY);
-        return;
-    }
-    if let Some((have, need)) = earned {
-        let below = Rect {
-            y: view.raise.y + view.raise.h + 13.0,
-            h: paint::GLYPH,
-            ..view.raise
-        };
-        let line = say(&PROGRESS, &[number(have), number(need)]).plain();
-        paint::text_centred(pen.host, pen.batch, &line, &below, GRAY);
-    }
-    let Some(cost) = price(d, pen.rules, state, skill).filter(|_| pen.rules.buying()) else {
-        if mastered(d, state, skill) {
-            draw_mastered_plaque(pen, &view.raise);
-        } else {
-            pen.button(&view.raise, &say(&AT_TOP, &[]).plain(), Look::Off);
-        }
-        return;
-    };
-    let can = can_raise(d, pen.rules, state, pen.xp, skill);
-    let hover = pen.over(&view.raise);
-    let look = if can { Look::Go } else { Look::Off };
-    let label = say(&LEVEL_UP, &[]).plain();
-    paint::arrow_button(pen.host, pen.batch, &view.raise, &label, look, hover);
-    let under = Rect {
-        y: view.raise.y + view.raise.h + 3.0,
-        h: paint::GLYPH,
-        ..view.raise
-    };
-    let cost = cost_line(pen.rules, cost).plain();
-    paint::text_centred(
-        pen.host,
-        pen.batch,
-        &cost,
-        &under,
-        if can { GREEN } else { RED },
-    );
-    if pen.over(&view.raise) {
-        pen.tip = Some(raise_tip(pen, skill));
-    }
-}
-
-fn draw_perk(pen: &mut Pen<'_>, row: &PerkRow, perk: &PerkDef) {
-    let (d, state) = (pen.d, pen.state);
-    let status = status(d, state, perk);
-    let hover = pen.over(&row.rect);
-    pen.fill(
-        &row.rect,
-        if hover {
-            paint::CARD_HOVER
-        } else {
-            paint::CARD
-        },
-    );
-    let (x, y) = (row.rect.x, row.rect.y + 5.0);
-    match status {
-        PerkStatus::Owned => pen.text(paint::TICK, x + 3.0, y, GOLD),
-        PerkStatus::Buyable => pen.text(paint::POINT, x + 4.0, y, GREEN),
-        PerkStatus::Locked(_) => paint::padlock(pen.host, pen.batch, [x + 4.0, row.rect.y + 3.0]),
-    }
-    let name = perk_name(d, &perk.id).plain();
-    let locked = matches!(status, PerkStatus::Locked(_));
-    pen.text(&name, x + 16.0, y, if locked { GRAY } else { WHITE });
-    let price_x = x + 16.0 + pen.width(&name) + 4.0;
-    let price = paint::POINT.repeat(perk.cost as usize);
-    let owned = matches!(status, PerkStatus::Owned);
-    pen.text(&price, price_x, y, if owned { DIM } else { GOLD });
-    let right = row.rect.x + row.rect.w - 6.0;
-    match &status {
-        PerkStatus::Owned => draw_owned(pen, row, perk, right, y),
-        PerkStatus::Buyable => pen.button(&row.buy, &say(&GET, &[]).plain(), Look::Go),
-        PerkStatus::Locked(why) => {
-            let room = right - (price_x + pen.width(&price) + 6.0);
-            let why = paint::fitted(pen.host, &why.plain(), room);
-            pen.text_right(&why, right, y, RED);
-        }
-    }
-    if hover {
-        pen.tip = Some(perk_tip(pen, perk, &status));
-    }
-}
-
-/// An owned perk's end of the row: its area button when it acts on an area, and its switch when the rules allow it,
-/// else "Owned".
-fn draw_owned(pen: &mut Pen<'_>, row: &PerkRow, perk: &PerkDef, right: f32, y: f32) {
-    if area_of(perk).is_some() {
-        let look = if pen.shown_areas.contains(&perk.id) {
-            Look::Go
-        } else {
-            Look::Plain
-        };
-        pen.button(&row.area, &say(&AREA, &[]).plain(), look);
-    }
-    if !pen.rules.perk_switches {
-        pen.text_right(&say(&OWNED, &[]).plain(), right, y, GOLD);
-        return;
-    }
-    let on = !switched_off(pen.state, &perk.id);
-    let label = say(if on { &VAL_ON } else { &VAL_OFF }, &[]).plain();
-    pen.button(&row.buy, &label, if on { Look::Go } else { Look::Plain });
-}
-
 /// A perk's tooltip: its name in bold and its skill; a bullet for each thing it does; then, after a gap, either
 /// that it is owned or its cost and needs, each marked met or not.
-fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
+pub(super) fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
     let mut lines = vec![
         perk_name(d, &perk.id).with_color(GOLD).bold(),
@@ -748,12 +521,12 @@ fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
     lines
 }
 
-fn met_colour(met: bool) -> u32 {
+pub(super) fn met_colour(met: bool) -> u32 {
     if met { GREEN } else { RED }
 }
 
 /// The line with a tick before it when met, a cross when not.
-fn marked(met: bool, what: Text) -> Text {
+pub(super) fn marked(met: bool, what: Text) -> Text {
     let mark = if met { paint::TICK } else { CROSS };
     Text::literal(format!("{mark} ")).append(what)
 }
@@ -787,7 +560,7 @@ fn description_lines(host: &dyn Host, text: &str) -> Vec<Text> {
 }
 
 /// The text's sentences, each keeping its full stop.
-fn sentences(text: &str) -> Vec<String> {
+pub(super) fn sentences(text: &str) -> Vec<String> {
     let parts: Vec<&str> = text.trim().split(". ").filter(|p| !p.is_empty()).collect();
     let last = parts.len().saturating_sub(1);
     parts
@@ -816,37 +589,6 @@ fn picked_out(lead: Text, words: &str) -> Text {
     })
 }
 
-/// What the next levels of the skill unlock, as many lines as fit.
-fn draw_preview(pen: &mut Pen<'_>, defs: &ClientDefs, now: u32, skill: &str, view: &Detail) {
-    let area = &view.preview;
-    pen.text(&say(&NEXT_UNLOCKS, &[]).plain(), area.x, area.y, GOLD);
-    let by_level = defs.labels.get(skill);
-    let next_tier = by_level.and_then(|levels| levels.range(now + 1..).next().map(|(l, _)| *l));
-    if let Some(next) = next_tier {
-        let reached = by_level.and_then(|levels| levels.range(..=now).next_back().map(|(l, _)| *l));
-        let from = reached.unwrap_or(1);
-        paint::bar(pen.host, pen.batch, &view.next_bar, now - from, next - from);
-        let count = say(&LEVEL, &[number(now), number(next)]).plain();
-        pen.text_right(&count, area.x + area.w, area.y, GRAY);
-    }
-    let next = defs
-        .labels
-        .get(skill)
-        .map(|by_level| by_level.range(now + 1..));
-    let mut lines = next.into_iter().flatten().take(PREVIEW_LINES).peekable();
-    if lines.peek().is_none() {
-        let none = say(&ALL_UNLOCKED, &[]).plain();
-        pen.text(&none, area.x, area.y + PREVIEW_HEADING, DIM);
-    }
-    for (n, (needed, labels)) in lines.enumerate() {
-        let names: Vec<String> = labels.iter().map(|key| label_name(key).plain()).collect();
-        let line = say(&UNLOCK, &[number(*needed), Text::literal(names.join(", "))]).plain();
-        let line = paint::fitted(pen.host, &line, area.w);
-        let y = area.y + PREVIEW_HEADING + n as f32 * PREVIEW_LINE;
-        pen.text(&line, area.x, y, GRAY);
-    }
-}
-
 /// What a click on the screen leads to.
 pub(super) enum Outcome {
     Nothing,
@@ -855,6 +597,8 @@ pub(super) enum Outcome {
     Back,
     /// Show the owned perk's area in the world, or stop.
     ToggleArea(String),
+    /// Tell about this perk in the skill page's dock.
+    Choose(String),
 }
 
 /// A click on the screen: opens a skill, goes back, or queues a raise, perk or focus request the player can pay
@@ -884,6 +628,7 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
                 cache.tab = Tab::Skill(cache.selected);
             }
             Outcome::Back => cache.tab = Tab::Home,
+            Outcome::Choose(perk) => cache.selected_perk = Some(perk),
             Outcome::ToggleArea(perk) => {
                 let shown = &mut cache.settings.shown_areas;
                 if !shown.remove(&perk) {
@@ -923,54 +668,24 @@ fn outcome(
     button: i32,
     times: u32,
 ) -> Outcome {
-    let (d, state, xp) = (&defs.defs, &cache.state, cache.xp_levels);
     let shown = shown(defs, cache.selected);
-    let raise = |skill: Option<&&String>| match skill {
-        Some(skill) if can_raise(d, &cache.rules, state, xp, skill) => {
-            Outcome::Ask(Request::Raise {
-                skill: (*skill).clone(),
-                times,
-            })
-        }
-        _ => Outcome::Nothing,
-    };
-    let hit = match (cache.tab, button) {
-        (Tab::Skill(_), RIGHT_BUTTON) => Some(Button::Back),
+    match (cache.tab, button) {
+        (Tab::Skill(_), RIGHT_BUTTON) => Outcome::Back,
         (Tab::Home, LEFT_BUTTON) => {
             let body = window_now(size, cache).body;
-            let groups = super::home::groups(d);
+            let groups = super::home::groups(&defs.defs);
             let l = super::home::home(&body, &groups, cache.first_row);
-            return super::home::click(cache, d, &l, &shown.skills, at, times);
+            super::home::click(cache, &defs.defs, &l, &shown.skills, at, times)
         }
         (Tab::Skill(_), LEFT_BUTTON) => {
-            let view = detail(size, shown.perks.len(), cache.first_perk);
-            hit_detail(&view, at[0], at[1])
+            let Some(skill) = shown.skills.get(shown.selected) else {
+                return Outcome::Nothing;
+            };
+            let body = window_now(size, cache).body;
+            let r = super::road::road_of(defs, &cache.state, skill, &body, cache.road_scroll);
+            super::road::click(cache, defs, skill, &r, at, times)
         }
-        _ => None,
-    };
-    match hit {
-        Some(Button::Back) => Outcome::Back,
-        Some(Button::RaiseShown) => raise(shown.skills.get(shown.selected)),
-        Some(Button::BuyPerk(perk)) => match shown.perks.get(perk) {
-            Some(perk) if matches!(status(d, state, perk), PerkStatus::Buyable) => {
-                Outcome::Ask(Request::BuyPerk {
-                    perk: perk.id.clone(),
-                })
-            }
-            Some(perk) if owns(state, &perk.id) && cache.rules.perk_switches => {
-                Outcome::Ask(Request::SwitchPerk {
-                    perk: perk.id.clone(),
-                })
-            }
-            _ => Outcome::Nothing,
-        },
-        Some(Button::ToggleArea(perk)) => match shown.perks.get(perk) {
-            Some(perk) if owns(state, &perk.id) && area_of(perk).is_some() => {
-                Outcome::ToggleArea(perk.id.clone())
-            }
-            _ => Outcome::Nothing,
-        },
-        None => Outcome::Nothing,
+        _ => Outcome::Nothing,
     }
 }
 
@@ -982,7 +697,6 @@ pub fn scroll(host: &dyn Host, amount: f64) -> Flow {
     with(|cache| {
         let Some(defs) = &cache.defs else { return };
         let shown = shown(defs, cache.selected);
-        let perks = shown.perks.len();
         let stepped = |now: usize, last: usize| {
             if amount > 0.0 {
                 now.min(last).saturating_sub(1)
@@ -992,18 +706,25 @@ pub fn scroll(host: &dyn Host, amount: f64) -> Flow {
                 now
             }
         };
+        let size = if cache.gui_size[0] > 0.0 {
+            cache.gui_size
+        } else {
+            [427.0, 240.0]
+        };
         match cache.tab {
             Tab::Home => {
-                let size = if cache.gui_size[0] > 0.0 {
-                    cache.gui_size
-                } else {
-                    [427.0, 240.0]
-                };
                 let body = window_now(size, cache).body;
                 let last = super::home::last_first(&body, &super::home::groups(&defs.defs));
                 cache.first_row = stepped(cache.first_row, last);
             }
-            Tab::Skill(_) => cache.first_perk = stepped(cache.first_perk, last_first_perk(perks)),
+            Tab::Skill(_) => {
+                if let Some(skill) = shown.skills.get(shown.selected) {
+                    let body = window_now(size, cache).body;
+                    let r =
+                        super::road::road_of(defs, &cache.state, skill, &body, cache.road_scroll);
+                    cache.road_scroll = super::road::scrolled(&r, cache.road_scroll, amount);
+                }
+            }
             Tab::Options => {}
         }
     });
@@ -1080,7 +801,7 @@ pub(crate) mod tests {
     /// Melee and Mining; Mining perks Sure Grip (owned), Deep Veins (level 16) and Rich Seams (buyable); focus areas
     /// Fighting (Melee) and Working (Mining, the player's); the player at Mining 12 with 1 point spent and 23 XP
     /// levels, on Home.
-    fn screen_open() -> TestHost {
+    pub(crate) fn screen_open() -> TestHost {
         let defs = Defs {
             skills: [(MINING.into(), skill(MINING)), (MELEE.into(), skill(MELEE))].into(),
             perks: [
@@ -1133,7 +854,7 @@ pub(crate) mod tests {
     }
 
     /// The screen open on Mining's own view (skills are listed by id: Melee, then Mining).
-    fn mining_open() -> TestHost {
+    pub(crate) fn mining_open() -> TestHost {
         let host = screen_open();
         with(|cache| {
             cache.selected = 1;
@@ -1214,8 +935,23 @@ pub(crate) mod tests {
             .collect()
     }
 
-    fn mining_view() -> Detail {
-        detail(SIZE, 3, 0)
+    /// Mining's road at the usual size.
+    fn mining_road() -> super::super::road::RoadLayout {
+        with(|cache| {
+            let defs = cache.defs.as_ref().unwrap();
+            let body = super::super::window::window(SIZE, defs.defs.skills.len(), 0).body;
+            super::super::road::road_of(defs, &cache.state, MINING, &body, 0.0)
+        })
+    }
+
+    /// A Mining perk's node on its road, by the end of its id.
+    fn node_of(perk: &str) -> Rect {
+        mining_road()
+            .nodes
+            .iter()
+            .find(|(id, _)| id.ends_with(perk))
+            .unwrap()
+            .1
     }
 
     /// Whether something drawn at height `y` is in the tabs' row above the frame, which the old views' tests
@@ -1287,7 +1023,10 @@ pub(crate) mod tests {
             row.contains(&"minecraft:iron_pickaxe".to_string()),
             "{row:?}"
         );
-        assert_eq!(view, vec!["minecraft:iron_pickaxe"]);
+        assert_eq!(
+            view.first().map(String::as_str),
+            Some("minecraft:iron_pickaxe")
+        );
         assert!(shown(&host).contains(&"minecraft:diamond_pickaxe".to_string()));
     }
 
@@ -1318,37 +1057,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn everything_is_drawn_inside_the_window() {
-        // Given the screen open on Mining's view
-        let _serial = exclusive();
-        let host = screen_open();
-        let window = panel(SIZE);
-
-        // When it is drawn
-        with(|cache| {
-            cache.selected = 1;
-            cache.tab = Tab::Skill(cache.selected);
-        });
-        draw(&host, &mut HudBatch::new([427, 240]), SIZE, AWAY);
-
-        // Then every text and icon lies inside the window
-        for paint in host.painted.borrow().iter() {
-            let (x, y, w, h) = match paint {
-                Paint::Text { text, at, .. } => (at[0], at[1], host.text_width(text), 8.0),
-                Paint::Item { at, .. } if in_tab_row(at[1]) => continue,
-                Paint::Item { at, size, .. } => (at[0], at[1], *size, *size),
-                _ => continue,
-            };
-            let fits = x >= window.x + 3.0
-                && y >= window.y + 3.0
-                && x + w <= window.x + window.w - 3.0
-                && y + h <= window.y + window.h - 3.0;
-            assert!(fits, "{paint:?} leaves {window:?}");
-        }
-    }
-
-    #[test]
-    fn a_row_opens_its_skill_with_perks_and_why_each_is_locked() {
+    fn a_row_opens_its_skills_road() {
         // Given the screen open on Home
         let _serial = exclusive();
         let host = screen_open();
@@ -1357,8 +1066,7 @@ pub(crate) mod tests {
         let flow = click(&host, SIZE, inside(&rows()[1].rect), LEFT_BUTTON);
         let drawn = drawn(&host, AWAY);
 
-        // Then Mining's view is up: its level, its points, the owned perk, the one to unlock, and the one that
-        // needs a higher level
+        // Then Mining's road is up: its level, its points, its raise, and the dock telling of the next perk
         assert_eq!(flow, Flow::Cancel);
         assert_eq!(
             with(|cache| (cache.tab, cache.selected)),
@@ -1367,36 +1075,13 @@ pub(crate) mod tests {
         contains(
             &drawn,
             &[
-                "Mining",
+                "MINING",
                 "Level 12 of 32",
-                "Perk points: 5",
-                "Level up",
-                "Cost: 12 XP levels",
-                "Perks",
-                "Mining sure grip",
-                "On",
+                "\u{25c6} 5 perk points",
+                "Level up \u{b7} 12 XP",
                 "Mining rich seams",
                 "Unlock",
-                "Mining deep veins",
-                "Needs Mining 16",
             ],
-        );
-    }
-
-    #[test]
-    fn the_skill_view_lists_only_what_the_next_levels_unlock() {
-        // Given Mining at 12 with locks labelled at 8 and 16
-        let _serial = exclusive();
-        let host = mining_open();
-
-        // When its view is drawn
-        let drawn = drawn(&host, AWAY);
-
-        // Then only the level still ahead is listed
-        contains(&drawn, &["Next unlocks", "Level 16: Diamond pickaxes"]);
-        assert!(
-            !drawn.iter().any(|t| t.contains("Iron pickaxes")),
-            "{drawn:?}"
         );
     }
 
@@ -1419,42 +1104,6 @@ pub(crate) mod tests {
             .filter(|p| matches!(p, Paint::Fill { rect, argb } if *argb == paint::ARROW && raise.contains(rect[0], rect[1])))
             .count();
         assert!(arrow >= 5, "{arrow}");
-    }
-
-    #[test]
-    fn the_skill_view_shows_how_far_the_next_unlock_is() {
-        // Given Mining at 12, between its unlocks at 8 and 16
-        let _serial = exclusive();
-        let host = mining_open();
-        let bar = mining_view().next_bar;
-
-        // When its view is drawn
-        let drawn = drawn(&host, AWAY);
-
-        // Then a bar beside "Next unlocks" is half full (4 of the 8 levels from 8 to 16) and reads 12/16
-        contains(&drawn, &["Next unlocks", "12/16"]);
-        let inner = bar.shrunk(1.0);
-        let half = [inner.x, inner.y, (inner.w * 0.5).round(), inner.h];
-        let filled = host
-            .painted
-            .borrow()
-            .iter()
-            .any(|p| matches!(p, Paint::Fill { rect, argb } if *rect == half && *argb == paint::BAR_FILL));
-        assert!(filled, "{:?}", host.painted.borrow());
-    }
-
-    #[test]
-    fn a_skill_with_nothing_left_to_unlock_says_so() {
-        // Given Mining past its last labelled lock
-        let _serial = exclusive();
-        let host = mining_open();
-        with(|cache| cache.state.skills.get_mut(MINING).unwrap().level = 20);
-
-        // When its view is drawn
-        let drawn = drawn(&host, AWAY);
-
-        // Then it says nothing more unlocks
-        contains(&drawn, &["Everything here is unlocked."]);
     }
 
     #[test]
@@ -1497,10 +1146,10 @@ pub(crate) mod tests {
         // Given Mining's view, the mouse over its third perk by level (Deep Veins, level 16)
         let _serial = exclusive();
         let host = mining_open();
-        let row = mining_view().rows[2];
+        let deep = node_of("deep_veins");
 
         // When the screen is drawn
-        drawn(&host, inside(&row.rect));
+        drawn(&host, inside(&deep));
 
         // Then one tooltip names it and its skill, then, after a gap, its cost and the level it needs, each marked
         // met or not
@@ -1526,10 +1175,10 @@ pub(crate) mod tests {
             let deep = perks.values_mut().find(|p| p.min_level == 16).unwrap();
             deep.also_needs = [(MELEE.to_string(), 20)].into();
         });
-        let row = mining_view().rows[2];
+        let deep = node_of("deep_veins");
 
         // When the mouse is over it
-        drawn(&host, inside(&row.rect));
+        drawn(&host, inside(&deep));
 
         // Then its tooltip also says it needs Melee 20
         assert_eq!(
@@ -1735,7 +1384,7 @@ pub(crate) mod tests {
         let flow = click(&host, SIZE, inside(&rows()[1].raise), LEFT_BUTTON);
         let still = with(|cache| cache.tab);
         click(&host, SIZE, inside(&rows()[1].rect), LEFT_BUTTON);
-        click(&host, SIZE, inside(&mining_view().raise), LEFT_BUTTON);
+        click(&host, SIZE, inside(&mining_road().raise), LEFT_BUTTON);
         let sent = requests_sent(&mut host);
 
         // Then both clicks are taken and ask the server, and the card's button does not open the skill
@@ -1844,18 +1493,19 @@ pub(crate) mod tests {
         let host = screen_open();
         with(|cache| cache.rules.cost_unit = skills_core::rules::CostUnit::Points);
 
-        // When Home is drawn, then Mining's page
+        // When Home is drawn, then Mining's page with the mouse on its raise
         let home = drawn(&host, AWAY);
         host.drawn.borrow_mut().clear();
         with(|cache| {
             cache.selected = 1;
             cache.tab = Tab::Skill(cache.selected);
         });
-        let page = drawn(&host, AWAY);
+        let page = drawn(&host, inside(&mining_road().raise));
 
-        // Then Mining's row asks 240 and its page says the cost is 240 XP points
+        // Then Mining's row asks 240, its page's raise too, and its tip says the cost is 240 XP points
         contains(&home, &["240"]);
-        contains(&page, &["Cost: 240 XP points"]);
+        contains(&page, &["Level up \u{b7} 240 XP"]);
+        assert!(tooltip(&host).iter().any(|t| t == "Cost: 240 XP points"));
     }
 
     #[test]
@@ -1883,7 +1533,7 @@ pub(crate) mod tests {
         contains(&home, &["50/120"]);
         assert!(!home.iter().any(|t| t == "12"), "{home:?}");
         contains(&page, &["Progress: 50/120"]);
-        assert!(!page.iter().any(|t| t == "Level up"), "{page:?}");
+        assert!(!page.iter().any(|t| t.starts_with("Level up")), "{page:?}");
         assert!(requests_sent(&mut host).is_empty());
     }
 
@@ -1901,7 +1551,7 @@ pub(crate) mod tests {
         let page = drawn(&host, AWAY);
 
         // Then it offers the raise and shows the progress
-        contains(&page, &["Level up", "Progress: 50/120"]);
+        contains(&page, &["Level up \u{b7} 12 XP", "50/120"]);
     }
 
     #[test]
@@ -1921,28 +1571,6 @@ pub(crate) mod tests {
             times: 1,
         });
         assert_eq!(requests_sent(&mut host), vec![melee]);
-    }
-
-    #[test]
-    fn only_a_perk_ready_to_unlock_is_asked_for() {
-        // Given Mining's view: perks by level are Sure Grip (owned), Rich Seams (ready), Deep Veins (level 16)
-        let _serial = exclusive();
-        let mut host = mining_open();
-        let rows = mining_view().rows;
-
-        // When each perk's unlock spot is clicked
-        for row in &rows {
-            click(&host, SIZE, inside(&row.buy), LEFT_BUTTON);
-        }
-
-        // Then the owned one's switch is asked for, the ready one is bought, and the locked one asks nothing
-        let switch_grip = ToServer::Act(Request::SwitchPerk {
-            perk: "reskilled:mining_sure_grip".into(),
-        });
-        let rich_seams = ToServer::Act(Request::BuyPerk {
-            perk: "reskilled:mining_rich_seams".into(),
-        });
-        assert_eq!(requests_sent(&mut host), vec![switch_grip, rich_seams]);
     }
 
     #[test]
@@ -1982,19 +1610,15 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn the_back_button_and_a_right_click_return_to_the_overview() {
-        // Given Mining's view
+    fn a_right_click_returns_home() {
+        // Given Mining's road
         let _serial = exclusive();
         let host = mining_open();
 
-        // When the back button is clicked, the view is opened again, and the right button is pressed anywhere
-        click(&host, SIZE, inside(&mining_view().back), LEFT_BUTTON);
-        let after_back = with(|cache| cache.tab);
-        with(|cache| cache.tab = Tab::Skill(cache.selected));
+        // When the right button is pressed anywhere
         click(&host, SIZE, AWAY, RIGHT_BUTTON);
 
-        // Then both lead back to the overview
-        assert_eq!(after_back, Tab::Home);
+        // Then Home is open
         assert_eq!(with(|cache| cache.tab), Tab::Home);
     }
 
@@ -2090,16 +1714,16 @@ pub(crate) mod tests {
 
     #[test]
     fn an_owned_perk_has_a_switch_and_no_refund() {
-        // Given Mining's view, Sure Grip owned (the first perk)
+        // Given Mining's road, Sure Grip owned and chosen for the dock
         let _serial = exclusive();
         let mut host = mining_open();
-        let grip = mining_view().rows[0];
+        click(&host, SIZE, inside(&node_of("sure_grip")), LEFT_BUTTON);
 
-        // When the view is drawn and its switch is clicked
+        // When the page is drawn and the dock's switch is clicked
         let drawn = drawn(&host, AWAY);
-        click(&host, SIZE, inside(&grip.buy), LEFT_BUTTON);
+        click(&host, SIZE, inside(&mining_road().dock_button), LEFT_BUTTON);
 
-        // Then the row shows "On" and nothing else to click, and the switch is asked for
+        // Then the dock shows "On" and nothing else to click, and the switch is asked for
         contains(&drawn, &["On"]);
         assert!(!drawn.iter().any(|t| t == "Refund" || t == "Area"));
         assert_eq!(
@@ -2124,22 +1748,23 @@ pub(crate) mod tests {
                 .unwrap();
             grip.effects = vec![skills_core::defs::Effect::HomeWard { radius: 24 }];
         });
-        let grip = mining_view().rows[0];
+        let (grip, area) = (node_of("sure_grip"), mining_road().dock_area);
+        click(&host, SIZE, inside(&grip), LEFT_BUTTON);
 
-        // When the view is drawn, its area button is clicked, the view is drawn again, and the button is clicked
-        // once more
-        let before = drawn(&host, inside(&grip.rect));
+        // When the page is drawn, the dock's area button is clicked, the page is drawn again, and the button is
+        // clicked once more
+        let before = drawn(&host, inside(&grip));
         let tip_before = tooltip(&host);
-        click(&host, SIZE, inside(&grip.area), LEFT_BUTTON);
+        click(&host, SIZE, inside(&area), LEFT_BUTTON);
         let shown = with(|cache| cache.settings.shown_areas.clone());
         let tip_after = {
             host.painted.borrow_mut().clear();
-            drawn(&host, inside(&grip.rect));
+            drawn(&host, inside(&grip));
             tooltip(&host)
         };
-        click(&host, SIZE, inside(&grip.area), LEFT_BUTTON);
+        click(&host, SIZE, inside(&area), LEFT_BUTTON);
 
-        // Then the row has an Area button; the first click chooses to see the area (the tooltip says so) and the
+        // Then the dock has an Area button; the first click chooses to see the area (the tooltip says so) and the
         // second stops; nothing is asked of the server
         contains(&before, &["Area", "On"]);
         assert!(
@@ -2159,13 +1784,14 @@ pub(crate) mod tests {
 
     #[test]
     fn a_switched_off_perk_reads_off() {
-        // Given Mining's view, Sure Grip owned and switched off
+        // Given Mining's road, Sure Grip owned, switched off and chosen for the dock
         let _serial = exclusive();
         let host = mining_open();
         with(|cache| {
             let mining = cache.state.skills.get_mut(MINING).unwrap();
             mining.disabled.insert("reskilled:mining_sure_grip".into());
         });
+        click(&host, SIZE, inside(&node_of("sure_grip")), LEFT_BUTTON);
 
         // When it is drawn
         let drawn = drawn(&host, AWAY);
@@ -2180,40 +1806,18 @@ pub(crate) mod tests {
         let _serial = exclusive();
         let mut host = mining_open();
         with(|cache| cache.rules.perk_switches = false);
-        let grip = mining_view().rows[0];
+        click(&host, SIZE, inside(&node_of("sure_grip")), LEFT_BUTTON);
+        let r = mining_road();
 
         // When it is drawn and the switch's spot and the area's are clicked
         let drawn = drawn(&host, AWAY);
-        click(&host, SIZE, inside(&grip.buy), LEFT_BUTTON);
-        click(&host, SIZE, inside(&grip.area), LEFT_BUTTON);
+        click(&host, SIZE, inside(&r.dock_button), LEFT_BUTTON);
+        click(&host, SIZE, inside(&r.dock_area), LEFT_BUTTON);
 
-        // Then the row just says it is owned, and nothing is asked or chosen
-        contains(&drawn, &["Owned"]);
+        // Then the dock just says it is owned, and nothing is asked or chosen
+        contains(&drawn, &["\u{2714} Owned"]);
         assert!(sent_acts(&mut host).is_empty());
         assert!(with(|cache| cache.settings.shown_areas.is_empty()));
-    }
-
-    #[test]
-    fn the_wheel_scrolls_perks_that_do_not_fit() {
-        // Given Mining's view with seven perks, five of which fit
-        let _serial = exclusive();
-        let host = mining_open();
-        with(|cache| {
-            let defs = cache.defs.as_mut().unwrap();
-            for n in 0..4 {
-                let extra = perk(&format!("mining_extra_{n}"), 20 + n, &[]);
-                defs.defs.perks.insert(extra.id.clone(), extra);
-            }
-        });
-
-        // When the wheel turns down three times, then up once
-        let flows = [-1.0, -1.0, -1.0].map(|turn| scroll(&host, turn));
-        let down = with(|cache| cache.first_perk);
-        scroll(&host, 1.0);
-
-        // Then the rows stop at the last that fills the list, and come back up one
-        assert_eq!(flows, [Flow::Cancel; 3]);
-        assert_eq!((down, with(|cache| cache.first_perk)), (2, 1));
     }
 
     #[test]
