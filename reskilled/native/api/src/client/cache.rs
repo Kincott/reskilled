@@ -180,6 +180,8 @@ pub struct ClientCache {
     pub first_tab: usize,
     /// The tab Options returns to.
     pub return_tab: Tab,
+    /// The GUI's size when the screen was last drawn, for the wheel.
+    pub gui_size: [f32; 2],
     /// The first row of skill cards on show, and the first perk row, when there are more than fit.
     pub first_row: usize,
     pub first_perk: usize,

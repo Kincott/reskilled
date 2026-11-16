@@ -146,6 +146,12 @@ pub enum Paint {
         name: String,
         rect: [f32; 4],
     },
+    /// Part `src` (in the texture's own pixels) of one of the game's GUI textures, stretched into `dst`.
+    Part {
+        name: String,
+        src: [f32; 4],
+        dst: [f32; 4],
+    },
     /// The game's menu background over `rect`.
     Background {
         rect: [f32; 4],
@@ -547,6 +553,15 @@ impl Host for TestHost {
             item: item.to_string(),
             at,
             size,
+        });
+        true
+    }
+
+    fn sprite(&self, _batch: &mut HudBatch, name: &str, src: [f32; 4], dst: [f32; 4]) -> bool {
+        self.painted.borrow_mut().push(Paint::Part {
+            name: name.to_string(),
+            src,
+            dst,
         });
         true
     }

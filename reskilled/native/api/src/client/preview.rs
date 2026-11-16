@@ -16,7 +16,7 @@ use skills_core::registry::{SourceFile, build};
 use skills_core::wire::{ClientDefs, client_defs_json};
 
 use super::cache::{Tab, WARNING_TICKS, Warning, with};
-use super::layout::{detail, overview, panel};
+use super::layout::{detail, panel};
 use super::screen::draw;
 use crate::MOD_ID;
 use crate::test_host::{Paint, TestHost, exclusive, mods, spans_of};
@@ -106,6 +106,7 @@ fn player(size: [u32; 2]) -> TestHost {
         cache.defs = Some(shipped());
         cache.state = state;
         cache.xp_levels = Some(23);
+        cache.my_name = Some("Steve".into());
         // A few ticks in, so the mastery glint is on its bar and a twinkle is lit.
         cache.ticks = 9;
     });
@@ -152,9 +153,14 @@ fn save(host: &TestHost, name: &str, size: [u32; 2]) -> Vec<Paint> {
     painted
 }
 
-/// Every text and icon lies inside the window, clear of its frame.
+/// Every text and icon lies inside the old views' window, clear of its frame.
 fn assert_inside_window(host: &TestHost, painted: &[Paint], size: [u32; 2], what: &str) {
     let window = panel([size[0] as f32, size[1] as f32]).shrunk(3.0);
+    assert_inside(host, painted, &window, what);
+}
+
+/// Every text and icon below the tab row lies inside `window`.
+fn assert_inside(host: &TestHost, painted: &[Paint], window: &super::layout::Rect, what: &str) {
     for paint in painted {
         let (x, y, w, h) = match paint {
             Paint::Text { text, at, .. } => (at[0], at[1], host.text_width(text), 8.0),
@@ -190,23 +196,24 @@ fn assert_no_text_overlap(host: &TestHost, painted: &[Paint], what: &str) {
 }
 
 #[test]
-fn the_shipped_overview_fits_the_window() {
+fn the_shipped_home_fits_the_window() {
     for size in [SMALLEST, USUAL] {
         // Given the shipped mod and a player a few hours in
         let _serial = exclusive();
         let host = player(size);
 
-        // When the overview is drawn
-        let painted = scene(&host, &format!("overview_{}", size[0]), size, AWAY);
+        // When Home is drawn
+        let painted = scene(&host, &format!("home_{}", size[0]), size, AWAY);
 
-        // Then its eight skills and three focus areas are all there, inside the window, no text over another
-        let cards = painted
+        // Then its eight skill rows are all there, inside the window's body, no text over another
+        let rows = painted
             .iter()
             .filter(|p| matches!(p, Paint::Item { at, .. } if !crate::client::screen::tests::in_tab_row(at[1])))
             .count();
-        assert_eq!(cards, 8);
-        assert_inside_window(&host, &painted, size, "overview");
-        assert_no_text_overlap(&host, &painted, "overview");
+        assert_eq!(rows, 8);
+        let body = super::window::window([size[0] as f32, size[1] as f32], 8, 0).body;
+        assert_inside(&host, &painted, &body, "home");
+        assert_no_text_overlap(&host, &painted, "home");
     }
 }
 
@@ -254,18 +261,18 @@ fn hovering_shows_one_tooltip() {
             .count()
     };
 
-    // When the mouse is over a card, a raise button, a focus button, and in a skill's view over a perk
-    let o = overview(size, 8, 0, 3);
+    // When the mouse is over a skill's row, its raise button, a focus button, and in a skill's view over a perk
+    let o = with(|cache| {
+        let d = &cache.defs.as_ref().unwrap().defs;
+        let body = super::window::window(size, 8, 0).body;
+        super::home::home(&body, &super::home::groups(d), 0)
+    });
     let over = |r: &super::layout::Rect| [r.x + 3.0, r.y + 3.0];
-    let card = scene(&host, "hover_card", USUAL, over(&o.cards[5].rect));
-    let raise = scene(&host, "hover_raise", USUAL, over(&o.cards[5].raise));
-    let focus = scene(&host, "hover_focus", USUAL, over(&o.focus_buttons[0]));
-    scene(
-        &host,
-        "hover_focus_working",
-        USUAL,
-        over(&o.focus_buttons[2]),
-    );
+    let (_, row, raise_button) = o.rows[1];
+    let card = scene(&host, "hover_row", USUAL, over(&row));
+    let raise = scene(&host, "hover_raise", USUAL, over(&raise_button));
+    let focus = scene(&host, "hover_focus", USUAL, over(&o.headings[0].2.unwrap()));
+    scene(&host, "hover_focus_working", USUAL, over(&o.headings[2].1));
     open_skill("mining");
     let perk = scene(
         &host,

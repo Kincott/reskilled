@@ -111,6 +111,24 @@ def tooltip(canvas, font, spans, at):
             left += font.width(text)
 
 
+def gui_texture(assets, name):
+    """One of the game's GUI textures. The game's atlas holds everything under `textures/gui/`; a name it would not
+    find stops the preview, as the game would draw nothing."""
+    file = assets / "textures" / f"{name}.png"
+    if not name.startswith("gui/") or not file.exists():
+        raise SystemExit(f"no texture {name!r} in the game's GUI atlas ({file})")
+    return file
+
+
+def part(canvas, assets, name, src, dst):
+    """Part `src` of a GUI texture stretched into `dst`, as the mod's `sprite` call draws it."""
+    picture = Image.open(gui_texture(assets, name)).convert("RGBA")
+    sx, sy, sw, sh = (round(v) for v in src)
+    x, y, w, h = (round(v) for v in dst)
+    if w > 0 and h > 0 and sw > 0 and sh > 0:
+        canvas.alpha_composite(scaled(picture.crop((sx, sy, sx + sw, sy + sh)), (w, h)), (x, y))
+
+
 def nine_slice(canvas, assets, name, rect):
     """A GUI atlas sprite (`gui/sprites/widget/button`) over `rect` as the game draws it: corners at their size,
     edges and middle tiled. A name the game's atlas would not find stops the preview, as the game would draw
@@ -179,6 +197,8 @@ def render(scene, font, assets):
             fill(canvas, paint["rect"], 0xC0101010)
         elif kind == "sprite":
             nine_slice(canvas, assets, paint["name"], paint["rect"])
+        elif kind == "part":
+            part(canvas, assets, paint["name"], paint["src"], paint["dst"])
         elif kind == "tooltip":
             tooltip(canvas, font, paint["spans"], paint["at"])
     return scaled(canvas, (canvas.width * SCALE, canvas.height * SCALE))

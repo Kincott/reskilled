@@ -20,7 +20,6 @@ pub const INSET: u32 = 0xFF12_1419;
 pub const BAR_FILL: u32 = 0xFF5F_C63A;
 pub const BAR_FULL: u32 = 0xFFF2_C14E;
 pub const ALERT: u32 = 0xFFD9_453A;
-pub const WHITE_ARGB: u32 = 0xFFE8_ECF2;
 /// RGB text colours.
 pub const WHITE: u32 = 0xFF_FFFF;
 pub const GRAY: u32 = 0xA8_ADB8;
@@ -388,15 +387,32 @@ pub fn crown(host: &dyn Host, batch: &mut HudBatch, at: [f32; 2]) {
     });
 }
 
-/// A mastered card's warm body.
-pub const MASTER_CARD: u32 = 0xFF33_2B1D;
+/// Vanilla's stone advancement backdrop, its tile side, and the shade laid over it.
+const STONE: &str = "gui/advancements/backgrounds/stone";
+const STONE_TILE: f32 = 16.0;
+const STONE_SHADE: u32 = 0x9E0B_0C10;
+
+/// Fills `r` with vanilla's stone advancement backdrop, darkened; tiles at its right and bottom edge are cut.
+pub fn stone(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
+    let mut y = r.y;
+    while y < r.y + r.h {
+        let h = STONE_TILE.min(r.y + r.h - y);
+        let mut x = r.x;
+        while x < r.x + r.w {
+            let w = STONE_TILE.min(r.x + r.w - x);
+            host.sprite(batch, STONE, [0.0, 0.0, w, h], [x, y, w, h]);
+            x += STONE_TILE;
+        }
+        y += STONE_TILE;
+    }
+    fill(host, batch, r, STONE_SHADE);
+}
 /// The bright core of the glint that runs along a mastered bar, and its softer edges.
 pub const GLINT: u32 = 0xFFFF_FBEA;
 const GLINT_HALO: u32 = 0x99FF_F2C4;
 const BAR_GOLD_LIGHT: u32 = 0xFFFF_E79A;
 const BAR_GOLD_DARK: u32 = 0xFFB3_7F22;
 const PLAQUE: u32 = 0xFF4A_3A1B;
-const SPARK: u32 = 0x00FF_F6D2;
 
 /// A full bar in bevelled gold, with a glint `along` of the way (0 to 1) through its run. The glint enters from the
 /// left, crosses, and leaves on the right, so for part of the run none shows.
@@ -431,49 +447,10 @@ pub fn mastered_bar(host: &dyn Host, batch: &mut HudBatch, r: &Rect, along: f32)
     }
 }
 
-/// Small gold brackets in the four corners just inside `r`, each with a bright tip.
-pub fn corner_brackets(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
-    const ARM: f32 = 4.0;
-    let (left, top) = (r.x + 2.0, r.y + 2.0);
-    let (right, bottom) = (r.x + r.w - 3.0, r.y + r.h - 3.0);
-    for (x, y, dx, dy) in [
-        (left, top, 1.0, 1.0),
-        (right, top, -1.0, 1.0),
-        (left, bottom, 1.0, -1.0),
-        (right, bottom, -1.0, -1.0),
-    ] {
-        let along_x = if dx > 0.0 { x } else { x - ARM + 1.0 };
-        let along_y = if dy > 0.0 { y } else { y - ARM + 1.0 };
-        host.fill(batch, [along_x, y, ARM, 1.0], FRAME);
-        host.fill(batch, [x, along_y, 1.0, ARM], FRAME);
-        host.fill(batch, [x, y, 1.0, 1.0], BAR_GOLD_LIGHT);
-    }
-}
-
 /// A raised gold plaque, for a label of honour.
 pub fn plaque(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
     fill(host, batch, r, OUTLINE);
     let inner = r.shrunk(1.0);
     fill(host, batch, &inner, PLAQUE);
     bevel(host, batch, &inner, FRAME_LIGHT, FRAME_DARK);
-}
-
-/// A four-pointed twinkle centred on `at`, `strength` (0 to 1) bright.
-pub fn sparkle(host: &dyn Host, batch: &mut HudBatch, at: [f32; 2], strength: f32) {
-    let alpha = |a: f32| ((a * strength.clamp(0.0, 1.0) * 255.0) as u32) << 24 | SPARK;
-    if strength <= 0.05 {
-        return;
-    }
-    let [x, y] = at;
-    host.fill(batch, [x, y, 1.0, 1.0], alpha(1.0));
-    host.fill(batch, [x - 1.0, y, 1.0, 1.0], alpha(0.7));
-    host.fill(batch, [x + 1.0, y, 1.0, 1.0], alpha(0.7));
-    host.fill(batch, [x, y - 1.0, 1.0, 1.0], alpha(0.7));
-    host.fill(batch, [x, y + 1.0, 1.0, 1.0], alpha(0.7));
-    if strength > 0.6 {
-        host.fill(batch, [x - 2.0, y, 1.0, 1.0], alpha(0.3));
-        host.fill(batch, [x + 2.0, y, 1.0, 1.0], alpha(0.3));
-        host.fill(batch, [x, y - 2.0, 1.0, 1.0], alpha(0.3));
-        host.fill(batch, [x, y + 2.0, 1.0, 1.0], alpha(0.3));
-    }
 }

@@ -14,25 +14,23 @@ use skills_core::wire::{ClientDefs, ToServer};
 
 use super::cache::{CLICK_SOUND, ClientCache, Tab, with};
 use super::layout::{
-    Button, Card, Detail, GEAR_ROOM, HEADER_H, PerkRow, Rect, Scroll, detail, hit_detail,
-    hit_overview, last_first_perk, last_first_row, overview, panel,
+    Button, Detail, HEADER_H, PerkRow, Rect, Scroll, detail, hit_detail, last_first_perk, panel,
 };
 use super::paint::{self, DIM, GOLD, GRAY, GREEN, Look, RED, WHITE};
 use crate::MOD_ID;
 use crate::text::{
-    ALL_UNLOCKED, AREA, AREA_HIDDEN, AREA_SHOWN, AT_TOP, BACK, COST, COST_POINTS, FOCUS,
-    FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE, FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED,
-    MISSING_PERK, NEEDS, NEXT_UNLOCKS, NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_OF,
-    PERK_POINTS, PERKS, PROGRESS, RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT,
-    RAISE_TO, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
-    REWARD_TRAVEL, SETTINGS, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, UNLOCK, VAL_OFF, VAL_ON,
-    WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say, skill_name,
+    ALL_UNLOCKED, AREA, AREA_HIDDEN, AREA_SHOWN, AT_TOP, BACK, COST, COST_POINTS, FOCUS_ACTIVE,
+    FOCUS_ADD, FOCUS_ADD_FREE, FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK,
+    NEEDS, NEXT_UNLOCKS, NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_OF, PERK_POINTS,
+    PERKS, PROGRESS, RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT, RAISE_TO,
+    REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
+    REWARD_TRAVEL, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, UNLOCK, VAL_OFF, VAL_ON, WAITING, XP,
+    focus_name, label_name, number, perk_description, perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
 pub const LEFT_BUTTON: i32 = 0;
 pub const RIGHT_BUTTON: i32 = 1;
-const ICON: f32 = 16.0;
 /// Raises one Shift-click asks for.
 const SHIFT_RAISES: u32 = 5;
 const BIG_ICON: f32 = 32.0;
@@ -41,12 +39,8 @@ const HEADER_TEXT: f32 = 7.0;
 const MARGIN: f32 = 8.0;
 /// Where a skill's name starts in the skill view's header, after the back button.
 const NAME_AFTER_BACK: f32 = 26.0;
-/// A card shows at most this many perk points as diamonds.
-const MOST_POINTS: usize = 8;
 /// The glint on a mastered bar runs once every this many ticks, and the twinkles pulse at the same pace.
 const SHINE_TICKS: f64 = 60.0;
-/// Laid over the cards of skills outside the focus area under the mouse.
-const FADED: u32 = 0xA014_161C;
 /// A perk's description wraps at this width in its tooltip.
 const TIP_WIDTH: f32 = 190.0;
 /// The unlock preview's heading takes 10 pixels, each line 9; two lines fit.
@@ -62,13 +56,13 @@ enum PerkStatus {
 }
 
 /// The selected skill's perks, by the level they need, then id.
-fn perks_of<'a>(defs: &'a Defs, skill: &str) -> Vec<&'a PerkDef> {
+pub(super) fn perks_of<'a>(defs: &'a Defs, skill: &str) -> Vec<&'a PerkDef> {
     let mut perks: Vec<&PerkDef> = defs.perks.values().filter(|p| p.skill == skill).collect();
     perks.sort_by(|a, b| (a.min_level, &a.id).cmp(&(b.min_level, &b.id)));
     perks
 }
 
-fn owns(state: &PlayerState, perk: &str) -> bool {
+pub(super) fn owns(state: &PlayerState, perk: &str) -> bool {
     state.skills.values().any(|p| p.perks.contains(perk))
 }
 
@@ -97,7 +91,6 @@ struct Shown<'a> {
     skills: Vec<&'a String>,
     selected: usize,
     perks: Vec<&'a PerkDef>,
-    focus: Vec<&'a String>,
 }
 
 fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
@@ -111,12 +104,11 @@ fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
         skills,
         selected,
         perks,
-        focus: defs.defs.focus.keys().collect(),
     }
 }
 
 /// Progress earned by doing toward the skill's next level, in actions: what is earned and what the level takes.
-fn earned_of(d: &Defs, state: &PlayerState, skill: &str) -> Option<(u32, u32)> {
+pub(super) fn earned_of(d: &Defs, state: &PlayerState, skill: &str) -> Option<(u32, u32)> {
     let need = earn_threshold(d, state, skill)?;
     let have = state.skills.get(skill).map_or(0, |p| p.earned);
     Some((have / HUNDREDTHS, need / HUNDREDTHS))
@@ -125,7 +117,13 @@ fn earned_of(d: &Defs, state: &PlayerState, skill: &str) -> Option<(u32, u32)> {
 /// Earned progress is kept in hundredths of an action.
 const HUNDREDTHS: u32 = 100;
 
-fn can_raise(d: &Defs, rules: &Rules, state: &PlayerState, xp: Option<u32>, skill: &str) -> bool {
+pub(super) fn can_raise(
+    d: &Defs,
+    rules: &Rules,
+    state: &PlayerState,
+    xp: Option<u32>,
+    skill: &str,
+) -> bool {
     if !rules.buying() {
         return false;
     }
@@ -137,7 +135,7 @@ fn can_raise(d: &Defs, rules: &Rules, state: &PlayerState, xp: Option<u32>, skil
 }
 
 /// What the next raise of the skill costs, in the rules' unit: XP levels, or XP points.
-fn price(d: &Defs, rules: &Rules, state: &PlayerState, skill: &str) -> Option<u32> {
+pub(super) fn price(d: &Defs, rules: &Rules, state: &PlayerState, skill: &str) -> Option<u32> {
     let cost = raise_cost(d, state, skill)?;
     Some(match rules.cost_unit {
         CostUnit::Levels => cost,
@@ -155,41 +153,41 @@ fn cost_line(rules: &Rules, price: u32) -> Text {
 }
 
 /// What a draw needs: where to draw, where the mouse is, and what the player has.
-struct Pen<'a> {
-    host: &'a dyn Host,
-    batch: &'a mut HudBatch,
-    mouse: [f32; 2],
-    d: &'a Defs,
-    state: &'a PlayerState,
-    xp: Option<u32>,
+pub(super) struct Pen<'a> {
+    pub(super) host: &'a dyn Host,
+    pub(super) batch: &'a mut HudBatch,
+    pub(super) mouse: [f32; 2],
+    pub(super) d: &'a Defs,
+    pub(super) state: &'a PlayerState,
+    pub(super) xp: Option<u32>,
     /// The tooltip to draw last, over everything.
-    tip: Option<Vec<Text>>,
+    pub(super) tip: Option<Vec<Text>>,
     /// Client ticks run, for the mastery glint and twinkles.
-    ticks: u64,
+    pub(super) ticks: u64,
     /// The server's rules: whether perks may be switched, how raises are paid.
-    rules: &'a Rules,
+    pub(super) rules: &'a Rules,
     /// The perks whose area the player chose to see in the world.
-    shown_areas: &'a std::collections::BTreeSet<String>,
+    pub(super) shown_areas: &'a std::collections::BTreeSet<String>,
 }
 
 impl Pen<'_> {
-    fn over(&self, r: &Rect) -> bool {
+    pub(super) fn over(&self, r: &Rect) -> bool {
         r.contains(self.mouse[0], self.mouse[1])
     }
 
-    fn text(&mut self, text: &str, x: f32, y: f32, rgb: u32) {
+    pub(super) fn text(&mut self, text: &str, x: f32, y: f32, rgb: u32) {
         self.host.text(self.batch, text, [x, y], rgb, true);
     }
 
-    fn text_right(&mut self, text: &str, right: f32, y: f32, rgb: u32) {
+    pub(super) fn text_right(&mut self, text: &str, right: f32, y: f32, rgb: u32) {
         paint::text_right(self.host, self.batch, text, right, y, rgb);
     }
 
-    fn fill(&mut self, r: &Rect, argb: u32) {
+    pub(super) fn fill(&mut self, r: &Rect, argb: u32) {
         paint::fill(self.host, self.batch, r, argb);
     }
 
-    fn button(&mut self, r: &Rect, label: &str, look: Look) {
+    pub(super) fn button(&mut self, r: &Rect, label: &str, look: Look) {
         let hover = self.over(r);
         paint::button(self.host, self.batch, r, label, look, hover);
     }
@@ -204,7 +202,7 @@ impl Pen<'_> {
         (ticks.rem_euclid(SHINE_TICKS) / SHINE_TICKS) as f32
     }
 
-    fn width(&self, text: &str) -> f32 {
+    pub(super) fn width(&self, text: &str) -> f32 {
         self.host.text_width(text)
     }
 
@@ -220,7 +218,7 @@ impl Pen<'_> {
         }
     }
 
-    fn scroll(&mut self, scroll: Option<Scroll>) {
+    pub(super) fn scroll(&mut self, scroll: Option<Scroll>) {
         if let Some(scroll) = scroll {
             self.fill(&scroll.track, paint::INSET);
             self.fill(&scroll.thumb, paint::FRAME);
@@ -291,6 +289,7 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
     }
     host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);
     with(|cache| {
+        cache.gui_size = size;
         let w = window_now(size, cache);
         super::window::draw_window(
             host,
@@ -334,7 +333,12 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
         };
         let shown = shown(defs, cache.selected);
         match cache.tab {
-            Tab::Home => draw_overview(&mut pen, size, cache, &shown),
+            Tab::Home => {
+                let body = window_now(size, cache).body;
+                let groups = super::home::groups(&defs.defs);
+                let l = super::home::home(&body, &groups, cache.first_row);
+                super::home::draw(&mut pen, &l, &shown.skills, cache.my_name.as_deref());
+            }
             Tab::Skill(_) => draw_skill(&mut pen, size, cache, defs, &shown),
             Tab::Options => {}
         }
@@ -342,165 +346,6 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
             host.gui_tooltip(pen.batch, &lines, mouse);
         }
     });
-}
-
-fn draw_overview(pen: &mut Pen<'_>, size: [f32; 2], cache: &ClientCache, shown: &Shown<'_>) {
-    let o = overview(size, shown.skills.len(), cache.first_row, shown.focus.len());
-    pen.window(&o.panel, &say(&TITLE, &[]).plain(), MARGIN, GEAR_ROOM);
-    pen.button(&o.gear, "", Look::Plain);
-    paint::gear(
-        pen.host,
-        pen.batch,
-        [o.gear.x + 3.0, o.gear.y + 3.0],
-        paint::WHITE_ARGB,
-    );
-    if pen.over(&o.gear) {
-        pen.tip = Some(vec![say(&SETTINGS, &[]).with_color(WHITE)]);
-    }
-    let hovered = shown
-        .focus
-        .iter()
-        .zip(&o.focus_buttons)
-        .find(|(_, button)| pen.over(button));
-    let marked = hovered.and_then(|(focus, _)| pen.d.focus.get(focus.as_str()));
-    for card in &o.cards {
-        let skill = shown.skills[card.index];
-        draw_card(pen, card, skill);
-        match marked {
-            Some(focus) if focus.skills.iter().any(|s| s == skill) => {
-                paint::edge(pen.host, pen.batch, &card.rect, paint::FRAME_LIGHT);
-                paint::edge(pen.host, pen.batch, &card.rect.shrunk(1.0), paint::FRAME);
-            }
-            Some(_) => pen.fill(&card.rect, FADED),
-            None => {}
-        }
-    }
-    if let Some(first) = o.focus_buttons.first() {
-        let label = say(&FOCUS, &[]).plain();
-        pen.text(&label, o.panel.x + MARGIN, first.y + 5.0, GRAY);
-    }
-    for (focus, button) in shown.focus.iter().zip(&o.focus_buttons) {
-        let current = pen.state.focus.contains(focus.as_str());
-        let name = paint::fitted(pen.host, &focus_name(pen.d, focus).plain(), button.w - 6.0);
-        pen.button(button, &name, if current { Look::Go } else { Look::Plain });
-        if pen.over(button) {
-            pen.tip = Some(focus_tip(pen, focus, current));
-        }
-    }
-    pen.scroll(o.scroll);
-}
-
-fn draw_card(pen: &mut Pen<'_>, card: &Card, skill: &str) {
-    let (d, state) = (pen.d, pen.state);
-    let hover = pen.over(&card.rect);
-    let body = match (mastered(d, state, skill), hover) {
-        (true, _) => paint::MASTER_CARD,
-        (false, true) => paint::CARD_HOVER,
-        (false, false) => paint::CARD,
-    };
-    pen.fill(&card.rect, body);
-    let rim = if hover {
-        paint::FRAME
-    } else {
-        paint::CARD_EDGE
-    };
-    paint::edge(pen.host, pen.batch, &card.rect, rim);
-    paint::slot(pen.host, pen.batch, &card.slot);
-    if let Some(icon) = d.skill(skill).map(|s| s.icon_at(level(state, d, skill))) {
-        pen.host.item(
-            pen.batch,
-            icon,
-            [card.slot.x + 2.0, card.slot.y + 2.0],
-            ICON,
-        );
-    }
-    let (now, most) = (level(state, d, skill), d.max_level(skill));
-    let levels = say(&LEVEL, &[number(now), number(most)]).plain();
-    let right = card.rect.x + card.rect.w - 6.0;
-    let top = card.rect.y + 5.0;
-    pen.text_right(&levels, right, top, if now >= most { GOLD } else { GRAY });
-    let room = right - pen.width(&levels) - 4.0 - card.bar.x;
-    let name = paint::fitted(pen.host, &skill_name(d, skill).plain(), room);
-    pen.text(&name, card.bar.x, top, WHITE);
-    if mastered(d, state, skill) {
-        let along = pen.sweep();
-        paint::mastered_bar(pen.host, pen.batch, &card.bar, along);
-    } else {
-        paint::bar(pen.host, pen.batch, &card.bar, now, most);
-    }
-    let points = points_available(d, state, skill) as usize;
-    if !mastered(d, state, skill) {
-        let diamonds = paint::POINT.repeat(points.min(MOST_POINTS));
-        pen.text(&diamonds, card.bar.x, card.bar.y + 7.0, GOLD);
-    }
-    if !pen.rules.buying() {
-        if let Some((have, need)) = earned_of(d, state, skill) {
-            let line = say(&LEVEL, &[number(have), number(need)]).plain();
-            paint::text_centred(pen.host, pen.batch, &line, &card.raise, GRAY);
-        }
-    } else if let Some(cost) = price(d, pen.rules, state, skill) {
-        let look = if can_raise(d, pen.rules, state, pen.xp, skill) {
-            Look::Go
-        } else {
-            Look::Off
-        };
-        let hover = pen.over(&card.raise);
-        paint::arrow_button(
-            pen.host,
-            pen.batch,
-            &card.raise,
-            &cost.to_string(),
-            look,
-            hover,
-        );
-    }
-    if mastered(d, state, skill) {
-        draw_mastery(pen, card);
-    }
-    if hover {
-        pen.tip = Some(if pen.over(&card.raise) {
-            raise_tip(pen, skill)
-        } else {
-            skill_tip(pen, skill)
-        });
-    }
-}
-
-/// What a mastered skill's card wears: a gold frame with brackets in its corners, two twinkles that take turns,
-/// and the crown with "Mastered" where its raise button was.
-fn draw_mastery(pen: &mut Pen<'_>, card: &Card) {
-    let along = pen.sweep();
-    paint::edge(pen.host, pen.batch, &card.rect, paint::FRAME_LIGHT);
-    paint::edge(
-        pen.host,
-        pen.batch,
-        &card.rect.shrunk(1.0),
-        paint::FRAME_DARK,
-    );
-    paint::corner_brackets(pen.host, pen.batch, &card.rect);
-    let twinkle = |phase: f32| (std::f32::consts::TAU * (along + phase)).sin().max(0.0);
-    let right = card.rect.x + card.rect.w - 9.0;
-    paint::sparkle(
-        pen.host,
-        pen.batch,
-        [right, card.rect.y + card.rect.h - 9.0],
-        twinkle(0.0),
-    );
-    paint::sparkle(
-        pen.host,
-        pen.batch,
-        [right - 14.0, card.bar.y + 8.0],
-        twinkle(0.5),
-    );
-    let label_y = card.bar.y + 6.0;
-    paint::crown(pen.host, pen.batch, [card.bar.x, label_y]);
-    let label = say(&MASTERED, &[]).plain();
-    pen.text(
-        &label,
-        card.bar.x + paint::CROWN_SIZE[0] + 2.0,
-        label_y,
-        GOLD,
-    );
 }
 
 /// A mastered skill's page: a gold plaque with the crown and "Mastered" where the raise button was.
@@ -539,7 +384,7 @@ fn raises_price(
     Some((own_level(&outcome.state, d, skill), price))
 }
 
-fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
+pub(super) fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
     let Some(cost) = price(d, pen.rules, state, skill) else {
         return vec![say(&AT_TOP, &[]).with_color(GOLD)];
@@ -587,7 +432,7 @@ fn raise_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     ]
 }
 
-fn skill_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
+pub(super) fn skill_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
     let levels = [number(level(state, d, skill)), number(d.max_level(skill))];
     let points = points_available(d, state, skill);
@@ -608,7 +453,7 @@ fn skill_tip(pen: &Pen<'_>, skill: &str) -> Vec<Text> {
 }
 
 /// A focus area's tooltip: its name, each task it gives XP for (once), and what a click does.
-fn focus_tip(pen: &Pen<'_>, focus: &str, active: bool) -> Vec<Text> {
+pub(super) fn focus_tip(pen: &Pen<'_>, focus: &str, active: bool) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
     let rewards = d
         .focus
@@ -1003,12 +848,11 @@ fn draw_preview(pen: &mut Pen<'_>, defs: &ClientDefs, now: u32, skill: &str, vie
 }
 
 /// What a click on the screen leads to.
-enum Outcome {
+pub(super) enum Outcome {
     Nothing,
     Ask(Request),
     Open(usize),
     Back,
-    OpenSettings,
     /// Show the owned perk's area in the world, or stop.
     ToggleArea(String),
 }
@@ -1040,7 +884,6 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
                 cache.tab = Tab::Skill(cache.selected);
             }
             Outcome::Back => cache.tab = Tab::Home,
-            Outcome::OpenSettings => open_tab(cache, Tab::Options),
             Outcome::ToggleArea(perk) => {
                 let shown = &mut cache.settings.shown_areas;
                 if !shown.remove(&perk) {
@@ -1094,8 +937,10 @@ fn outcome(
     let hit = match (cache.tab, button) {
         (Tab::Skill(_), RIGHT_BUTTON) => Some(Button::Back),
         (Tab::Home, LEFT_BUTTON) => {
-            let o = overview(size, shown.skills.len(), cache.first_row, shown.focus.len());
-            hit_overview(&o, at[0], at[1])
+            let body = window_now(size, cache).body;
+            let groups = super::home::groups(d);
+            let l = super::home::home(&body, &groups, cache.first_row);
+            return super::home::click(cache, d, &l, &shown.skills, at, times);
         }
         (Tab::Skill(_), LEFT_BUTTON) => {
             let view = detail(size, shown.perks.len(), cache.first_perk);
@@ -1104,20 +949,8 @@ fn outcome(
         _ => None,
     };
     match hit {
-        Some(Button::Open(skill)) => Outcome::Open(skill),
         Some(Button::Back) => Outcome::Back,
-        Some(Button::Settings) => Outcome::OpenSettings,
-        Some(Button::Raise(skill)) => raise(shown.skills.get(skill)),
         Some(Button::RaiseShown) => raise(shown.skills.get(shown.selected)),
-        Some(Button::SetFocus(focus)) => match shown.focus.get(focus) {
-            Some(focus) if state.focus.contains(focus.as_str()) => Outcome::Nothing,
-            Some(focus) if xp.is_some_and(|xp| xp >= focus_cost(d, state)) => {
-                Outcome::Ask(Request::AddFocus {
-                    focus: (*focus).clone(),
-                })
-            }
-            _ => Outcome::Nothing,
-        },
         Some(Button::BuyPerk(perk)) => match shown.perks.get(perk) {
             Some(perk) if matches!(status(d, state, perk), PerkStatus::Buyable) => {
                 Outcome::Ask(Request::BuyPerk {
@@ -1149,7 +982,7 @@ pub fn scroll(host: &dyn Host, amount: f64) -> Flow {
     with(|cache| {
         let Some(defs) = &cache.defs else { return };
         let shown = shown(defs, cache.selected);
-        let (skills, perks) = (shown.skills.len(), shown.perks.len());
+        let perks = shown.perks.len();
         let stepped = |now: usize, last: usize| {
             if amount > 0.0 {
                 now.min(last).saturating_sub(1)
@@ -1160,7 +993,16 @@ pub fn scroll(host: &dyn Host, amount: f64) -> Flow {
             }
         };
         match cache.tab {
-            Tab::Home => cache.first_row = stepped(cache.first_row, last_first_row(skills)),
+            Tab::Home => {
+                let size = if cache.gui_size[0] > 0.0 {
+                    cache.gui_size
+                } else {
+                    [427.0, 240.0]
+                };
+                let body = window_now(size, cache).body;
+                let last = super::home::last_first(&body, &super::home::groups(&defs.defs));
+                cache.first_row = stepped(cache.first_row, last);
+            }
             Tab::Skill(_) => cache.first_perk = stepped(cache.first_perk, last_first_perk(perks)),
             Tab::Options => {}
         }
@@ -1191,7 +1033,7 @@ pub(crate) mod tests {
     /// Nowhere near anything.
     const AWAY: [f32; 2] = [1.0, 1.0];
 
-    fn skill(id: &str) -> SkillDef {
+    pub(crate) fn skill(id: &str) -> SkillDef {
         let path = id.split_once(':').unwrap().1;
         SkillDef {
             id: id.into(),
@@ -1207,7 +1049,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn perk(path: &str, min_level: u32, requires: &[&str]) -> PerkDef {
+    pub(crate) fn perk(path: &str, min_level: u32, requires: &[&str]) -> PerkDef {
         PerkDef {
             id: format!("reskilled:{path}"),
             priority: 0,
@@ -1223,7 +1065,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn focus(id: &str, skills: &[&str]) -> (String, FocusDef) {
+    pub(crate) fn focus(id: &str, skills: &[&str]) -> (String, FocusDef) {
         let path = id.split_once(':').unwrap().1;
         let def = FocusDef {
             id: id.into(),
@@ -1237,7 +1079,7 @@ pub(crate) mod tests {
 
     /// Melee and Mining; Mining perks Sure Grip (owned), Deep Veins (level 16) and Rich Seams (buyable); focus areas
     /// Fighting (Melee) and Working (Mining, the player's); the player at Mining 12 with 1 point spent and 23 XP
-    /// levels, on the overview.
+    /// levels, on Home.
     fn screen_open() -> TestHost {
         let defs = Defs {
             skills: [(MINING.into(), skill(MINING)), (MELEE.into(), skill(MELEE))].into(),
@@ -1328,8 +1170,48 @@ pub(crate) mod tests {
             .collect()
     }
 
-    fn cards() -> Vec<Card> {
-        overview(SIZE, 2, 0, 2).cards
+    /// A skill's row on Home and its raise button.
+    #[derive(Debug, Clone, Copy)]
+    struct Row {
+        rect: Rect,
+        raise: Rect,
+    }
+
+    fn home_now() -> super::super::home::HomeLayout {
+        with(|cache| {
+            let d = &cache.defs.as_ref().unwrap().defs;
+            let body = super::super::window::window(SIZE, d.skills.len(), 0).body;
+            super::super::home::home(&body, &super::super::home::groups(d), 0)
+        })
+    }
+
+    /// Each skill's row on Home, by the skill's place in id order.
+    fn rows() -> Vec<Row> {
+        let l = home_now();
+        let mut rows: Vec<(usize, Row)> = l
+            .rows
+            .iter()
+            .map(|(i, rect, raise)| {
+                (
+                    *i,
+                    Row {
+                        rect: *rect,
+                        raise: *raise,
+                    },
+                )
+            })
+            .collect();
+        rows.sort_by_key(|(i, _)| *i);
+        rows.into_iter().map(|(_, row)| row).collect()
+    }
+
+    /// The focus areas' buttons on Home, in id order (an active area's spot takes no click).
+    fn focus_buttons() -> Vec<Rect> {
+        home_now()
+            .headings
+            .iter()
+            .filter_map(|(.., b)| *b)
+            .collect()
     }
 
     fn mining_view() -> Detail {
@@ -1350,44 +1232,6 @@ pub(crate) mod tests {
         for text in expected {
             assert!(drawn.iter().any(|t| t == text), "{text:?} not in {drawn:?}");
         }
-    }
-
-    #[test]
-    fn the_overview_shows_a_card_for_each_skill() {
-        // Given the screen open on the overview
-        let _serial = exclusive();
-        let host = screen_open();
-
-        // When it is drawn
-        let drawn = drawn(&host, AWAY);
-
-        // Then the header shows the XP levels, each skill its level and raise cost, Mining its perk points as
-        // diamonds, each focus area its button, and each skill its icon
-        contains(
-            &drawn,
-            &[
-                "Reskilled",
-                "XP levels: 23",
-                "Melee",
-                "1/32",
-                "1",
-                "Mining",
-                "12/32",
-                "12",
-                "\u{25C6}\u{25C6}\u{25C6}\u{25C6}\u{25C6}",
-                "Focus",
-                "Fighting",
-                "Working",
-            ],
-        );
-        let cards = host
-            .icons
-            .borrow()
-            .iter()
-            .filter(|(_, at)| !in_tab_row(at[1]))
-            .count();
-        assert_eq!(cards, 2);
-        assert_eq!(tooltip(&host), Vec::<String>::new());
     }
 
     #[test]
@@ -1421,9 +1265,9 @@ pub(crate) mod tests {
                 .collect()
         };
 
-        // When the overview is drawn, then Mining's own view, then the overview again at level 16
+        // When Home is drawn, then Mining's own view, then Home again at level 16
         drawn(&host, AWAY);
-        let card = shown(&host);
+        let row = shown(&host);
         host.icons.borrow_mut().clear();
         with(|cache| {
             cache.selected = 1;
@@ -1438,10 +1282,10 @@ pub(crate) mod tests {
         });
         drawn(&host, AWAY);
 
-        // Then the card and the view show the iron pickaxe, and the diamond one once Mining reaches 16
+        // Then the row and the view show the iron pickaxe, and the diamond one once Mining reaches 16
         assert!(
-            card.contains(&"minecraft:iron_pickaxe".to_string()),
-            "{card:?}"
+            row.contains(&"minecraft:iron_pickaxe".to_string()),
+            "{row:?}"
         );
         assert_eq!(view, vec!["minecraft:iron_pickaxe"]);
         assert!(shown(&host).contains(&"minecraft:diamond_pickaxe".to_string()));
@@ -1456,115 +1300,6 @@ pub(crate) mod tests {
             };
             cache.state.skills.insert(MELEE.into(), progress);
         });
-    }
-
-    #[test]
-    fn a_mastered_skill_wears_gold_a_crown_and_says_so() {
-        // Given Melee mastered and Mining not
-        let _serial = exclusive();
-        let host = screen_open();
-        melee_mastered();
-        let [melee, mining] = [cards()[0], cards()[1]];
-
-        // When the overview is drawn
-        let drawn = drawn(&host, AWAY);
-        let painted = host.painted.borrow().clone();
-
-        // Then Melee's card has a warm body in a gold frame, and "Mastered" with the crown just before it, inside
-        // the card; Mining's has none of these
-        let filled = |r: Rect, colour: u32| {
-            painted.iter().any(|p| matches!(p, Paint::Fill { rect, argb } if *rect == r.array() && *argb == colour))
-        };
-        let gold_top = |r: Rect| {
-            let top = [r.x, r.y, r.w, 1.0];
-            painted.iter().any(|p| matches!(p, Paint::Fill { rect, argb } if *rect == top && *argb == paint::FRAME_LIGHT))
-        };
-        let crown_in = |r: Rect| {
-            painted
-                .iter()
-                .filter_map(|p| match p {
-                    Paint::Fill { rect, argb }
-                        if *argb == paint::CROWN && r.contains(rect[0], rect[1]) =>
-                    {
-                        Some(rect[0])
-                    }
-                    _ => None,
-                })
-                .fold(None, |most: Option<f32>, x| {
-                    Some(most.map_or(x, |m| m.max(x)))
-                })
-        };
-        assert!(filled(melee.rect, paint::MASTER_CARD) && !filled(mining.rect, paint::MASTER_CARD));
-        assert!(gold_top(melee.rect) && !gold_top(mining.rect));
-        assert!(crown_in(melee.slot).is_none(), "the crown left the icon");
-        assert_eq!(drawn.iter().filter(|t| *t == "Mastered").count(), 1);
-        let label = painted.iter().find_map(|p| match p {
-            Paint::Text { text, at, .. } if text == "Mastered" => Some(*at),
-            _ => None,
-        });
-        let [x, y] = label.unwrap();
-        let inside = x >= melee.rect.x
-            && y >= melee.rect.y
-            && x + host.text_width("Mastered") <= melee.rect.x + melee.rect.w - 3.0
-            && y + 8.0 <= melee.rect.y + melee.rect.h - 3.0;
-        assert!(inside, "{label:?} leaves {:?}", melee.rect);
-        let crown_right = crown_in(melee.rect).expect("a crown on the card");
-        assert!(
-            crown_right < x && crown_right > x - 12.0,
-            "crown at {crown_right}, label at {x}"
-        );
-        assert!(crown_in(mining.rect).is_none());
-    }
-
-    #[test]
-    fn a_mastered_bar_carries_a_glint_that_moves_and_nothing_sweeps_the_card() {
-        // Given Melee mastered
-        let _serial = exclusive();
-        let host = screen_open();
-        melee_mastered();
-        let bar = cards()[0].bar;
-        let glint = |host: &TestHost| -> Vec<[f32; 4]> {
-            host.painted
-                .borrow()
-                .iter()
-                .filter_map(|p| match p {
-                    Paint::Fill { rect, argb } if *argb == paint::GLINT => Some(*rect),
-                    _ => None,
-                })
-                .collect()
-        };
-        let quads = |host: &TestHost| {
-            host.painted
-                .borrow()
-                .iter()
-                .filter(|p| matches!(p, Paint::Quad { .. }))
-                .count()
-        };
-
-        // When the overview is drawn while the glint crosses the bar (it starts off the bar's left end), and again
-        // 10 ticks later
-        with(|cache| cache.ticks = 6);
-        drawn(&host, AWAY);
-        let (first, first_quads) = (glint(&host), quads(&host));
-        host.painted.borrow_mut().clear();
-        with(|cache| cache.ticks += 10);
-        drawn(&host, AWAY);
-        let later = glint(&host);
-
-        // Then the glint lies inside the bar and has moved along it, and no band is drawn across the card
-        assert!(!first.is_empty() && !later.is_empty());
-        for r in first.iter().chain(&later) {
-            assert!(
-                r[0] >= bar.x && r[0] + r[2] <= bar.x + bar.w,
-                "{r:?} leaves {bar:?}"
-            );
-            assert!(
-                r[1] >= bar.y && r[1] + r[3] <= bar.y + bar.h,
-                "{r:?} leaves {bar:?}"
-            );
-        }
-        assert_ne!(first, later);
-        assert_eq!(first_quads, 0);
     }
 
     #[test]
@@ -1584,13 +1319,12 @@ pub(crate) mod tests {
 
     #[test]
     fn everything_is_drawn_inside_the_window() {
-        // Given the screen open, on the overview and then on Mining's view
+        // Given the screen open on Mining's view
         let _serial = exclusive();
         let host = screen_open();
         let window = panel(SIZE);
 
-        // When each view is drawn
-        draw(&host, &mut HudBatch::new([427, 240]), SIZE, AWAY);
+        // When it is drawn
         with(|cache| {
             cache.selected = 1;
             cache.tab = Tab::Skill(cache.selected);
@@ -1614,13 +1348,13 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_card_opens_its_skill_with_perks_and_why_each_is_locked() {
-        // Given the screen open on the overview
+    fn a_row_opens_its_skill_with_perks_and_why_each_is_locked() {
+        // Given the screen open on Home
         let _serial = exclusive();
         let host = screen_open();
 
-        // When Mining's card is clicked and the screen is drawn
-        let flow = click(&host, SIZE, inside(&cards()[1].rect), LEFT_BUTTON);
+        // When Mining's row is clicked and the screen is drawn
+        let flow = click(&host, SIZE, inside(&rows()[1].rect), LEFT_BUTTON);
         let drawn = drawn(&host, AWAY);
 
         // Then Mining's view is up: its level, its points, the owned perk, the one to unlock, and the one that
@@ -1668,10 +1402,10 @@ pub(crate) mod tests {
 
     #[test]
     fn raise_buttons_show_a_drawn_arrow_beside_the_cost() {
-        // Given the overview
+        // Given Home
         let _serial = exclusive();
         let host = screen_open();
-        let raise = cards()[1].raise;
+        let raise = rows()[1].raise;
 
         // When it is drawn
         let drawn = drawn(&host, AWAY);
@@ -1806,12 +1540,12 @@ pub(crate) mod tests {
 
     #[test]
     fn hovering_a_raise_button_shows_the_level_and_cost() {
-        // Given the overview, the mouse over Mining's raise button
+        // Given Home, the mouse over Mining's raise button
         let _serial = exclusive();
         let host = screen_open();
 
         // When the screen is drawn
-        drawn(&host, inside(&cards()[1].raise));
+        drawn(&host, inside(&rows()[1].raise));
 
         // Then the tooltip says what the raise gives and costs
         assert_eq!(
@@ -1832,21 +1566,21 @@ pub(crate) mod tests {
         let host = screen_open();
         with(|cache| cache.state.skills.get_mut(MINING).unwrap().own = Some(4));
 
-        // When the mouse is over Mining's raise button, then over its card
-        drawn(&host, inside(&cards()[1].raise));
+        // When the mouse is over Mining's raise button, then over its row
+        drawn(&host, inside(&rows()[1].raise));
         let raise = tooltip(&host);
         host.painted.borrow_mut().clear();
-        drawn(&host, inside(&cards()[1].rect));
-        let card = tooltip(&host);
+        drawn(&host, inside(&rows()[1].rect));
+        let row = tooltip(&host);
 
-        // Then the raise is from the own level at its price, and the card says the 12 is shared
+        // Then the raise is from the own level at its price, and the row says the 12 is shared
         assert_eq!(
             raise[..2],
             ["Raise your own level to 5", "Cost: 4 XP levels"]
         );
         assert!(
-            card.contains(&"Shared level. Yours: 4".to_string()),
-            "{card:?}"
+            row.contains(&"Shared level. Yours: 4".to_string()),
+            "{row:?}"
         );
     }
 
@@ -1858,7 +1592,7 @@ pub(crate) mod tests {
         host.shift = true;
 
         // When the screen is drawn with Shift held
-        drawn(&host, inside(&cards()[1].raise));
+        drawn(&host, inside(&rows()[1].raise));
 
         // Then the tooltip shows level 17 for 70 levels, in red as 23 do not pay for it
         assert_eq!(
@@ -1877,7 +1611,7 @@ pub(crate) mod tests {
         with(|cache| cache.xp_levels = Some(40));
 
         // When the screen is drawn with Control held
-        drawn(&host, inside(&cards()[1].raise));
+        drawn(&host, inside(&rows()[1].raise));
 
         // Then the tooltip shows level 15 for 39 levels, in green
         assert_eq!(
@@ -1901,7 +1635,7 @@ pub(crate) mod tests {
 
     #[test]
     fn hovering_a_focus_shows_what_it_gives_xp_for_and_what_adding_it_costs() {
-        // Given the overview, the player focused on Working; Fighting gives more XP from kills and some for
+        // Given Home, the player focused on Working; Fighting gives more XP from kills and some for
         // chopping logs (labelled) and for breaking anything (not labelled), and for travelling
         let _serial = exclusive();
         let host = screen_open();
@@ -1936,7 +1670,7 @@ pub(crate) mod tests {
                 Reward::Travel { points: 0.02 },
             ];
         });
-        let buttons = overview(SIZE, 2, 0, 2).focus_buttons;
+        let buttons = focus_buttons();
 
         // When the screen is drawn with the mouse over Fighting, then over Working
         drawn(&host, inside(&buttons[0]));
@@ -1958,37 +1692,6 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!(tooltip(&host), vec!["Working", "Gives XP for:", "Active."]);
-    }
-
-    #[test]
-    fn hovering_a_focus_marks_its_skills_on_the_cards() {
-        // Given the overview, the mouse over Fighting, whose one skill is Melee (the first card)
-        let _serial = exclusive();
-        let host = screen_open();
-        let fighting = overview(SIZE, 2, 0, 2).focus_buttons[0];
-        let [melee, mining] = [cards()[0].rect, cards()[1].rect];
-
-        // When the screen is drawn, then drawn again with the mouse away
-        drawn(&host, inside(&fighting));
-        let hovered = host.painted.borrow().clone();
-        host.painted.borrow_mut().clear();
-        drawn(&host, AWAY);
-        let away = host.painted.borrow().clone();
-
-        // Then Melee's card is outlined in bright gold and Mining's is faded over, and neither happens with the
-        // mouse away
-        let outlined = |painted: &[Paint], r: Rect| {
-            let top = [r.x, r.y, r.w, 1.0];
-            painted.iter().any(|p| matches!(p, Paint::Fill { rect, argb } if *rect == top && *argb == paint::FRAME_LIGHT))
-        };
-        let faded = |painted: &[Paint], r: Rect| {
-            painted.iter().any(
-                |p| matches!(p, Paint::Fill { rect, argb } if *rect == r.array() && *argb == FADED),
-            )
-        };
-        assert!(outlined(&hovered, melee) && !outlined(&hovered, mining));
-        assert!(faded(&hovered, mining) && !faded(&hovered, melee));
-        assert!(!outlined(&away, melee) && !faded(&away, mining));
     }
 
     #[test]
@@ -2014,7 +1717,7 @@ pub(crate) mod tests {
 
         // When it is drawn and clicked
         let drawn = drawn(&host, AWAY);
-        let flow = click(&host, SIZE, inside(&cards()[0].rect), LEFT_BUTTON);
+        let flow = click(&host, SIZE, [SIZE[0] / 2.0, SIZE[1] / 2.0], LEFT_BUTTON);
 
         // Then it says it is waiting, and the click is taken without doing anything
         contains(&drawn, &["Reskilled", "Waiting for the server..."]);
@@ -2029,9 +1732,9 @@ pub(crate) mod tests {
         let mut host = screen_open();
 
         // When Mining's raise button is clicked on its card, then on its own view, then a tick passes
-        let flow = click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
+        let flow = click(&host, SIZE, inside(&rows()[1].raise), LEFT_BUTTON);
         let still = with(|cache| cache.tab);
-        click(&host, SIZE, inside(&cards()[1].rect), LEFT_BUTTON);
+        click(&host, SIZE, inside(&rows()[1].rect), LEFT_BUTTON);
         click(&host, SIZE, inside(&mining_view().raise), LEFT_BUTTON);
         let sent = requests_sent(&mut host);
 
@@ -2053,10 +1756,10 @@ pub(crate) mod tests {
 
         // When Mining's raise is clicked with Shift held, then with Control held
         host.shift = true;
-        click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
+        click(&host, SIZE, inside(&rows()[1].raise), LEFT_BUTTON);
         host.shift = false;
         host.control = true;
-        click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
+        click(&host, SIZE, inside(&rows()[1].raise), LEFT_BUTTON);
         let sent = requests_sent(&mut host);
 
         // Then the first asks for five raises and the second for as many as the server will grant
@@ -2076,31 +1779,13 @@ pub(crate) mod tests {
         let host = screen_open();
 
         // When the mouse is over Mining's raise button
-        drawn(&host, inside(&cards()[1].raise));
+        drawn(&host, inside(&rows()[1].raise));
 
         // Then its tooltip ends with the hint
         assert_eq!(
             tooltip(&host)[2..],
             ["Shift: +5 levels", "Ctrl: all you can pay for"]
         );
-    }
-
-    #[test]
-    fn the_gear_opens_the_options() {
-        // Given the overview
-        let _serial = exclusive();
-        let host = screen_open();
-
-        // When the gear is clicked
-        click(
-            &host,
-            SIZE,
-            inside(&overview(SIZE, 2, 0, 2).gear),
-            LEFT_BUTTON,
-        );
-
-        // Then the options take over the screen
-        assert_eq!(with(|cache| cache.tab), Tab::Options);
     }
 
     #[test]
@@ -2111,8 +1796,8 @@ pub(crate) mod tests {
         host.eye = Some([3.0, 70.5, -8.0]);
         with(|cache| cache.settings.click_sounds = false);
 
-        // When Mining's card is clicked and a tick passes
-        click(&host, SIZE, inside(&cards()[1].rect), LEFT_BUTTON);
+        // When Mining's row is clicked and a tick passes
+        click(&host, SIZE, inside(&rows()[1].rect), LEFT_BUTTON);
         horizon_client::mod_api::dispatch_tick(&mut host, &mods());
 
         // Then nothing plays
@@ -2126,7 +1811,7 @@ pub(crate) mod tests {
         let mut host = screen_open();
         host.eye = Some([3.0, 70.5, -8.0]);
 
-        // When bare window is clicked and a tick passes, then Mining's card and another tick
+        // When bare window is clicked and a tick passes, then Mining's row and another tick
         let body = super::super::window::window(SIZE, 2, 0).body;
         click(
             &host,
@@ -2136,7 +1821,7 @@ pub(crate) mod tests {
         );
         horizon_client::mod_api::dispatch_tick(&mut host, &mods());
         let after_nothing = host.sounds.len();
-        click(&host, SIZE, inside(&cards()[1].rect), LEFT_BUTTON);
+        click(&host, SIZE, inside(&rows()[1].rect), LEFT_BUTTON);
         horizon_client::mod_api::dispatch_tick(&mut host, &mods());
 
         // Then only the click that opened something plays the button sound, quietly, once
@@ -2159,8 +1844,8 @@ pub(crate) mod tests {
         let host = screen_open();
         with(|cache| cache.rules.cost_unit = skills_core::rules::CostUnit::Points);
 
-        // When the overview is drawn, then Mining's page
-        let overview = drawn(&host, AWAY);
+        // When Home is drawn, then Mining's page
+        let home = drawn(&host, AWAY);
         host.drawn.borrow_mut().clear();
         with(|cache| {
             cache.selected = 1;
@@ -2168,8 +1853,8 @@ pub(crate) mod tests {
         });
         let page = drawn(&host, AWAY);
 
-        // Then Mining's card asks 240 and its page says the cost is 240 XP points
-        contains(&overview, &["240"]);
+        // Then Mining's row asks 240 and its page says the cost is 240 XP points
+        contains(&home, &["240"]);
         contains(&page, &["Cost: 240 XP points"]);
     }
 
@@ -2183,9 +1868,9 @@ pub(crate) mod tests {
             cache.state.skills.get_mut(MINING).unwrap().earned = 5_000;
         });
 
-        // When the overview is drawn, then Mining's page, and Mining's card spot is clicked where its raise was
-        let overview = drawn(&host, AWAY);
-        click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
+        // When Home is drawn, then Mining's page, and Mining's row is clicked where its raise was
+        let home = drawn(&host, AWAY);
+        click(&host, SIZE, inside(&rows()[1].raise), LEFT_BUTTON);
         host.drawn.borrow_mut().clear();
         with(|cache| {
             cache.selected = 1;
@@ -2193,10 +1878,10 @@ pub(crate) mod tests {
         });
         let page = drawn(&host, AWAY);
 
-        // Then the card shows 50/120 and no price, the page shows the progress and no level-up button, and nothing
+        // Then the row shows 50/120 and no price, the page shows the progress and no level-up button, and nothing
         // is bought
-        contains(&overview, &["50/120"]);
-        assert!(!overview.iter().any(|t| t == "12"), "{overview:?}");
+        contains(&home, &["50/120"]);
+        assert!(!home.iter().any(|t| t == "12"), "{home:?}");
         contains(&page, &["Progress: 50/120"]);
         assert!(!page.iter().any(|t| t == "Level up"), "{page:?}");
         assert!(requests_sent(&mut host).is_empty());
@@ -2227,8 +1912,8 @@ pub(crate) mod tests {
         with(|cache| cache.xp_levels = Some(2));
 
         // When Mining's raise button is clicked, and Melee's, which costs 2
-        click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
-        click(&host, SIZE, inside(&cards()[0].raise), LEFT_BUTTON);
+        click(&host, SIZE, inside(&rows()[1].raise), LEFT_BUTTON);
+        click(&host, SIZE, inside(&rows()[0].raise), LEFT_BUTTON);
 
         // Then only the one they can pay for is asked
         let melee = ToServer::Act(Request::Raise {
@@ -2262,11 +1947,11 @@ pub(crate) mod tests {
 
     #[test]
     fn a_focus_button_unlocks_an_area_and_an_unlocked_one_stays() {
-        // Given the overview, the player focused on Working
+        // Given Home, the player focused on Working
         let _serial = exclusive();
         let mut host = screen_open();
         host.eye = Some([0.0, 64.0, 0.0]);
-        let buttons = overview(SIZE, 2, 0, 2).focus_buttons;
+        let buttons = focus_buttons();
 
         // When Working is clicked, then Fighting
         click(&host, SIZE, inside(&buttons[1]), LEFT_BUTTON);
@@ -2283,11 +1968,11 @@ pub(crate) mod tests {
 
     #[test]
     fn a_focus_the_player_cannot_pay_for_is_not_asked() {
-        // Given the overview and 19 XP levels, when a second area costs 20
+        // Given Home and 19 XP levels, when a second area costs 20
         let _serial = exclusive();
         let mut host = screen_open();
         with(|cache| cache.xp_levels = Some(19));
-        let fighting = overview(SIZE, 2, 0, 2).focus_buttons[0];
+        let fighting = focus_buttons()[0];
 
         // When Fighting is clicked
         click(&host, SIZE, inside(&fighting), LEFT_BUTTON);
@@ -2313,7 +1998,7 @@ pub(crate) mod tests {
         assert_eq!(with(|cache| cache.tab), Tab::Home);
     }
 
-    fn sent_acts(host: &mut TestHost) -> Vec<Request> {
+    pub(crate) fn sent_acts(host: &mut TestHost) -> Vec<Request> {
         requests_sent(host)
             .into_iter()
             .filter_map(|m| match m {
@@ -2539,7 +2224,7 @@ pub(crate) mod tests {
         host.open_screen = None;
 
         // When a raise button's spot is clicked and the wheel turns
-        let flow = click(&host, SIZE, inside(&cards()[0].raise), LEFT_BUTTON);
+        let flow = click(&host, SIZE, inside(&rows()[0].raise), LEFT_BUTTON);
         let wheel = scroll(&host, -1.0);
 
         // Then both are left to others and nothing is sent

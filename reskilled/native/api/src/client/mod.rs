@@ -3,6 +3,7 @@
 pub mod areas;
 pub mod badge;
 pub mod cache;
+pub mod home;
 pub mod keys;
 pub mod layout;
 pub mod options;

@@ -22,22 +22,7 @@ pub const HEADER_H: f32 = 22.0;
 const PAD: f32 = 8.0;
 const INNER_W: f32 = PANEL_W - 2.0 * PAD;
 
-/// The overview: skill cards, two to a row, four rows on show.
-pub const COLUMNS: usize = 2;
-pub const CARD_ROWS: usize = 4;
-const CARD_W: f32 = 139.0;
-const CARD_H: f32 = 34.0;
-const CARD_GAP_X: f32 = 6.0;
-const CARD_GAP_Y: f32 = 4.0;
-const GRID_TOP: f32 = 28.0;
-const SLOT: f32 = 20.0;
-const FOCUS_TOP: f32 = 182.0;
-const FOCUS_H: f32 = 18.0;
-/// Room for the word "Focus" before its buttons.
-const FOCUS_LABEL_W: f32 = 44.0;
-const BUTTON_GAP: f32 = 4.0;
-
-/// The header's small square buttons (back, settings).
+/// The header's small square button (back).
 const SMALL_BUTTON: f32 = 14.0;
 
 /// The skill view: five perk rows on show.
@@ -108,7 +93,7 @@ pub struct Scroll {
 }
 
 /// The bar for `shown` of `total` rows from row `first`, beside `area`; none when everything fits.
-fn scroll(area: &Rect, first: usize, shown: usize, total: usize) -> Option<Scroll> {
+pub(super) fn scroll(area: &Rect, first: usize, shown: usize, total: usize) -> Option<Scroll> {
     if total <= shown {
         return None;
     }
@@ -123,75 +108,6 @@ fn scroll(area: &Rect, first: usize, shown: usize, total: usize) -> Option<Scrol
         ..track
     };
     Some(Scroll { track, thumb })
-}
-
-/// One skill's card.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Card {
-    /// The skill's place in the list.
-    pub index: usize,
-    pub rect: Rect,
-    /// The sunken square its icon sits in.
-    pub slot: Rect,
-    pub bar: Rect,
-    /// The raise button, inside the card.
-    pub raise: Rect,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Overview {
-    pub panel: Rect,
-    /// The settings button, at the header's right end.
-    pub gear: Rect,
-    /// The cards on show.
-    pub cards: Vec<Card>,
-    pub focus_buttons: Vec<Rect>,
-    pub scroll: Option<Scroll>,
-}
-
-/// The first card row that may be on top when there are `skills` cards.
-pub fn last_first_row(skills: usize) -> usize {
-    skills.div_ceil(COLUMNS).saturating_sub(CARD_ROWS)
-}
-
-/// The overview for a screen of `size`: `skills` cards from row `first_row`, and `focus` buttons.
-pub fn overview(size: [f32; 2], skills: usize, first_row: usize, focus: usize) -> Overview {
-    let panel = panel(size);
-    let first_row = first_row.min(last_first_row(skills));
-    let cards = (first_row * COLUMNS..skills)
-        .take(CARD_ROWS * COLUMNS)
-        .enumerate()
-        .map(|(n, index)| {
-            let x = PAD + (n % COLUMNS) as f32 * (CARD_W + CARD_GAP_X);
-            let y = GRID_TOP + (n / COLUMNS) as f32 * (CARD_H + CARD_GAP_Y);
-            let rect = panel.at(x, y, CARD_W, CARD_H);
-            Card {
-                index,
-                rect,
-                slot: rect.at(5.0, 7.0, SLOT, SLOT),
-                bar: rect.at(30.0, 17.0, 68.0, 5.0),
-                raise: rect.at(CARD_W - 36.0, 15.0, 31.0, 14.0),
-            }
-        })
-        .collect();
-    let gaps = BUTTON_GAP * focus.saturating_sub(1) as f32;
-    let width = ((INNER_W - FOCUS_LABEL_W - gaps) / focus.max(1) as f32).floor();
-    let focus_buttons = (0..focus)
-        .map(|i| {
-            let x = PAD + FOCUS_LABEL_W + i as f32 * (width + BUTTON_GAP);
-            panel.at(x, FOCUS_TOP, width, FOCUS_H)
-        })
-        .collect();
-    let grid_h = CARD_ROWS as f32 * (CARD_H + CARD_GAP_Y) - CARD_GAP_Y;
-    let grid = panel.at(PAD, GRID_TOP, INNER_W, grid_h);
-    let rows = skills.div_ceil(COLUMNS);
-    Overview {
-        gear: gear(&panel),
-        panel,
-        cards,
-        focus_buttons,
-        scroll: scroll(&grid, first_row, CARD_ROWS, rows),
-    }
 }
 
 /// One perk's row.
@@ -260,27 +176,9 @@ pub fn detail(size: [f32; 2], perks: usize, first: usize) -> Detail {
     }
 }
 
-/// The header's small square button at its right end (the settings gear).
-fn gear(panel: &Rect) -> Rect {
-    panel.at(
-        PANEL_W - 6.0 - SMALL_BUTTON,
-        4.0,
-        SMALL_BUTTON,
-        SMALL_BUTTON,
-    )
-}
-
-/// How far from the window's right edge the header's XP text ends when the gear is there.
-pub const GEAR_ROOM: f32 = SMALL_BUTTON + 6.0;
-
 /// What a click asks for. Skills and perks are named by their place in the lists the screen shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Button {
-    /// A skill's card: open its view.
-    Open(usize),
-    /// The raise button on a skill's card.
-    Raise(usize),
-    SetFocus(usize),
     /// Back to the overview.
     Back,
     /// The raise button of the skill on show.
@@ -289,27 +187,6 @@ pub enum Button {
     BuyPerk(usize),
     /// An owned perk's area button: show its area in the world, or stop.
     ToggleArea(usize),
-    /// The gear: the settings page.
-    Settings,
-}
-
-/// The overview's button under the point, if any; a raise button wins over the card it sits in.
-pub fn hit_overview(o: &Overview, x: f32, y: f32) -> Option<Button> {
-    if o.gear.contains(x, y) {
-        return Some(Button::Settings);
-    }
-    let card = o.cards.iter().find(|c| c.rect.contains(x, y));
-    card.map(|c| {
-        if c.raise.contains(x, y) {
-            Button::Raise(c.index)
-        } else {
-            Button::Open(c.index)
-        }
-    })
-    .or_else(|| {
-        let focus = o.focus_buttons.iter().position(|r| r.contains(x, y));
-        focus.map(Button::SetFocus)
-    })
 }
 
 /// The skill view's button under the point, if any.
@@ -359,112 +236,6 @@ mod tests {
         );
         assert_eq!((usual.x, usual.y), (63.0, 16.0));
         assert!(small.x + small.w <= SMALLEST[0] && small.y + small.h <= SMALLEST[1]);
-    }
-
-    #[test]
-    fn eight_skills_make_four_rows_of_two_inside_the_window() {
-        // Given eight skills and three focus areas
-        // When the overview is laid out
-        let o = overview(SMALLEST, 8, 0, 3);
-
-        // Then every card and focus button is inside the window below its header, none touching another, and
-        // nothing scrolls
-        let body = Rect {
-            y: o.panel.y + HEADER_H,
-            h: o.panel.h - HEADER_H,
-            ..o.panel
-        };
-        assert_eq!(
-            o.cards.iter().map(|c| c.index).collect::<Vec<_>>(),
-            (0..8).collect::<Vec<_>>()
-        );
-        let parts: Vec<&Rect> = o
-            .cards
-            .iter()
-            .map(|c| &c.rect)
-            .chain(&o.focus_buttons)
-            .collect();
-        for (n, part) in parts.iter().enumerate() {
-            assert!(inside(&body.shrunk(3.0), part), "{part:?}");
-            assert!(
-                parts[n + 1..].iter().all(|other| apart(part, other)),
-                "{part:?}"
-            );
-        }
-        assert_eq!(
-            (o.cards[0].rect.y, o.cards[2].rect.y),
-            (o.cards[1].rect.y, o.cards[0].rect.y + 38.0)
-        );
-        assert_eq!(o.scroll, None);
-    }
-
-    #[test]
-    fn a_card_holds_its_icon_bar_and_raise_button() {
-        // Given one card
-        // When the overview is laid out
-        let card = overview(USUAL, 1, 0, 0).cards[0];
-
-        // Then its parts are inside it and apart from each other
-        for part in [&card.slot, &card.bar, &card.raise] {
-            assert!(inside(&card.rect, part), "{part:?}");
-        }
-        assert!(apart(&card.slot, &card.bar) && apart(&card.bar, &card.raise));
-    }
-
-    #[test]
-    fn more_skills_than_fit_scroll_by_rows() {
-        // Given eleven skills, six rows of which four show
-        // When the overview is laid out from the top, from its last row, and from past it
-        let top = overview(USUAL, 11, 0, 3);
-        let end = overview(USUAL, 11, 2, 3);
-        let past = overview(USUAL, 11, 9, 3);
-
-        // Then the top shows skills 0 to 7, the end 4 to 10, past the end is the end, and a bar says where
-        assert_eq!(last_first_row(11), 2);
-        assert_eq!(
-            top.cards.iter().map(|c| c.index).collect::<Vec<_>>(),
-            (0..8).collect::<Vec<_>>()
-        );
-        assert_eq!(
-            end.cards.iter().map(|c| c.index).collect::<Vec<_>>(),
-            (4..11).collect::<Vec<_>>()
-        );
-        assert_eq!(past, end);
-        let (top, end) = (top.scroll.unwrap(), end.scroll.unwrap());
-        assert_eq!(top.thumb.y, top.track.y);
-        assert_eq!(end.thumb.y + end.thumb.h, end.track.y + end.track.h);
-        assert!(inside(&panel(USUAL), &top.track));
-    }
-
-    #[test]
-    fn a_raise_button_wins_over_its_card() {
-        // Given the overview of eight skills and three focus areas
-        let o = overview(USUAL, 8, 0, 3);
-        let third = o.cards[2];
-
-        // When points on the third card, its raise button, the second focus button and bare window are clicked
-        let on_card = hit_overview(&o, third.rect.x + 2.0, third.rect.y + 2.0);
-        let on_raise = hit_overview(&o, third.raise.x + 1.0, third.raise.y + 1.0);
-        let on_focus = hit_overview(&o, o.focus_buttons[1].x + 1.0, o.focus_buttons[1].y + 1.0);
-        let on_nothing = hit_overview(&o, o.panel.x + 1.0, o.panel.y + 1.0);
-
-        // Then each lands on what is drawn there
-        assert_eq!(on_card, Some(Button::Open(2)));
-        assert_eq!(on_raise, Some(Button::Raise(2)));
-        assert_eq!(on_focus, Some(Button::SetFocus(1)));
-        assert_eq!(on_nothing, None);
-    }
-
-    #[test]
-    fn the_gear_sits_in_the_overviews_header() {
-        // Given the overview
-        // When it is laid out and its gear clicked
-        let o = overview(USUAL, 8, 0, 3);
-        let hit = hit_overview(&o, o.gear.x + 1.0, o.gear.y + 1.0);
-
-        // Then the gear is inside the window, in the header, and answers
-        assert!(inside(&o.panel, &o.gear) && o.gear.y + o.gear.h <= o.panel.y + HEADER_H);
-        assert_eq!(hit, Some(Button::Settings));
     }
 
     #[test]
