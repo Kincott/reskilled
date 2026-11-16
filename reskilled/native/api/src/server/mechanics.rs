@@ -31,6 +31,10 @@ const UPDATE_ALL: i32 = 3;
 static HEALTH: Mutex<BTreeMap<u128, f32>> = Mutex::new(BTreeMap::new());
 /// The tick each player's last stand was last used.
 static LAST_STAND_USED: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
+/// Players a last stand just saved, whose next tick sets them to half a heart.
+static LAST_STAND_SAVED: Mutex<BTreeSet<u128>> = Mutex::new(BTreeSet::new());
+/// Half a heart, in health.
+const HALF_A_HEART: f32 = 1.0;
 /// Potion effects earned by kills, given on the player's own tick.
 static KILL_EFFECTS: Mutex<BTreeMap<u128, Vec<NativeEffect>>> = Mutex::new(BTreeMap::new());
 /// The tick each player's crops next grow.
@@ -107,6 +111,14 @@ pub fn run_for(
     selected: usize,
     asleep: bool,
 ) {
+    // A player a last stand saved is left at half a heart, whatever the game or their regeneration did meanwhile
+    let health = if lock(&LAST_STAND_SAVED).remove(&player)
+        && host.set_player_status(player, Some(HALF_A_HEART), None, None)
+    {
+        HALF_A_HEART
+    } else {
+        health
+    };
     lock(&HEALTH).insert(player, health);
     notice_getting_up(player, asleep);
     for effect in lock(&KILL_EFFECTS).remove(&player).unwrap_or_default() {
@@ -459,6 +471,7 @@ pub fn on_death(host: &mut dyn Host, entity: u32, kind: &str, damage_type: &str)
         return Flow::Continue;
     }
     lock(&LAST_STAND_USED).insert(player, now);
+    lock(&LAST_STAND_SAVED).insert(player);
     host.action_bar(player, say(&LAST_STAND, &[]));
     Flow::Cancel
 }
@@ -690,6 +703,7 @@ fn grow_crops(host: &mut dyn Host, player: u128, dimension: &str, feet: [f64; 3]
 pub(crate) fn reset() {
     lock(&HEALTH).clear();
     lock(&LAST_STAND_USED).clear();
+    lock(&LAST_STAND_SAVED).clear();
     lock(&KILL_EFFECTS).clear();
     lock(&GROWTH_DUE).clear();
     lock(&REPLANTS).clear();
@@ -836,6 +850,34 @@ mod tests {
             (killed, first, again, later),
             (Flow::Continue, Flow::Cancel, Flow::Continue, Flow::Cancel)
         );
+    }
+
+    #[test]
+    fn a_saved_player_is_left_at_half_a_heart() {
+        // Given a last stand and a player at full health
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "last_stand", "cooldown_seconds": 300}]),
+        );
+        tick(&mut host, 20.0);
+
+        // When a killing blow is survived, and their next tick runs having healed back up
+        let saved = on_death(
+            &mut host,
+            ENTITY,
+            "minecraft:player",
+            "minecraft:mob_attack",
+        );
+        tick(&mut host, 20.0);
+        let after_one = host.health_set.clone();
+        tick(&mut host, 20.0);
+
+        // Then their health is set to half a heart on that tick, once
+        assert_eq!(saved, Flow::Cancel);
+        assert_eq!(after_one, vec![(PLAYER, 1.0)]);
+        assert_eq!(host.health_set, vec![(PLAYER, 1.0)]);
     }
 
     #[test]
