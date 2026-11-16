@@ -12,7 +12,7 @@ Skills, perks and gear locks for [Minecraft Horizon](https://github.com/horizon-
   Arcane 12.
 - **40 perks** to unlock with the points your levels earn, such as extra ore drops, more armor, or surviving a
   killing blow.
-- **Fully tunable**: servers change the rules in game; packs and mods can add, change or remove anything.
+- **Fully tunable**: servers change the rules in game, and packs and mods can add, change or remove anything.
 
 ![The skills window's Home tab](reskilled/screenshots/home.png)
 
