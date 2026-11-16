@@ -16,6 +16,13 @@ from PIL import Image, ImageDraw
 SCALE = 3
 
 
+def scaled(picture, size):
+    """The picture stretched to `size` with nearest-neighbour sampling. An affine transform, not `resize`, which
+    some Pillow builds fail in."""
+    w, h = size
+    return picture.transform((w, h), Image.AFFINE, (picture.width / w, 0, 0, 0, picture.height / h, 0), Image.NEAREST)
+
+
 class Font:
     """Vanilla's bitmap font: each glyph as its opaque pixels, and its advance."""
 
@@ -80,7 +87,7 @@ def item(canvas, assets, name, at, size):
         file = assets / "textures" / folder / f"{path}.png"
         if file.exists():
             picture = Image.open(file).convert("RGBA")
-            picture = picture.crop((0, 0, picture.width, picture.width)).resize((size, size), Image.NEAREST)
+            picture = scaled(picture.crop((0, 0, picture.width, picture.width)), (size, size))
             canvas.alpha_composite(picture, (round(at[0]), round(at[1])))
             return
     # An item drawn from a model (a shield): a plain plate stands in for it.
@@ -119,7 +126,7 @@ def nine_slice(canvas, assets, name, rect):
         border = scaling.get("border", 0) if scaling.get("type") == "nine_slice" else 0
     x, y, w, h = (round(v) for v in rect)
     if not border:
-        canvas.alpha_composite(picture.resize((w, h), Image.NEAREST), (x, y))
+        canvas.alpha_composite(scaled(picture, (w, h)), (x, y))
         return
     if isinstance(border, int):
         border = {"left": border, "top": border, "right": border, "bottom": border}
@@ -174,7 +181,7 @@ def render(scene, font, assets):
             nine_slice(canvas, assets, paint["name"], paint["rect"])
         elif kind == "tooltip":
             tooltip(canvas, font, paint["spans"], paint["at"])
-    return canvas.resize((canvas.width * SCALE, canvas.height * SCALE), Image.NEAREST)
+    return scaled(canvas, (canvas.width * SCALE, canvas.height * SCALE))
 
 
 def main():
