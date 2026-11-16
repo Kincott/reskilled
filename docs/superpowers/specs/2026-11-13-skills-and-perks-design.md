@@ -5,7 +5,7 @@ Renamed on 2026-11-14 at the user's request: the mod is **Reskilled** (id `reski
 mod's name, and the user picked Reskilled. Older entries below keep the old name where they quote history.
 
 - Date: 2026-11-13
-- Status: draft, waiting for the user's approval
+- Status: approved by the user on 2026-11-13 and built; later changes are recorded in 7.11
 - Working name: Reskilled (mod id `reskilled`)
 - Platform: Minecraft Horizon (Rust rewrite of Minecraft Java Edition 26.3)
 
@@ -79,7 +79,8 @@ Checked against `horizon-rust/horizon` at commit `298c01b` (2026-11-13), mostly 
 
 - The other layers (survival, combat and gear, creatures and places). They integrate like any other mod (7.10).
 - A server-only mode or a chest-menu interface (approaches 1 and 3 below were rejected).
-- Parties, leaderboards, shared progress, or classes beyond the focus choice.
+- Leaderboards, or classes beyond the focus choice. (Parties and shared skills were later added as a server rule,
+  7.11.)
 - Importing saves from Reskillable or Level Up! Reloaded.
 - Languages other than English. All text must still be translatable.
 
@@ -377,7 +378,8 @@ Rules:
 
 The user handed these to Claude; each can be changed.
 
-- The eight default skills, including Taming (new) and no Building skill.
+- The eight default skills, first with Taming (new) and no Building skill; Building replaced Taming on 2026-11-14
+  (7.11).
 - The cost curve (2 levels, +1 every 4 levels) and 1 perk point every 4 levels.
 - Three focus areas with a 25% discount and a 10-level switching cost.
 - The lock ladder (copper 4, iron 8, diamond 16, netherite 24) and the special items listed in 7.5.
