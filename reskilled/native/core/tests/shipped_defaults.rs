@@ -602,6 +602,25 @@ fn golden_tools_need_their_skill_at_2_and_arcane_at_4() {
 }
 
 #[test]
+fn using_a_tool_on_a_block_needs_its_tier() {
+    // Given the shipped data
+    let defs = defaults();
+
+    // When each tier's axe, shovel and hoe is checked for its use (stripping, paths, tilling)
+    // Then the use needs the same Gathering level as breaking with it
+    for (metal, level) in [("golden", 2), ("copper", 4), ("iron", 8), ("diamond", 16), ("netherite", 24)] {
+        for tool in ["axe", "shovel", "hoe"] {
+            let id = format!("minecraft:{metal}_{tool}");
+            assert_eq!(
+                needed(&defs, TargetKind::Item, &id, Action::Use, GATHERING),
+                level,
+                "{id}"
+            );
+        }
+    }
+}
+
+#[test]
 fn enchantments_need_arcane_three_levels_a_step() {
     // Given the shipped data
     let defs = defaults();

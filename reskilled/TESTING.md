@@ -50,6 +50,8 @@ Locks
       where it came from.
 - [ ] Full inventory, locked chestplate worn, `/skills reset @s`: it drops at your feet, and only one drops.
 - [ ] Locked mount and locked menu (e.g. an enchanting table) are refused.
+- [ ] Below Gathering 8, an iron axe cannot strip a log, an iron shovel cannot make a path and an iron hoe cannot
+      till; a refused TNT (below Mining 10) stays in the hand, all of it, with no ghost item.
 - [ ] `/gamemode creative` ignores locks; going back to survival takes off locked gear worn meanwhile.
 
 Mechanic perks
