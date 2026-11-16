@@ -22,5 +22,6 @@
       "kind": "fall",
       "multiplier": 0.7
     }
-  ]
+  ],
+  "icon": "minecraft:wind_charge"
 }

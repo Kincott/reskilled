@@ -71,6 +71,7 @@ Entities, enchantments, damage types and abilities have no tags the game lets Re
 | `cost` | `{"base": n, "every": n ≥ 1}` | settings' `cost` | raising from level L costs `base + floor((L - 1) / every)` XP levels |
 | `points_every` | integer ≥ 1 | settings' `points_every` | one perk point at every multiple of this level |
 | `earned_by` | list of rules | `[]` | see below; a skill with none grows only by buying |
+| `color` | `"#RRGGBB"` | one of eight, chosen by the id | the skill's stripe and accents on the screens |
 
 ### earned_by
 
@@ -107,6 +108,7 @@ How the skill grows when the server's rule lets skills grow by doing. Each rule 
 | `requires` | list of perk ids | `[]` | bought first |
 | `also_needs` | object, skill id → level | `{}` | levels in other skills, to buy it and keep it working |
 | `effects` | list | required | see below |
+| `icon` | item id | the skill's icon | drawn for the perk on the skill's road and in its panel |
 
 A perk whose `skill`, `also_needs` skill or `requires` perk does not exist is skipped with an error.
 
@@ -170,6 +172,7 @@ To add your skill to a shipped area, override the area in full (copy it, `"prior
 | `label` | translation key | none | shown in the skill page's "Next unlocks" |
 | `replace` | boolean | false | drops earlier entries for an equal target first; with `"requires": {}` it only removes them |
 | `enchantment_level` | integer | 1 | enchantment targets only: the lock applies from this level up |
+| `icon` | item id | none | with a `label`, the entry shows on its skill's road at its level with this item; without one it is not on the road |
 
 An enchantment lock adds to the lock of any item carrying that enchantment, and the player is told which
 enchantment brings it. `equip` locks are checked on the game's own worn slots (armor, off hand); another mod's

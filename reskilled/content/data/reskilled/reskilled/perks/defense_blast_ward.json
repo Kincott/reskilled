@@ -20,5 +20,6 @@
       "amount": 0.25,
       "operation": "add_value"
     }
-  ]
+  ],
+  "icon": "minecraft:obsidian"
 }

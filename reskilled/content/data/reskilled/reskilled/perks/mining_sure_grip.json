@@ -14,5 +14,6 @@
       "amount": 0.05,
       "operation": "add_multiplied_base"
     }
-  ]
+  ],
+  "icon": "minecraft:stone_pickaxe"
 }

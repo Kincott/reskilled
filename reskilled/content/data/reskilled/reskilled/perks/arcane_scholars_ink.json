@@ -14,5 +14,6 @@
       "kind": "magic",
       "multiplier": 0.7
     }
-  ]
+  ],
+  "icon": "minecraft:glass_bottle"
 }

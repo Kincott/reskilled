@@ -43,6 +43,7 @@ files in its own namespace**, never by editing Reskilled's.
 | Mod's statue/cart earns no Melee XP | `settings/` `not_creatures` | `.../settings/examplemod.json` |
 | Mod's darts earn Ranged XP | `settings/` `projectile_damage` | same |
 | Shift-click must not put on a locked modded wearable | `settings/` `equip_slots` | same |
+| Give a skill its colour, a perk its icon, or put a lock on the skill's road | `color` on the skill, `icon` on the perk or the lock entry (with its `label`) | `.../skills/digging.json`, `.../locks/examplemod_gear.json` |
 | Change costs, max level, perk point pace | `settings/`, priority 1, only those fields | reference.md, Settings |
 | Make a mod's own accessory slots (rings, amulets) respect equip locks | code: `reskilled::may_equip` / `may_wear` | [integration.md](integration.md), Accessory slots |
 

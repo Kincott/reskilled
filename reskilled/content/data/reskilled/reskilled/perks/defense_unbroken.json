@@ -22,5 +22,6 @@
       "kind": "melee",
       "multiplier": 0.9
     }
-  ]
+  ],
+  "icon": "minecraft:golden_apple"
 }

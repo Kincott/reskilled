@@ -13,5 +13,6 @@
     {
       "type": "attack"
     }
-  ]
+  ],
+  "color": "#D9534A"
 }

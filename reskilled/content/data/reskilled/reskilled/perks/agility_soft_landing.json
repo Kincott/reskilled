@@ -17,5 +17,6 @@
   ],
   "also_needs": {
     "reskilled:arcane": 8
-  }
+  },
+  "icon": "minecraft:ender_pearl"
 }

@@ -22,5 +22,6 @@
       "amount": 0.5,
       "operation": "add_value"
     }
-  ]
+  ],
+  "icon": "minecraft:iron_sword"
 }

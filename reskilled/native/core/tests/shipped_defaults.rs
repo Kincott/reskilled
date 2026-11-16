@@ -945,3 +945,32 @@ fn shipped_settings_lists_cover_vanilla() {
     assert_eq!(slot_of("minecraft:shield"), Some(WornSlot::Offhand));
     assert_eq!(slot_of("minecraft:stick"), None);
 }
+
+#[test]
+fn every_shipped_skill_has_its_colour() {
+    let defs = defaults();
+    let colour = |skill: &str| skills_core::defs::skill_rgb(&defs.skills[skill]);
+    assert_eq!(
+        [MINING, MELEE, DEFENSE, ARCANE, GATHERING, AGILITY, BUILDING, RANGED].map(colour),
+        [0x8FA6B8, 0xD9534A, 0x6E8FD9, 0xB07CF2, 0x7FC75A, 0x5AD1C7, 0xD98C4A, 0xD9C24A]
+    );
+    assert!(defs.skills.values().all(|s| s.color.is_some()));
+}
+
+#[test]
+fn every_shipped_perk_has_an_icon() {
+    let defs = defaults();
+    for perk in defs.perks.values() {
+        let icon = perk.icon.as_deref().unwrap_or_else(|| panic!("{} has no icon", perk.id));
+        assert!(icon.starts_with("minecraft:"), "{}: {icon}", perk.id);
+    }
+}
+
+#[test]
+fn every_labelled_lock_has_an_icon() {
+    let defs = defaults();
+    for entry in defs.locks.iter().filter(|e| e.label.is_some()) {
+        let icon = entry.icon.as_deref().unwrap_or_else(|| panic!("{:?} has no icon", entry.label));
+        assert!(icon.starts_with("minecraft:"), "{:?}: {icon}", entry.label);
+    }
+}

@@ -14,5 +14,6 @@
       "kind": "projectile",
       "multiplier": 1.1
     }
-  ]
+  ],
+  "icon": "minecraft:target"
 }

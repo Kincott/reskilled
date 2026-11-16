@@ -129,5 +129,6 @@
   ],
   "also_needs": {
     "reskilled:defense": 8
-  }
+  },
+  "icon": "minecraft:redstone"
 }

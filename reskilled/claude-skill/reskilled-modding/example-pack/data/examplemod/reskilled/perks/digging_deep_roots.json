@@ -27,5 +27,6 @@
       },
       "chance": 0.2
     }
-  ]
+  ],
+  "icon": "minecraft:clay_ball"
 }

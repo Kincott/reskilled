@@ -24,7 +24,8 @@
       "requires": {
         "reskilled:arcane": 3
       },
-      "label": "reskilled.lock.ench.sharp_2"
+      "label": "reskilled.lock.ench.sharp_2",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -49,7 +50,8 @@
       "requires": {
         "reskilled:arcane": 6
       },
-      "label": "reskilled.lock.ench.sharp_3"
+      "label": "reskilled.lock.ench.sharp_3",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -74,7 +76,8 @@
       "requires": {
         "reskilled:arcane": 9
       },
-      "label": "reskilled.lock.ench.sharp_4"
+      "label": "reskilled.lock.ench.sharp_4",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -99,7 +102,8 @@
       "requires": {
         "reskilled:arcane": 12
       },
-      "label": "reskilled.lock.ench.sharp_5"
+      "label": "reskilled.lock.ench.sharp_5",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -114,7 +118,8 @@
       "requires": {
         "reskilled:arcane": 3
       },
-      "label": "reskilled.lock.ench.power_2"
+      "label": "reskilled.lock.ench.power_2",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -129,7 +134,8 @@
       "requires": {
         "reskilled:arcane": 6
       },
-      "label": "reskilled.lock.ench.power_3"
+      "label": "reskilled.lock.ench.power_3",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -144,7 +150,8 @@
       "requires": {
         "reskilled:arcane": 9
       },
-      "label": "reskilled.lock.ench.power_4"
+      "label": "reskilled.lock.ench.power_4",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -159,7 +166,8 @@
       "requires": {
         "reskilled:arcane": 12
       },
-      "label": "reskilled.lock.ench.power_5"
+      "label": "reskilled.lock.ench.power_5",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -187,7 +195,8 @@
       "requires": {
         "reskilled:arcane": 3
       },
-      "label": "reskilled.lock.ench.protection_2"
+      "label": "reskilled.lock.ench.protection_2",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -215,7 +224,8 @@
       "requires": {
         "reskilled:arcane": 6
       },
-      "label": "reskilled.lock.ench.protection_3"
+      "label": "reskilled.lock.ench.protection_3",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -243,7 +253,8 @@
       "requires": {
         "reskilled:arcane": 9
       },
-      "label": "reskilled.lock.ench.protection_4"
+      "label": "reskilled.lock.ench.protection_4",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -261,7 +272,8 @@
       "requires": {
         "reskilled:arcane": 3
       },
-      "label": "reskilled.lock.ench.unbreaking_2"
+      "label": "reskilled.lock.ench.unbreaking_2",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -279,7 +291,8 @@
       "requires": {
         "reskilled:arcane": 6
       },
-      "label": "reskilled.lock.ench.unbreaking_3"
+      "label": "reskilled.lock.ench.unbreaking_3",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -294,7 +307,8 @@
       "requires": {
         "reskilled:arcane": 6
       },
-      "label": "reskilled.lock.ench.fortune_2"
+      "label": "reskilled.lock.ench.fortune_2",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -309,7 +323,8 @@
       "requires": {
         "reskilled:arcane": 12
       },
-      "label": "reskilled.lock.ench.fortune_3"
+      "label": "reskilled.lock.ench.fortune_3",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -324,7 +339,8 @@
       "requires": {
         "reskilled:arcane": 6
       },
-      "label": "reskilled.lock.ench.looting_2"
+      "label": "reskilled.lock.ench.looting_2",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -339,7 +355,8 @@
       "requires": {
         "reskilled:arcane": 12
       },
-      "label": "reskilled.lock.ench.looting_3"
+      "label": "reskilled.lock.ench.looting_3",
+      "icon": "minecraft:enchanted_book"
     },
     {
       "target": {
@@ -356,7 +373,8 @@
       "requires": {
         "reskilled:arcane": 12
       },
-      "label": "reskilled.lock.ench.mending"
+      "label": "reskilled.lock.ench.mending",
+      "icon": "minecraft:enchanted_book"
     }
   ]
 }

@@ -15,7 +15,8 @@
         "examplemod:digging": 12,
         "reskilled:mining": 8
       },
-      "label": "examplemod.lock.drill"
+      "label": "examplemod.lock.drill",
+      "icon": "examplemod:drill"
     },
     {
       "target": {
@@ -29,7 +30,8 @@
       "requires": {
         "reskilled:agility": 6
       },
-      "label": "examplemod.lock.backpacks"
+      "label": "examplemod.lock.backpacks",
+      "icon": "examplemod:leather_backpack"
     },
     {
       "target": {
@@ -43,7 +45,8 @@
       "requires": {
         "reskilled:agility": 16
       },
-      "label": "examplemod.lock.mammoth"
+      "label": "examplemod.lock.mammoth",
+      "icon": "minecraft:saddle"
     },
     {
       "target": {
@@ -59,7 +62,8 @@
         "reskilled:defense": 8
       },
       "replace": true,
-      "label": "reskilled.lock.shield"
+      "label": "reskilled.lock.shield",
+      "icon": "minecraft:shield"
     }
   ]
 }

@@ -16,5 +16,6 @@
       "amount": 1.0,
       "operation": "add_value"
     }
-  ]
+  ],
+  "icon": "minecraft:iron_ingot"
 }

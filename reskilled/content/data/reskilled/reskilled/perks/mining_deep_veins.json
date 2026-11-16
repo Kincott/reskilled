@@ -25,5 +25,6 @@
       },
       "chance": 0.15
     }
-  ]
+  ],
+  "icon": "minecraft:raw_iron"
 }

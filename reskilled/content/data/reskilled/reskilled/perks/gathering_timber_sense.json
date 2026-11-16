@@ -15,5 +15,6 @@
       },
       "chance": 0.15
     }
-  ]
+  ],
+  "icon": "minecraft:oak_log"
 }

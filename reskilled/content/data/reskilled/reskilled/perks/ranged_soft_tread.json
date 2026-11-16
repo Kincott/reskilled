@@ -14,5 +14,6 @@
       "amount": 0.5,
       "operation": "add_multiplied_base"
     }
-  ]
+  ],
+  "icon": "minecraft:leather_boots"
 }

@@ -22,5 +22,6 @@
       "amount": 1.0,
       "operation": "add_value"
     }
-  ]
+  ],
+  "icon": "minecraft:blaze_powder"
 }

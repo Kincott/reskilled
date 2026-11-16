@@ -14,5 +14,6 @@
       "type": "safe_haven",
       "radius": 32
     }
-  ]
+  ],
+  "icon": "minecraft:lantern"
 }

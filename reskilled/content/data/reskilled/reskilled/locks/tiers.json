@@ -22,7 +22,8 @@
         "reskilled:mining": 2,
         "reskilled:arcane": 4
       },
-      "label": "reskilled.lock.golden_pickaxes"
+      "label": "reskilled.lock.golden_pickaxes",
+      "icon": "minecraft:golden_pickaxe"
     },
     {
       "target": {
@@ -54,7 +55,8 @@
         "reskilled:gathering": 2,
         "reskilled:arcane": 4
       },
-      "label": "reskilled.lock.golden_harvest_tools"
+      "label": "reskilled.lock.golden_harvest_tools",
+      "icon": "minecraft:golden_axe"
     },
     {
       "target": {
@@ -83,7 +85,8 @@
         "reskilled:gathering": 2,
         "reskilled:arcane": 4
       },
-      "label": "reskilled.lock.golden_harvest_tools"
+      "label": "reskilled.lock.golden_harvest_tools",
+      "icon": "minecraft:golden_axe"
     },
     {
       "target": {
@@ -112,7 +115,8 @@
         "reskilled:melee": 2,
         "reskilled:arcane": 4
       },
-      "label": "reskilled.lock.golden_weapons"
+      "label": "reskilled.lock.golden_weapons",
+      "icon": "minecraft:golden_sword"
     },
     {
       "target": {
@@ -135,7 +139,8 @@
         "reskilled:melee": 2,
         "reskilled:arcane": 4
       },
-      "label": "reskilled.lock.golden_weapons"
+      "label": "reskilled.lock.golden_weapons",
+      "icon": "minecraft:golden_sword"
     },
     {
       "target": {
@@ -157,7 +162,8 @@
       "requires": {
         "reskilled:mining": 4
       },
-      "label": "reskilled.lock.copper_pickaxes"
+      "label": "reskilled.lock.copper_pickaxes",
+      "icon": "minecraft:copper_pickaxe"
     },
     {
       "target": {
@@ -188,7 +194,8 @@
       "requires": {
         "reskilled:gathering": 4
       },
-      "label": "reskilled.lock.copper_harvest_tools"
+      "label": "reskilled.lock.copper_harvest_tools",
+      "icon": "minecraft:copper_axe"
     },
     {
       "target": {
@@ -216,7 +223,8 @@
       "requires": {
         "reskilled:gathering": 4
       },
-      "label": "reskilled.lock.copper_harvest_tools"
+      "label": "reskilled.lock.copper_harvest_tools",
+      "icon": "minecraft:copper_axe"
     },
     {
       "target": {
@@ -244,7 +252,8 @@
       "requires": {
         "reskilled:melee": 4
       },
-      "label": "reskilled.lock.copper_weapons"
+      "label": "reskilled.lock.copper_weapons",
+      "icon": "minecraft:copper_sword"
     },
     {
       "target": {
@@ -266,7 +275,8 @@
       "requires": {
         "reskilled:melee": 4
       },
-      "label": "reskilled.lock.copper_weapons"
+      "label": "reskilled.lock.copper_weapons",
+      "icon": "minecraft:copper_sword"
     },
     {
       "target": {
@@ -300,7 +310,8 @@
       "requires": {
         "reskilled:defense": 4
       },
-      "label": "reskilled.lock.copper_armor"
+      "label": "reskilled.lock.copper_armor",
+      "icon": "minecraft:copper_chestplate"
     },
     {
       "target": {
@@ -334,7 +345,8 @@
       "requires": {
         "reskilled:defense": 4
       },
-      "label": "reskilled.lock.chainmail_armor"
+      "label": "reskilled.lock.chainmail_armor",
+      "icon": "minecraft:chainmail_chestplate"
     },
     {
       "target": {
@@ -369,7 +381,8 @@
         "reskilled:defense": 2,
         "reskilled:arcane": 4
       },
-      "label": "reskilled.lock.golden_armor"
+      "label": "reskilled.lock.golden_armor",
+      "icon": "minecraft:golden_chestplate"
     },
     {
       "target": {
@@ -390,7 +403,8 @@
       "requires": {
         "reskilled:agility": 4
       },
-      "label": "reskilled.lock.copper_mount_armor"
+      "label": "reskilled.lock.copper_mount_armor",
+      "icon": "minecraft:copper_horse_armor"
     },
     {
       "target": {
@@ -412,7 +426,8 @@
       "requires": {
         "reskilled:mining": 8
       },
-      "label": "reskilled.lock.iron_pickaxes"
+      "label": "reskilled.lock.iron_pickaxes",
+      "icon": "minecraft:iron_pickaxe"
     },
     {
       "target": {
@@ -443,7 +458,8 @@
       "requires": {
         "reskilled:gathering": 8
       },
-      "label": "reskilled.lock.iron_harvest_tools"
+      "label": "reskilled.lock.iron_harvest_tools",
+      "icon": "minecraft:iron_axe"
     },
     {
       "target": {
@@ -471,7 +487,8 @@
       "requires": {
         "reskilled:gathering": 8
       },
-      "label": "reskilled.lock.iron_harvest_tools"
+      "label": "reskilled.lock.iron_harvest_tools",
+      "icon": "minecraft:iron_axe"
     },
     {
       "target": {
@@ -499,7 +516,8 @@
       "requires": {
         "reskilled:melee": 8
       },
-      "label": "reskilled.lock.iron_weapons"
+      "label": "reskilled.lock.iron_weapons",
+      "icon": "minecraft:iron_sword"
     },
     {
       "target": {
@@ -521,7 +539,8 @@
       "requires": {
         "reskilled:melee": 8
       },
-      "label": "reskilled.lock.iron_weapons"
+      "label": "reskilled.lock.iron_weapons",
+      "icon": "minecraft:iron_sword"
     },
     {
       "target": {
@@ -555,7 +574,8 @@
       "requires": {
         "reskilled:defense": 8
       },
-      "label": "reskilled.lock.iron_armor"
+      "label": "reskilled.lock.iron_armor",
+      "icon": "minecraft:iron_chestplate"
     },
     {
       "target": {
@@ -576,7 +596,8 @@
       "requires": {
         "reskilled:agility": 8
       },
-      "label": "reskilled.lock.iron_mount_armor"
+      "label": "reskilled.lock.iron_mount_armor",
+      "icon": "minecraft:iron_horse_armor"
     },
     {
       "target": {
@@ -598,7 +619,8 @@
       "requires": {
         "reskilled:mining": 16
       },
-      "label": "reskilled.lock.diamond_pickaxes"
+      "label": "reskilled.lock.diamond_pickaxes",
+      "icon": "minecraft:diamond_pickaxe"
     },
     {
       "target": {
@@ -629,7 +651,8 @@
       "requires": {
         "reskilled:gathering": 16
       },
-      "label": "reskilled.lock.diamond_harvest_tools"
+      "label": "reskilled.lock.diamond_harvest_tools",
+      "icon": "minecraft:diamond_axe"
     },
     {
       "target": {
@@ -657,7 +680,8 @@
       "requires": {
         "reskilled:gathering": 16
       },
-      "label": "reskilled.lock.diamond_harvest_tools"
+      "label": "reskilled.lock.diamond_harvest_tools",
+      "icon": "minecraft:diamond_axe"
     },
     {
       "target": {
@@ -685,7 +709,8 @@
       "requires": {
         "reskilled:melee": 16
       },
-      "label": "reskilled.lock.diamond_weapons"
+      "label": "reskilled.lock.diamond_weapons",
+      "icon": "minecraft:diamond_sword"
     },
     {
       "target": {
@@ -707,7 +732,8 @@
       "requires": {
         "reskilled:melee": 16
       },
-      "label": "reskilled.lock.diamond_weapons"
+      "label": "reskilled.lock.diamond_weapons",
+      "icon": "minecraft:diamond_sword"
     },
     {
       "target": {
@@ -741,7 +767,8 @@
       "requires": {
         "reskilled:defense": 16
       },
-      "label": "reskilled.lock.diamond_armor"
+      "label": "reskilled.lock.diamond_armor",
+      "icon": "minecraft:diamond_chestplate"
     },
     {
       "target": {
@@ -762,7 +789,8 @@
       "requires": {
         "reskilled:agility": 16
       },
-      "label": "reskilled.lock.diamond_mount_armor"
+      "label": "reskilled.lock.diamond_mount_armor",
+      "icon": "minecraft:diamond_horse_armor"
     },
     {
       "target": {
@@ -784,7 +812,8 @@
       "requires": {
         "reskilled:mining": 24
       },
-      "label": "reskilled.lock.netherite_pickaxes"
+      "label": "reskilled.lock.netherite_pickaxes",
+      "icon": "minecraft:netherite_pickaxe"
     },
     {
       "target": {
@@ -815,7 +844,8 @@
       "requires": {
         "reskilled:gathering": 24
       },
-      "label": "reskilled.lock.netherite_harvest_tools"
+      "label": "reskilled.lock.netherite_harvest_tools",
+      "icon": "minecraft:netherite_axe"
     },
     {
       "target": {
@@ -843,7 +873,8 @@
       "requires": {
         "reskilled:gathering": 24
       },
-      "label": "reskilled.lock.netherite_harvest_tools"
+      "label": "reskilled.lock.netherite_harvest_tools",
+      "icon": "minecraft:netherite_axe"
     },
     {
       "target": {
@@ -871,7 +902,8 @@
       "requires": {
         "reskilled:melee": 24
       },
-      "label": "reskilled.lock.netherite_weapons"
+      "label": "reskilled.lock.netherite_weapons",
+      "icon": "minecraft:netherite_sword"
     },
     {
       "target": {
@@ -893,7 +925,8 @@
       "requires": {
         "reskilled:melee": 24
       },
-      "label": "reskilled.lock.netherite_weapons"
+      "label": "reskilled.lock.netherite_weapons",
+      "icon": "minecraft:netherite_sword"
     },
     {
       "target": {
@@ -927,7 +960,8 @@
       "requires": {
         "reskilled:defense": 24
       },
-      "label": "reskilled.lock.netherite_armor"
+      "label": "reskilled.lock.netherite_armor",
+      "icon": "minecraft:netherite_chestplate"
     },
     {
       "target": {
@@ -948,7 +982,8 @@
       "requires": {
         "reskilled:agility": 24
       },
-      "label": "reskilled.lock.netherite_mount_armor"
+      "label": "reskilled.lock.netherite_mount_armor",
+      "icon": "minecraft:netherite_horse_armor"
     }
   ]
 }

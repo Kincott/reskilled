@@ -13,7 +13,8 @@
       "requires": {
         "reskilled:melee": 20
       },
-      "label": "reskilled.lock.mace"
+      "label": "reskilled.lock.mace",
+      "icon": "minecraft:mace"
     },
     {
       "target": {
@@ -28,7 +29,8 @@
       "requires": {
         "reskilled:ranged": 16
       },
-      "label": "reskilled.lock.trident"
+      "label": "reskilled.lock.trident",
+      "icon": "minecraft:trident"
     },
     {
       "target": {
@@ -42,7 +44,8 @@
       "requires": {
         "reskilled:ranged": 6
       },
-      "label": "reskilled.lock.crossbow"
+      "label": "reskilled.lock.crossbow",
+      "icon": "minecraft:crossbow"
     },
     {
       "target": {
@@ -56,7 +59,8 @@
       "requires": {
         "reskilled:agility": 2
       },
-      "label": "reskilled.lock.bow"
+      "label": "reskilled.lock.bow",
+      "icon": "minecraft:bow"
     },
     {
       "target": {
@@ -70,7 +74,8 @@
       "requires": {
         "reskilled:agility": 32
       },
-      "label": "reskilled.lock.elytra"
+      "label": "reskilled.lock.elytra",
+      "icon": "minecraft:elytra"
     },
     {
       "target": {
@@ -85,7 +90,8 @@
       "requires": {
         "reskilled:defense": 12
       },
-      "label": "reskilled.lock.shield"
+      "label": "reskilled.lock.shield",
+      "icon": "minecraft:shield"
     },
     {
       "target": {
@@ -99,7 +105,8 @@
       "requires": {
         "reskilled:agility": 6
       },
-      "label": "reskilled.lock.wolf_armor"
+      "label": "reskilled.lock.wolf_armor",
+      "icon": "minecraft:wolf_armor"
     },
     {
       "target": {
@@ -114,7 +121,8 @@
       "requires": {
         "reskilled:gathering": 2
       },
-      "label": "reskilled.lock.shears"
+      "label": "reskilled.lock.shears",
+      "icon": "minecraft:shears"
     },
     {
       "target": {
@@ -128,7 +136,8 @@
       "requires": {
         "reskilled:arcane": 8
       },
-      "label": "reskilled.lock.ender_pearl"
+      "label": "reskilled.lock.ender_pearl",
+      "icon": "minecraft:ender_pearl"
     },
     {
       "target": {
@@ -142,7 +151,8 @@
       "requires": {
         "reskilled:arcane": 16
       },
-      "label": "reskilled.lock.ender_eye"
+      "label": "reskilled.lock.ender_eye",
+      "icon": "minecraft:ender_eye"
     },
     {
       "target": {
@@ -156,7 +166,8 @@
       "requires": {
         "reskilled:agility": 4
       },
-      "label": "reskilled.lock.fireworks"
+      "label": "reskilled.lock.fireworks",
+      "icon": "minecraft:firework_rocket"
     },
     {
       "target": {
@@ -170,7 +181,8 @@
       "requires": {
         "reskilled:agility": 4
       },
-      "label": "reskilled.lock.lead"
+      "label": "reskilled.lock.lead",
+      "icon": "minecraft:lead"
     }
   ]
 }

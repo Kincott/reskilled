@@ -11,5 +11,6 @@
     {
       "type": "projectile_hit"
     }
-  ]
+  ],
+  "color": "#D9C24A"
 }

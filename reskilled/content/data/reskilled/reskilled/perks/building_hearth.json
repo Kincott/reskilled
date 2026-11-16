@@ -14,5 +14,6 @@
       "effect": "minecraft:regeneration",
       "amplifier": 0
     }
-  ]
+  ],
+  "icon": "minecraft:campfire"
 }

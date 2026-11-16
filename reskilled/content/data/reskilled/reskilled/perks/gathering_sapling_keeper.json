@@ -41,5 +41,6 @@
   ],
   "also_needs": {
     "reskilled:agility": 8
-  }
+  },
+  "icon": "minecraft:wheat_seeds"
 }

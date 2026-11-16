@@ -13,5 +13,6 @@
       "per_enchantment": 0.01,
       "max": 0.08
     }
-  ]
+  ],
+  "icon": "minecraft:amethyst_shard"
 }

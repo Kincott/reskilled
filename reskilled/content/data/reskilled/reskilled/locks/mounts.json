@@ -13,7 +13,8 @@
       "requires": {
         "reskilled:agility": 12
       },
-      "label": "reskilled.lock.happy_ghast"
+      "label": "reskilled.lock.happy_ghast",
+      "icon": "minecraft:white_harness"
     },
     {
       "target": {
@@ -67,7 +68,8 @@
       "requires": {
         "reskilled:agility": 4
       },
-      "label": "reskilled.lock.mounts"
+      "label": "reskilled.lock.mounts",
+      "icon": "minecraft:saddle"
     }
   ]
 }

@@ -17,7 +17,8 @@
       "requires": {
         "reskilled:building": 4
       },
-      "label": "reskilled.lock.building_scaffolding"
+      "label": "reskilled.lock.building_scaffolding",
+      "icon": "minecraft:scaffolding"
     },
     {
       "target": {
@@ -50,7 +51,8 @@
       "requires": {
         "reskilled:building": 8
       },
-      "label": "reskilled.lock.building_machines"
+      "label": "reskilled.lock.building_machines",
+      "icon": "minecraft:piston"
     },
     {
       "target": {
@@ -86,7 +88,8 @@
       "requires": {
         "reskilled:building": 12
       },
-      "label": "reskilled.lock.building_workshops"
+      "label": "reskilled.lock.building_workshops",
+      "icon": "minecraft:observer"
     },
     {
       "target": {
@@ -113,7 +116,8 @@
       "requires": {
         "reskilled:building": 16
       },
-      "label": "reskilled.lock.building_wonders"
+      "label": "reskilled.lock.building_wonders",
+      "icon": "minecraft:beacon"
     }
   ]
 }

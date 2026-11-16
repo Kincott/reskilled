@@ -29,5 +29,6 @@
         "minecraft:infested"
       ]
     }
-  ]
+  ],
+  "icon": "minecraft:red_bed"
 }

@@ -16,5 +16,6 @@
       "amount": 0.4,
       "operation": "add_value"
     }
-  ]
+  ],
+  "icon": "minecraft:ladder"
 }

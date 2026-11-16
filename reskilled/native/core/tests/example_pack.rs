@@ -71,6 +71,9 @@ fn the_example_pack_does_what_the_guide_says() {
 
     // A new skill that grows by digging with shovels or the mod's drill, with its two perks
     let digging = &defs.skills["examplemod:digging"];
+    assert_eq!(skills_core::defs::skill_rgb(digging), 0xC08A4F);
+    assert!(defs.locks.iter().any(|e| e.icon.as_deref() == Some("examplemod:drill")));
+    assert_eq!(defs.perks["examplemod:digging_quick_spade"].icon.as_deref(), Some("minecraft:iron_shovel"));
     assert!(matches!(&digging.earned_by[..], [EarnRule::Break { .. }]));
     assert!(defs.perks.contains_key("examplemod:digging_quick_spade"));
     assert!(defs.perks.contains_key("examplemod:digging_deep_roots"));

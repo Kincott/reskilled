@@ -22,5 +22,6 @@
       "amount": 0.1,
       "operation": "add_multiplied_base"
     }
-  ]
+  ],
+  "icon": "minecraft:note_block"
 }

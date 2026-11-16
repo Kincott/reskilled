@@ -13,5 +13,6 @@
       "per_enchantment": 0.03,
       "max": 0.15
     }
-  ]
+  ],
+  "icon": "minecraft:golden_sword"
 }

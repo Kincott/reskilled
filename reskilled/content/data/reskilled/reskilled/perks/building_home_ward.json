@@ -12,5 +12,6 @@
       "type": "home_ward",
       "radius": 24
     }
-  ]
+  ],
+  "icon": "minecraft:tnt"
 }

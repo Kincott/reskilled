@@ -15,5 +15,6 @@
       },
       "chance": 0.2
     }
-  ]
+  ],
+  "icon": "minecraft:wheat"
 }

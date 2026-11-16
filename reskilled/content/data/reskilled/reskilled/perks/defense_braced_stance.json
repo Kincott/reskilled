@@ -16,5 +16,6 @@
   ],
   "also_needs": {
     "reskilled:agility": 12
-  }
+  },
+  "icon": "minecraft:totem_of_undying"
 }

@@ -13,7 +13,8 @@
       "requires": {
         "reskilled:arcane": 12
       },
-      "label": "reskilled.lock.enchanting_table"
+      "label": "reskilled.lock.enchanting_table",
+      "icon": "minecraft:enchanting_table"
     },
     {
       "target": {
@@ -27,7 +28,8 @@
       "requires": {
         "reskilled:arcane": 12
       },
-      "label": "reskilled.lock.anvil"
+      "label": "reskilled.lock.anvil",
+      "icon": "minecraft:anvil"
     },
     {
       "target": {
@@ -41,7 +43,8 @@
       "requires": {
         "reskilled:arcane": 8
       },
-      "label": "reskilled.lock.brewing_stand"
+      "label": "reskilled.lock.brewing_stand",
+      "icon": "minecraft:brewing_stand"
     }
   ]
 }

@@ -16,5 +16,6 @@
       "kind": "projectile",
       "multiplier": 0.8
     }
-  ]
+  ],
+  "icon": "minecraft:shield"
 }

@@ -15,5 +15,6 @@
       "interval_seconds": 30,
       "points": 10
     }
-  ]
+  ],
+  "icon": "minecraft:experience_bottle"
 }

@@ -23,5 +23,6 @@
       },
       "chance": 0.25
     }
-  ]
+  ],
+  "icon": "minecraft:hay_block"
 }

@@ -12,5 +12,6 @@
       "type": "travel",
       "per_block": 0.05
     }
-  ]
+  ],
+  "color": "#5AD1C7"
 }
