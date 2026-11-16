@@ -19,21 +19,6 @@
     {
       "target": {
         "block": {
-          "tag": "#minecraft:anvil"
-        }
-      },
-      "actions": [
-        "open"
-      ],
-      "requires": {
-        "reskilled:arcane": 12
-      },
-      "label": "reskilled.lock.anvil",
-      "icon": "minecraft:anvil"
-    },
-    {
-      "target": {
-        "block": {
           "id": "minecraft:brewing_stand"
         }
       },

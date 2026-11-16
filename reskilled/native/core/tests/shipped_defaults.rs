@@ -684,7 +684,7 @@ fn enchantments_need_arcane_three_levels_a_step() {
 }
 
 #[test]
-fn advanced_blocks_need_building_to_place_and_arcane_to_use() {
+fn advanced_blocks_need_building_to_place_and_anvils_open_for_anyone() {
     // Given the shipped data
     let defs = defaults();
     let place = |id: &str| needed(&defs, TargetKind::Block, id, Action::Place, BUILDING);
@@ -698,14 +698,14 @@ fn advanced_blocks_need_building_to_place_and_arcane_to_use() {
         ARCANE,
     );
 
-    // Then each tier needs its Building level, and using the anvil still needs Arcane 12
+    // Then each tier needs its Building level, and the anvil opens with no level
     assert_eq!(place("minecraft:scaffolding"), 4);
     assert_eq!(place("minecraft:piston"), 8);
     assert_eq!(place("minecraft:brewing_stand"), 8);
     assert_eq!(place("minecraft:anvil"), 12);
     assert_eq!(place("minecraft:enchanting_table"), 12);
     assert_eq!(place("minecraft:beacon"), 16);
-    assert_eq!(opened, 12);
+    assert_eq!(opened, 0);
 }
 
 #[test]
@@ -758,7 +758,7 @@ fn specials_match_spec() {
         "minecraft:chipped_anvil",
         "minecraft:damaged_anvil",
     ] {
-        assert_eq!(block(anvil), 12, "{anvil}");
+        assert_eq!(block(anvil), 0, "{anvil} opens for anyone");
     }
     assert_eq!(block("minecraft:brewing_stand"), 8);
 }
