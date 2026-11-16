@@ -10,7 +10,6 @@
   "effects": [
     {
       "type": "last_stand",
-      "above": 6.0,
       "cooldown_seconds": 300
     }
   ],

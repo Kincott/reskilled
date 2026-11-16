@@ -432,10 +432,13 @@ fn due(timers: &Mutex<BTreeMap<u128, u64>>, player: u128, every: u64) -> bool {
     }
 }
 
-/// A mob or player is about to die. A player whose last stand is ready, and who had at least its health before
-/// the blow, stays alive at half a heart (Horizon leaves a cancelled death at 1 health).
-pub fn on_death(host: &mut dyn Host, entity: u32, kind: &str) -> Flow {
-    if kind != "minecraft:player" {
+/// `/kill`'s damage type: an operator's kill goes through whatever the perks.
+const KILL_COMMAND: &str = "minecraft:generic_kill";
+
+/// A mob or player is about to die. A player whose last stand is ready, and who had at least its health floor (if
+/// it has one) before the blow, stays alive at half a heart (Horizon leaves a cancelled death at 1 health).
+pub fn on_death(host: &mut dyn Host, entity: u32, kind: &str, damage_type: &str) -> Flow {
+    if kind != "minecraft:player" || damage_type == KILL_COMMAND {
         return Flow::Continue;
     }
     let Some(player) = i32::try_from(entity).ok().and_then(player_of_entity) else {
@@ -444,9 +447,10 @@ pub fn on_death(host: &mut dyn Host, entity: u32, kind: &str) -> Flow {
     let Some((above, rest)) = effects_of(player).and_then(|e| e.last_stand) else {
         return Flow::Continue;
     };
-    let healthy = lock(&HEALTH)
-        .get(&player)
-        .is_some_and(|health| *health >= above);
+    let healthy = above <= 0.0
+        || lock(&HEALTH)
+            .get(&player)
+            .is_some_and(|health| *health >= above);
     let now = queue::now();
     let ready = lock(&LAST_STAND_USED)
         .get(&player)
@@ -772,12 +776,12 @@ mod tests {
         tick(&mut host, 10.0);
 
         // When a blow kills them, another at once, and one after the rest while they were at 4 health
-        let first = on_death(&mut host, ENTITY, "minecraft:player");
-        let again = on_death(&mut host, ENTITY, "minecraft:player");
+        let first = on_death(&mut host, ENTITY, "minecraft:player", "minecraft:fall");
+        let again = on_death(&mut host, ENTITY, "minecraft:player", "minecraft:fall");
         for _ in 0..25 {
             tick(&mut host, 4.0);
         }
-        let weak = on_death(&mut host, ENTITY, "minecraft:player");
+        let weak = on_death(&mut host, ENTITY, "minecraft:player", "minecraft:fall");
 
         // Then only the first is survived, and they are told
         assert_eq!(
@@ -785,6 +789,53 @@ mod tests {
             (Flow::Cancel, Flow::Continue, Flow::Continue)
         );
         assert_eq!(host.action_bars_of(PLAYER).len(), 1);
+    }
+
+    #[test]
+    fn a_last_stand_with_no_floor_saves_a_player_at_any_health_but_not_from_kill() {
+        // Given a last stand with no health floor resting 1 second, and a player at half a heart
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "last_stand", "cooldown_seconds": 1}]),
+        );
+        tick(&mut host, 1.0);
+
+        // When /kill strikes, then a lethal hit, another at once, and one after the rest
+        let killed = on_death(
+            &mut host,
+            ENTITY,
+            "minecraft:player",
+            "minecraft:generic_kill",
+        );
+        let first = on_death(
+            &mut host,
+            ENTITY,
+            "minecraft:player",
+            "minecraft:mob_attack",
+        );
+        let again = on_death(
+            &mut host,
+            ENTITY,
+            "minecraft:player",
+            "minecraft:mob_attack",
+        );
+        for _ in 0..25 {
+            tick(&mut host, 1.0);
+        }
+        let later = on_death(
+            &mut host,
+            ENTITY,
+            "minecraft:player",
+            "minecraft:out_of_world",
+        );
+
+        // Then /kill goes through, the first hit is survived, the next is not, and after the rest it saves again
+        assert_eq!(
+            (killed, first, again, later),
+            (Flow::Continue, Flow::Cancel, Flow::Continue, Flow::Cancel)
+        );
     }
 
     #[test]

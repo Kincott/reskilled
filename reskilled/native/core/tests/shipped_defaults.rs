@@ -602,6 +602,21 @@ fn golden_tools_need_their_skill_at_2_and_arcane_at_4() {
 }
 
 #[test]
+fn last_breath_saves_at_any_health_every_five_minutes() {
+    // Given the shipped data
+    let defs = defaults();
+
+    // When Last Breath's effect is read
+    let effects = &defs.perks["reskilled:defense_braced_stance"].effects;
+
+    // Then it has no health floor and rests five minutes
+    assert!(matches!(
+        effects.as_slice(),
+        [skills_core::defs::Effect::LastStand { above, cooldown_seconds: 300 }] if *above == 0.0
+    ));
+}
+
+#[test]
 fn using_a_tool_on_a_block_needs_its_tier() {
     // Given the shipped data
     let defs = defaults();

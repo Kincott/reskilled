@@ -394,7 +394,7 @@ impl Hooks for Mod {
     }
 
     fn living_death(&self, host: &mut dyn Host, event: &mut LivingDeathEvent<'_>) -> Flow {
-        server::mechanics::on_death(host, event.entity, event.kind)
+        server::mechanics::on_death(host, event.entity, event.kind, event.damage_type)
     }
 
     fn server_stopped(&self, _host: &mut dyn Host, _event: &mut ServerStoppedEvent) {

@@ -125,7 +125,7 @@ Attribute operations: `add_value`, `add_multiplied_base`, `add_multiplied_total`
 | `damage` | `direction` (`dealt`/`taken`), `kind`, `multiplier` | multiplier ≥ 0 |
 | `xp_gain` | `multiplier` | ≥ 0 |
 | `anvil_cost` | `multiplier` | ≥ 0 |
-| `last_stand` | `above` (health, half hearts), `cooldown_seconds` | above ≥ 0 |
+| `last_stand` | `cooldown_seconds`, optional `above` (least health before the blow, half hearts; default 0: any) | above ≥ 0; `/kill` is never survived |
 | `effect_on_kill` | `effect` (effect id), `seconds`, `amplifier`, `mobs` (entity matcher) | |
 | `crop_growth` | `radius`, `interval_seconds`, `chance`, `blocks` (block matcher, default `#minecraft:crops`) | radius ≤ 16, interval ≥ 1, chance 0–1; blocks grow by their `age` property |
 | `replant` | `crops`: list of `{"block", "seed", "ripe_age"}` | |

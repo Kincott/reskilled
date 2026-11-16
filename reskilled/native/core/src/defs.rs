@@ -210,9 +210,13 @@ pub enum Effect {
         amount: f64,
         operation: Operation,
     },
-    /// A blow that would kill the player, taken while their health was at least `above`, leaves them at half a
-    /// heart instead; then it rests `cooldown_seconds`.
-    LastStand { above: f32, cooldown_seconds: u32 },
+    /// A blow that would kill the player leaves them at half a heart instead, when their health was at least
+    /// `above` (0, the default: whatever it was); then it rests `cooldown_seconds`. `/kill` is never survived.
+    LastStand {
+        #[serde(default)]
+        above: f32,
+        cooldown_seconds: u32,
+    },
     /// Killing one of `mobs` gives the player the potion effect `effect` (`minecraft:strength`) for `seconds`.
     EffectOnKill {
         effect: String,
