@@ -41,10 +41,7 @@ Left column, "you":
 - **Gear**: the player's real head, chest, legs, feet, main-hand and off-hand items in slots. An item the player may
   not fully use gets a padlock and, under the slots, the first unmet need of the hovered or first locked item
   ("✘ Pickaxe: Mining 16"). Hovering a slot shows the item's own tooltip (with its requirement lines).
-- **Focus**: the focus areas as buttons, active ones green with a tick; the hover tooltip stays as today (what it
-  gives XP for, what adding it costs).
-
-Right, one row per skill:
+Right, one row per skill, on one line:
 
 - Accent stripe, icon, name, "Lv N".
 - A mini road: a line from 1 to the top level, gold up to the player's level, with a stop per perk (gold owned, green
@@ -53,6 +50,12 @@ Right, one row per skill:
   same hints as today. Mastered skills show ★ Mastered in place of the button and an amber row.
 - Clicking a row opens its skill's tab. Hover brass-outlines the row.
 - Under the rule that skills grow by doing, the raise button gives way to the earning progress ("37/120").
+
+Along the bottom, the full width of the window (moved there from under the gear at the user's request: it was
+cramped):
+
+- **Focus**: a gold FOCUS label, then the focus areas as buttons sharing the width, active ones green with a tick;
+  the hover tooltip stays as today (what it gives XP for, what adding it costs).
 
 ## 4. A skill's road
 

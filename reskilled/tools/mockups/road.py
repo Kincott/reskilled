@@ -320,29 +320,29 @@ def home():
     c = Canvas()
     chrome(c, "Home")
     x0, x1, y0, y1 = WX + 8, WX + WW - 8, WY + 9, WY + WH - 8
+    strip_h = 16
+    top_y1 = y1 - strip_h - 6
+    # you
     cw = 104
-    c.fill(x0, y0, cw, y1 - y0, BLACK)
-    c.fill(x0 + 1, y0 + 1, cw - 2, y1 - y0 - 2, CARD)
+    c.fill(x0, y0, cw, top_y1 - y0, BLACK)
+    c.fill(x0 + 1, y0 + 1, cw - 2, top_y1 - y0 - 2, CARD)
     mx = x0 + cw // 2
-    c.sprite("advancements/goal_frame_obtained", mx - 16, y0 + 5, 32, 32)
-    c.art(FACE, FACE_PAL, mx - 8, y0 + 13, 2)
-    c.centred("xKincott", x0, y0 + 40, cw, WHITE)
-    c.centred("Total level 65", x0, y0 + 50, cw, GOLD)
-    c.fill(x0 + 8, y0 + 61, cw - 16, 1, BRASS_DARK)
-    c.text("GEAR", x0 + 8, y0 + 65, DIM, False)
-    gx, gy = mx - 29, y0 + 75
+    c.sprite("advancements/goal_frame_obtained", mx - 16, y0 + 6, 32, 32)
+    c.art(FACE, FACE_PAL, mx - 8, y0 + 14, 2)
+    c.centred("xKincott", x0, y0 + 42, cw, WHITE)
+    c.centred("Total level 65", x0, y0 + 52, cw, GOLD)
+    c.fill(x0 + 8, y0 + 64, cw - 16, 1, BRASS_DARK)
+    c.text("GEAR", x0 + 8, y0 + 69, DIM, False)
+    gx, gy = mx - 29, y0 + 80
     gear = ["minecraft:iron_helmet", "minecraft:iron_chestplate", "minecraft:diamond_pickaxe",
             "minecraft:iron_leggings", "minecraft:iron_boots", None]
     for i, item in enumerate(gear):
         c.slot(gx + (i % 3) * 20, gy + (i // 3) * 20, item, locked=item == "minecraft:diamond_pickaxe")
-    c.centred("✘ Pickaxe: Mining 16", x0, gy + 42, cw, RED, False)
-    c.fill(x0 + 8, gy + 53, cw - 16, 1, BRASS_DARK)
-    c.text("FOCUS", x0 + 8, gy + 57, DIM, False)
-    for i, (name, on) in enumerate([("Fighting", False), ("Roaming", False), ("Working", True)]):
-        c.button(x0 + 8, gy + 67 + i * 13, cw - 16, 12, ("✔ " if on else "") + name, GO if on else PLAIN)
+    c.centred("\u2718 Pickaxe: Mining 16", x0, gy + 45, cw, RED, False)
+    # the eight roads
     rx = x0 + cw + 6
     rw = x1 - rx
-    rh = (y1 - y0 - 7 * 2) / 8
+    rh = (top_y1 - y0 - 7 * 2) / 8
     for i, (name, icon, lvl, pts) in enumerate(SKILLS):
         y = round(y0 + i * (rh + 2))
         h = round(rh)
@@ -353,12 +353,13 @@ def home():
         c.fill(rx + 1, y + 1, 2, h - 2, ACCENT[name])
         if hover:
             c.edge(rx, y, rw, h, BRASS_LIGHT)
-        c.item(icon, rx + 7, y + (h - 16) // 2)
-        c.text(name, rx + 28, y + 3, WHITE)
-        c.text("Lv", rx + 28, y + 12, DIM, False)
-        c.text(str(lvl), rx + 28 + FONT.width("Lv "), y + 12, GOLD if mastered else WHITE)
-        mx0, mx1 = rx + 86, rx + rw - 62
-        my = y + h // 2
+        ty = y + (h - 8) // 2 + 1
+        c.item(icon, rx + 6, y + (h - 16) // 2)
+        c.text(name, rx + 26, ty, WHITE)
+        c.right(str(lvl), rx + 108, ty, GOLD if mastered else WHITE)
+        c.right("Lv ", rx + 108 - FONT.width(str(lvl)), ty, DIM, False)
+        mx0, mx1 = rx + 116, rx + rw - 62
+        my = y + h // 2 - 1
 
         def mat(lv):
             return round(mx0 + (lv - 1) * (mx1 - mx0) / 31)
@@ -375,11 +376,20 @@ def home():
             if state == "owned":
                 c.fill(px - 1, my - 1, 3, 1, 0xFFFFE79A)
         if mastered:
-            c.right("★ Mastered", rx + rw - 6, y + (h - 8) // 2 + 1, GOLD)
+            c.right("\u2605 Mastered", rx + rw - 6, ty, GOLD)
         else:
             if pts:
-                c.right(f"◆{pts}", rx + rw - 44, y + (h - 8) // 2 + 1, GOLD)
-            c.button(rx + rw - 40, y + (h - 14) // 2, 35, 14, str(lvl), GO, arrow=True)
+                c.right(f"\u25c6{pts}", rx + rw - 44, ty, GOLD)
+            c.button(rx + rw - 40, y + (h - 13) // 2, 35, 13, str(lvl), GO, arrow=True)
+    # focus, along the bottom
+    fy = y1 - strip_h
+    c.fill(x0, fy - 4, x1 - x0, 1, BRASS_DARK)
+    c.text("FOCUS", x0 + 2, fy + 4, GOLD)
+    bx0 = x0 + FONT.width("FOCUS") + 10
+    bw = (x1 - bx0 - 2 * 4) / 3
+    for i, (name, on) in enumerate([("Fighting", False), ("Roaming", False), ("Working", True)]):
+        c.button(round(bx0 + i * (bw + 4)), fy, round(bw), strip_h, ("\u2714 " if on else "") + name,
+                 GO if on else PLAIN)
     c.save("road_home")
 
 
