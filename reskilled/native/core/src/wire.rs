@@ -57,7 +57,12 @@ pub enum ToClient {
         because: Option<(String, u32)>,
     },
     /// The player this client plays as, so it can read its own synced state.
-    You { player: u128 },
+    You {
+        player: u128,
+        /// Their name, as they logged in with it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+    },
     /// The player's home (respawn point): its dimension and block, or none; perks' areas are drawn around it.
     Home { home: Option<(String, [i32; 3])> },
     /// The player's XP level, and whether locks are off for them (creative or spectator, by the settings): the
@@ -360,6 +365,7 @@ mod tests {
             },
             ToClient::You {
                 player: u128::MAX - 7,
+                name: Some("Ann".into()),
             },
             ToClient::Status {
                 levels: 31,
@@ -441,6 +447,18 @@ mod tests {
         assert_eq!(
             client.labels[MINING][&16],
             vec!["reskilled.lock.diamond_tools".to_string()]
+        );
+    }
+
+    #[test]
+    fn a_you_without_a_name_reads_as_before() {
+        let read: ToClient = serde_json::from_str(r#"{"you": {"player": 1}}"#).unwrap();
+        assert_eq!(
+            read,
+            ToClient::You {
+                player: 1,
+                name: None
+            }
         );
     }
 

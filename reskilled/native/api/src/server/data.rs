@@ -125,7 +125,11 @@ pub fn send_defs(player: u128) {
         return;
     };
     queue::drop_waiting(player, DEFS_CHANNEL);
-    let you = serde_json::to_vec(&ToClient::You { player }).expect("You always encodes");
+    let you = serde_json::to_vec(&ToClient::You {
+        player,
+        name: super::state::name_of(player),
+    })
+    .expect("You always encodes");
     queue::send(player, MSG_CHANNEL, you);
     // Send ids only need to grow within one server run; 2^32 data loads never happen.
     let send_id = data.generation as u32;

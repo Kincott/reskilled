@@ -196,6 +196,7 @@ mod tests {
             &mut host,
             &[("skills", vec![("reskilled:mining", mining)])],
         );
+        crate::server::state::logged_in(7, "Pat");
         take_queued();
         queue(Job::SendDefs(7));
 
@@ -217,7 +218,13 @@ mod tests {
             .iter()
             .map(|m| serde_json::from_slice(m).unwrap())
             .collect();
-        assert_eq!(you, vec![skills_core::wire::ToClient::You { player: 7 }]);
+        assert_eq!(
+            you,
+            vec![skills_core::wire::ToClient::You {
+                player: 7,
+                name: Some("Pat".into())
+            }]
+        );
     }
 
     #[test]

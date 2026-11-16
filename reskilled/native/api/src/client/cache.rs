@@ -162,6 +162,8 @@ const TICKS_PER_SECOND: u32 = 20;
 pub struct ClientCache {
     /// The player this client plays as, once the server says.
     pub me: Option<u128>,
+    /// Their name, as the server said.
+    pub my_name: Option<String>,
     /// Their home (respawn point) as the server last said: dimension and block.
     pub home: Option<(String, [i32; 3])>,
     pub defs: Option<ClientDefs>,
@@ -349,7 +351,8 @@ pub fn on_message(host: &mut dyn Host, channel: &str, data: &[u8]) {
             });
         }
         Ok(ToClient::Home { home }) => with(|cache| cache.home = home),
-        Ok(ToClient::You { player }) => with(|cache| {
+        Ok(ToClient::You { player, name }) => with(|cache| {
+            cache.my_name = name;
             cache.me = Some(player);
             cache.outgoing.push(ToServer::Hello);
         }),
@@ -532,6 +535,20 @@ mod tests {
     }
 
     #[test]
+    fn the_client_keeps_its_players_name() {
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        send_msg(
+            &mut host,
+            &ToClient::You {
+                player: ME,
+                name: Some("Ann".into()),
+            },
+        );
+        assert_eq!(with(|cache| cache.my_name.clone()), Some("Ann".to_string()));
+    }
+
+    #[test]
     fn defs_reassemble_across_messages() {
         // Given definitions too big for one message
         let _serial = exclusive();
@@ -690,7 +707,13 @@ mod tests {
             ..TestHost::default()
         };
         send_defs(&mut host, &defs_with(1), 1);
-        send_msg(&mut host, &ToClient::You { player: ME });
+        send_msg(
+            &mut host,
+            &ToClient::You {
+                player: ME,
+                name: None,
+            },
+        );
         synced(&mut host, 31, &[]);
 
         // When the player raises it to 32, then a later sync arrives unchanged
@@ -720,7 +743,13 @@ mod tests {
             ..TestHost::default()
         };
         send_defs(&mut host, &defs_with(1), 1);
-        send_msg(&mut host, &ToClient::You { player: ME });
+        send_msg(
+            &mut host,
+            &ToClient::You {
+                player: ME,
+                name: None,
+            },
+        );
         synced(&mut host, 4, &[]);
         with(|cache| cache.settings.progress_sounds = false);
 
@@ -795,7 +824,13 @@ mod tests {
         send_defs(&mut host, &defs_with(1), 1);
 
         // When the server names the player, and two ticks pass
-        send_msg(&mut host, &ToClient::You { player: ME });
+        send_msg(
+            &mut host,
+            &ToClient::You {
+                player: ME,
+                name: None,
+            },
+        );
         dispatch_tick(&mut host, &mods());
         dispatch_tick(&mut host, &mods());
 
@@ -854,7 +889,13 @@ mod tests {
             ..TestHost::default()
         };
         send_defs(&mut host, &defs_with(1), 1);
-        send_msg(&mut host, &ToClient::You { player: ME });
+        send_msg(
+            &mut host,
+            &ToClient::You {
+                player: ME,
+                name: None,
+            },
+        );
         synced(&mut host, 4, &[]);
         let at_login = host.sounds.len();
 
@@ -977,7 +1018,13 @@ mod tests {
         let _serial = exclusive();
         let mut host = TestHost::default();
         send_defs(&mut host, &defs_with(1), 1);
-        send_msg(&mut host, &ToClient::You { player: ME });
+        send_msg(
+            &mut host,
+            &ToClient::You {
+                player: ME,
+                name: None,
+            },
+        );
         let mut state = PlayerState::default();
         state.skills.insert(
             "reskilled:skill_0000".into(),
@@ -1007,7 +1054,13 @@ mod tests {
         let _serial = exclusive();
         let mut host = TestHost::default();
         send_defs(&mut host, &defs_with(1), 5);
-        send_msg(&mut host, &ToClient::You { player: ME });
+        send_msg(
+            &mut host,
+            &ToClient::You {
+                player: ME,
+                name: None,
+            },
+        );
         send_msg(
             &mut host,
             &ToClient::Reqs {
