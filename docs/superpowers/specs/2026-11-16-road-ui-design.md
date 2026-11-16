@@ -33,29 +33,34 @@ top.
 
 ## 3. Home
 
+Mockup: [Home](2026-11-16-road-ui/home_doll.png). Earlier versions (focus under the gear, a strip along the bottom,
+medallions) were set aside by the user; focus is now the structure of the skill list.
+
 Left column, "you":
 
-- The player's head in a gold goal frame. It is drawn as a `minecraft:player_head` item carrying the player's
-  profile; if Horizon does not draw the skin in a screen, the default head shows instead (to be checked in game).
-- Name, then "Total level N" (the sum of all skill levels).
-- **Gear**: the player's real head, chest, legs, feet, main-hand and off-hand items in slots. An item the player may
-  not fully use gets a padlock and, under the slots, the first unmet need of the hovered or first locked item
-  ("✘ Pickaxe: Mining 16"). Hovering a slot shows the item's own tooltip (with its requirement lines).
-Right, one row per skill, on one line:
+- The player's name and total level ("Lv 65") on one line.
+- **Steve** in a stone alcove (vanilla's advancement stone, darkened), drawn by the mod in pixel art (16 x 32 pixels at
+  twice the size), front on, with a shadow under him. His eyes follow the mouse, as the player in the inventory does.
+  Horizon does not let mods draw the player's real model or skin in a screen at the pinned commit; if a later
+  Horizon offers the inventory's player preview to mods, it takes Steve's place.
+- **Gear** around him: head, chest, legs and feet down the left, main hand and off hand on the right, the player's
+  real items. An item the player may not fully use is dimmed with a padlock, and under the alcove the first unmet
+  need of the hovered (else the first locked) item: "✘ Pickaxe: Mining 16". Hovering a slot shows the item's own
+  tooltip with its requirement lines.
+- **Stats**: perks owned out of all perks, skills mastered out of all skills, perk points waiting to be spent.
 
-- Accent stripe, icon, name, "Lv N".
-- A mini road: a line from 1 to the top level, gold up to the player's level, with a stop per perk (gold owned, green
-  buyable, dark otherwise).
-- Unspent points (◆N), and a raise button showing its price with the arrow; Shift and Ctrl raise 5 or all, with the
-  same hints as today. Mastered skills show ★ Mastered in place of the button and an amber row.
+Right, the skills **grouped by focus area**, in the areas' order, then skills in no area under "Other":
+
+- A group heading per area: its name in capitals (gold when the area is active, grey otherwise), what it gives in a
+  few words ("+50% ore XP", from its rewards), a rule line, and at the right "✔ Focused" when active or a **Focus**
+  button that adds it (its cost and first-free rule as today, in the button's tooltip).
+- Under it, one row per skill, on one line: accent stripe, icon, name, "Lv N", a mini road (a line from 1 to the top
+  level, gold up to the player's level, a stop per perk: gold owned, green buyable, dark otherwise), unspent points
+  (◆N), and a raise button showing its price with the arrow; Shift and Ctrl raise 5 or all, with the same hints as
+  today. Mastered skills show ★ Mastered in place of the button and an amber row.
 - Clicking a row opens its skill's tab. Hover brass-outlines the row.
 - Under the rule that skills grow by doing, the raise button gives way to the earning progress ("37/120").
-
-Along the bottom, the full width of the window (moved there from under the gear at the user's request: it was
-cramped):
-
-- **Focus**: a gold FOCUS label, then the focus areas as buttons sharing the width, active ones green with a tick;
-  the hover tooltip stays as today (what it gives XP for, what adding it costs).
+- More rows than fit: the list scrolls with the wheel.
 
 ## 4. A skill's road
 

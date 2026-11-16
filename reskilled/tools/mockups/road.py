@@ -574,27 +574,66 @@ home_medallions()
 home_groups()
 
 
+# Steve, front on, 16 x 32 pixels: head 8 x 8, body and arms 12 high, legs 12 high.
+STEVE = [
+    "....hhhhhhhh....",
+    "....hhhhhhhh....",
+    "....hHsssssh....",
+    "....ssssssss....",
+    "....sWBssBWs....",
+    "....sssnnsss....",
+    "....ssmmmmss....",
+    "....ssssssss....",
+    "ttttTTsssTTTtttt",
+    "ttttTTTssTTTtttt",
+    "ttttTTTTTTTTtttt",
+    "ttttTTTTTTTTtttt",
+    "ssssTTTTTTTTssss",
+    "ssssTTTTTTTTssss",
+    "ssssTTTTTTTTssss",
+    "ssssTTTTTTTTssss",
+    "ssssTTTTTTTTssss",
+    "ssssTTTTTTTTssss",
+    "ssssTTTTTTTTssss",
+    "SSSSTTTTTTTTSSSS",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ppppPPPP....",
+    "....ggggGGGG....",
+    "....ggggGGGG....",
+]
+STEVE_PAL = {"h": 0xFF3B2A1A, "H": 0xFF4A3420, "s": 0xFFC69473, "S": 0xFFB07F60, "W": 0xFFFFFFFF,
+             "B": 0xFF3D5AA8, "n": 0xFF9A6B52, "m": 0xFF7A4B3B, "t": 0xFF2BA3A3, "T": 0xFF1F8C8C,
+             "p": 0xFF3F3FA8, "P": 0xFF35358F, "g": 0xFF6B6B6B, "G": 0xFF5A5A5A}
+
+
 def you_doll(c, x0, y0, cw, y1):
     c.fill(x0, y0, cw, y1 - y0, BLACK)
     c.fill(x0 + 1, y0 + 1, cw - 2, y1 - y0 - 2, CARD)
     mx = x0 + cw // 2
-    c.art(FACE, FACE_PAL, x0 + 7, y0 + 5, 1)
-    c.edge(x0 + 6, y0 + 4, 10, 10, BRASS)
-    c.text("xKincott", x0 + 20, y0 + 6, WHITE)
+    c.text("xKincott", x0 + 8, y0 + 6, WHITE)
     c.right("65", x0 + cw - 8, y0 + 6, GOLD)
     c.right("Lv ", x0 + cw - 8 - FONT.width("65"), y0 + 6, DIM, False)
     c.fill(x0 + 8, y0 + 18, cw - 16, 1, BRASS_DARK)
-    # the doll: the gear shaped like a body in a stone alcove
+    # Steve in a stone alcove, the gear in slots either side
     ax, ay, aw, ah = x0 + 8, y0 + 23, cw - 16, 90
     c.fill(ax, ay, aw, ah, INSET)
     c.tile("gui/advancements/backgrounds/stone", ax + 1, ay + 1, aw - 2, ah - 2, 0.72)
+    c.fill(mx - 18, ay + ah - 9, 36, 4, 0x66000000)
+    c.art(STEVE, STEVE_PAL, mx - 16, ay + 13, 2)
     for i, item in enumerate(["minecraft:iron_helmet", "minecraft:iron_chestplate", "minecraft:iron_leggings",
                               "minecraft:iron_boots"]):
-        c.slot(mx - 9, ay + 6 + i * 20, item)
-    c.slot(mx - 31, ay + 26, "minecraft:diamond_pickaxe", locked=True)
-    c.slot(mx + 13, ay + 26, None)
+        c.slot(ax + 3, ay + 5 + i * 20, item)
+    c.slot(ax + aw - 21, ay + 25, "minecraft:diamond_pickaxe", locked=True)
+    c.slot(ax + aw - 21, ay + 45, None)
     c.centred("\u2718 Pickaxe: Mining 16", x0, ay + ah + 4, cw, RED, False)
-    # stats
     sy = ay + ah + 18
     c.fill(x0 + 8, sy - 4, cw - 16, 1, BRASS_DARK)
     stats = [("Perks", "7 / 40", WHITE), ("Mastered", "1 / 8", GOLD), ("Points", "12", GOLD)]
