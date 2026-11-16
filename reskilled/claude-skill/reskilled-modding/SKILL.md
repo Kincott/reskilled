@@ -6,9 +6,13 @@ description: Use when creating, retuning or removing Reskilled skills, perks, fo
 # Customizing Reskilled
 
 Reskilled (Minecraft Horizon) is driven entirely by JSON data files. A mod or pack changes it by **adding its own
-files in its own namespace**, never by editing Reskilled's. Every field, default and limit is in
-[reference.md](reference.md); a complete working pack is in [example-pack/](example-pack/) (a new skill with
-perks, locks on a mod's items, settings entries, a retuned shipped perk and a removed one).
+files in its own namespace**, never by editing Reskilled's.
+
+- [reference.md](reference.md): every field, default and limit.
+- [example-pack/](example-pack/): a complete working pack (a new skill with perks, locks on a mod's items, settings
+  entries, a retuned shipped perk and a removed one).
+- [integration.md](integration.md): what another mod's code can call (abilities, accessory slots, reading
+  progress).
 
 ## A correct change
 
@@ -40,7 +44,7 @@ perks, locks on a mod's items, settings entries, a retuned shipped perk and a re
 | Mod's darts earn Ranged XP | `settings/` `projectile_damage` | same |
 | Shift-click must not put on a locked modded wearable | `settings/` `equip_slots` | same |
 | Change costs, max level, perk point pace | `settings/`, priority 1, only those fields | reference.md, Settings |
-| Make a mod's own accessory slots (rings, amulets) respect equip locks | code: `reskilled::may_equip` / `may_wear` | Reskilled's `INTEGRATION.md`, Accessory slots |
+| Make a mod's own accessory slots (rings, amulets) respect equip locks | code: `reskilled::may_equip` / `may_wear` | [integration.md](integration.md), Accessory slots |
 
 Modded gear that joins vanilla tags (`#minecraft:pickaxes`, `#minecraft:chest_armor`...) and is repaired with
 diamonds or netherite already falls under the shipped tier locks.

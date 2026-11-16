@@ -38,7 +38,7 @@ grows it. `/reload` applies changes, and gear a player may no longer wear comes 
 [data reference](claude-skill/reskilled-modding/reference.md).
 
 Other mods can add their own unlockables, including abilities with no item behind them: see
-[INTEGRATION.md](INTEGRATION.md).
+[integration.md](claude-skill/reskilled-modding/integration.md).
 
 ### Customizing with Claude
 
