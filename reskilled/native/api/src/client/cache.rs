@@ -487,6 +487,7 @@ mod tests {
                 points_every: None,
                 icon_levels: Default::default(),
                 earned_by: Vec::new(),
+                color: None,
             };
             defs.skills.insert(id, skill);
         }

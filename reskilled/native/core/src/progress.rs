@@ -579,6 +579,7 @@ mod tests {
             points_every: None,
             icon_levels: Default::default(),
             earned_by: Vec::new(),
+            color: None,
         }
     }
 
@@ -593,6 +594,7 @@ mod tests {
             min_level,
             requires: requires.iter().map(|r| r.to_string()).collect(),
             also_needs: BTreeMap::new(),
+            icon: None,
             effects: vec![],
         }
     }

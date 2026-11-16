@@ -331,6 +331,7 @@ mod tests {
             min_level,
             requires: vec![],
             also_needs: Default::default(),
+            icon: None,
             effects,
         }
     }
@@ -347,6 +348,7 @@ mod tests {
             points_every: None,
             icon_levels: Default::default(),
             earned_by: Vec::new(),
+            color: None,
         };
         let mut state = PlayerState::default();
         let owned = perks.iter().map(|p| p.id.clone()).collect();

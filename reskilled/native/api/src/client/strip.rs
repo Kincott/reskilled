@@ -118,6 +118,7 @@ mod tests {
             points_every: None,
             icon_levels: [(8, "minecraft:iron_pickaxe".to_string())].into(),
             earned_by: Vec::new(),
+            color: None,
         };
         (id, def)
     }
@@ -139,6 +140,7 @@ mod tests {
             cache.defs = Some(ClientDefs {
                 defs,
                 labels: Default::default(),
+                label_icons: Default::default(),
             });
             cache.state = state;
         });

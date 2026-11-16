@@ -1139,6 +1139,7 @@ mod tests {
             points_every: None,
             icon_levels: Default::default(),
             earned_by: Vec::new(),
+            color: None,
         }
     }
 
@@ -1153,6 +1154,7 @@ mod tests {
             min_level,
             requires: requires.iter().map(|r| format!("reskilled:{r}")).collect(),
             also_needs: Default::default(),
+            icon: None,
             effects: vec![],
         }
     }
@@ -1210,7 +1212,11 @@ mod tests {
             },
         );
         with(|cache| {
-            cache.defs = Some(ClientDefs { defs, labels });
+            cache.defs = Some(ClientDefs {
+                defs,
+                labels,
+                label_icons: Default::default(),
+            });
             cache.state = state;
             cache.xp_levels = Some(23);
         });

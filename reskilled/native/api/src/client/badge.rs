@@ -65,6 +65,7 @@ mod tests {
             points_every: None,
             icon_levels: Default::default(),
             earned_by: Vec::new(),
+            color: None,
         };
         let needs = |level: u32| Requirements {
             by_action: [(Action::Break, [(MINING.to_string(), level)].into())].into(),
@@ -85,6 +86,7 @@ mod tests {
             cache.defs = Some(ClientDefs {
                 defs,
                 labels: Default::default(),
+                label_icons: Default::default(),
             });
             cache
                 .reqs

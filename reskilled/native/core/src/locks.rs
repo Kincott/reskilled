@@ -298,6 +298,7 @@ mod tests {
             label: label.map(str::to_string),
             replace: false,
             enchantment_level: None,
+            icon: None,
         }
     }
 

@@ -140,6 +140,7 @@ mod tests {
             points_every: None,
             icon_levels: Default::default(),
             earned_by: Vec::new(),
+            color: None,
         };
         let defs = Defs {
             skills: [
@@ -175,6 +176,7 @@ mod tests {
             cache.defs = Some(ClientDefs {
                 defs,
                 labels: Default::default(),
+                label_icons: Default::default(),
             });
             cache.reqs.insert(PICKAXE.into(), pickaxe);
             cache.state = state;
@@ -326,6 +328,7 @@ mod tests {
                 label: None,
                 replace: false,
                 enchantment_level: Some(3),
+                icon: None,
             };
             cache.defs.as_mut().unwrap().defs.locks.push(sharpness);
         });

@@ -125,6 +125,7 @@ mod tests {
             points_every: None,
             icon_levels: Default::default(),
             earned_by: Vec::new(),
+            color: None,
         };
         let mut state = PlayerState::default();
         let progress = SkillProgress {
@@ -140,6 +141,7 @@ mod tests {
             cache.defs = Some(ClientDefs {
                 defs,
                 labels: Default::default(),
+                label_icons: Default::default(),
             });
             cache.state = state;
             cache.warning = Some(Warning {

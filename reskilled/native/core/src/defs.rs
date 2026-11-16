@@ -43,6 +43,34 @@ pub struct SkillDef {
     /// The work that grows the skill when the server's rules let skills grow by doing.
     #[serde(default)]
     pub earned_by: Vec<EarnRule>,
+    /// The skill's colour on the screens, `#RRGGBB`; without one, [`skill_rgb`] picks one from the id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+/// The colours a skill without its own takes, chosen by its id.
+pub const FALLBACK_RGB: [u32; 8] = [
+    0x8FA6B8, 0xD9534A, 0x6E8FD9, 0xB07CF2, 0x7FC75A, 0x5AD1C7, 0xD98C4A, 0xD9C24A,
+];
+
+/// The skill's colour as `0xRRGGBB`: its own, else a fallback chosen by a stable hash of its id.
+pub fn skill_rgb(skill: &SkillDef) -> u32 {
+    if let Some(rgb) = skill.color.as_deref().and_then(parse_rgb) {
+        return rgb;
+    }
+    // FNV-1a, so the choice stays the same across runs and versions.
+    let hash = skill.id.bytes().fold(0x811C_9DC5_u32, |h, b| {
+        (h ^ u32::from(b)).wrapping_mul(0x0100_0193)
+    });
+    FALLBACK_RGB[hash as usize % FALLBACK_RGB.len()]
+}
+
+/// `#RRGGBB` as `0xRRGGBB`.
+fn parse_rgb(colour: &str) -> Option<u32> {
+    let hex = colour.strip_prefix('#')?;
+    (hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit()))
+        .then(|| u32::from_str_radix(hex, 16).ok())
+        .flatten()
 }
 
 fn crops() -> Matcher {
@@ -149,6 +177,9 @@ pub struct PerkDef {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub also_needs: BTreeMap<String, u32>,
     pub effects: Vec<Effect>,
+    /// The item drawn for the perk on the screens; without one, its skill's icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 /// What a perk does while it is active.
@@ -344,6 +375,9 @@ pub struct LockEntry {
     /// For an enchantment target: the enchantment level the lock starts at (1 when absent).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enchantment_level: Option<u32>,
+    /// The item drawn for the lock on its skill's road, with its label; without one it is not on the road.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 /// The three kinds of thing a lock can target.
@@ -611,6 +645,11 @@ impl SkillDef {
         check_at_least_one("max_level", self.max_level)?;
         check_cost(self.cost)?;
         check_at_least_one("points_every", self.points_every)?;
+        if let Some(colour) = &self.color
+            && parse_rgb(colour).is_none()
+        {
+            return Err(format!("color {colour:?} is not #RRGGBB"));
+        }
         self.earned_by.iter().try_for_each(EarnRule::validate)
     }
 }
@@ -622,6 +661,9 @@ impl PerkDef {
         self.requires
             .iter()
             .try_for_each(|perk| check_id("requires", perk))?;
+        if let Some(icon) = &self.icon {
+            check_id("icon", icon)?;
+        }
         self.effects.iter().try_for_each(Effect::validate)
     }
 }
@@ -799,6 +841,9 @@ impl LockEntry {
         if self.actions.is_empty() {
             return Err("actions must not be empty".into());
         }
+        if let Some(icon) = &self.icon {
+            check_id("icon", icon)?;
+        }
         if let Some(action) = self
             .actions
             .iter()
@@ -964,6 +1009,70 @@ mod tests {
     }
 
     #[test]
+    fn skill_colour_and_perk_and_lock_icons_parse() {
+        // Given a skill with a colour, a perk with an icon, and a lock entry with an icon
+        let skill = r##"{"format": 1, "id": "reskilled:mining", "name": "n", "icon": "minecraft:stone",
+            "color": "#8FA6B8"}"##;
+        let perk = r#"{"format": 1, "id": "reskilled:p", "skill": "reskilled:mining", "name": "n",
+            "description": "d", "cost": 1, "min_level": 1, "effects": [], "icon": "minecraft:raw_iron"}"#;
+        let lock = r#"{"format": 1, "entries": [{"target": {"item": {"id": "minecraft:diamond_pickaxe"}},
+            "actions": ["break"], "requires": {"reskilled:mining": 16}, "label": "l",
+            "icon": "minecraft:diamond_pickaxe"}]}"#;
+
+        // When they are parsed
+        let (DefFile::Skill(skill), DefFile::Perk(perk), DefFile::Lock(lock)) = (
+            parse_ok(DefKind::Skill, skill),
+            parse_ok(DefKind::Perk, perk),
+            parse_ok(DefKind::Lock, lock),
+        ) else {
+            panic!("a skill, a perk and a lock file");
+        };
+
+        // Then the colour reads as RGB and the icons are kept
+        assert_eq!(skill_rgb(&skill), 0x8FA6B8);
+        assert_eq!(perk.icon.as_deref(), Some("minecraft:raw_iron"));
+        assert_eq!(
+            lock.entries[0].icon.as_deref(),
+            Some("minecraft:diamond_pickaxe")
+        );
+    }
+
+    #[test]
+    fn bad_colours_and_icons_are_refused() {
+        let skill = |extra: &str| {
+            format!(
+                r##"{{"format": 1, "id": "a:b", "name": "n", "icon": "minecraft:stone", {extra}}}"##
+            )
+        };
+        for colour in ["8FA6B8", "#8FA6B", "#GGGGGG"] {
+            let reason = refusal(DefKind::Skill, &skill(&format!(r#""color": "{colour}""#)));
+            assert!(reason.contains("color"), "{colour}: {reason}");
+        }
+        let perk = r#"{"format": 1, "id": "a:p", "skill": "a:b", "name": "n", "description": "d", "cost": 1,
+            "min_level": 1, "effects": [], "icon": "Raw Iron"}"#;
+        assert!(refusal(DefKind::Perk, perk).contains("icon"));
+    }
+
+    #[test]
+    fn a_skill_without_a_colour_gets_a_stable_one() {
+        // Given two skills with no colour
+        let skill = |id: &str| match parse_ok(
+            DefKind::Skill,
+            &format!(r#"{{"format": 1, "id": "{id}", "name": "n", "icon": "minecraft:stone"}}"#),
+        ) {
+            DefFile::Skill(skill) => skill,
+            other => panic!("{other:?}"),
+        };
+        let (a, b) = (skill("othermod:digging"), skill("othermod:cooking"));
+
+        // When their colours are read twice
+        // Then each is one of the fallback colours, the same every time
+        assert_eq!(skill_rgb(&a), skill_rgb(&a));
+        assert!(FALLBACK_RGB.contains(&skill_rgb(&a)));
+        assert!(FALLBACK_RGB.contains(&skill_rgb(&b)));
+    }
+
+    #[test]
     fn a_skill_says_what_work_grows_it() {
         // Given a skill grown by breaking with pickaxes or a modded drill, by hits taken, and by travel
         let json = r##"{"format": 1, "id": "othermod:digging", "name": "n", "icon": "minecraft:stone",
@@ -1084,6 +1193,7 @@ mod tests {
                 points_every: Some(5),
                 icon_levels: Default::default(),
                 earned_by: Vec::new(),
+                color: None,
             })
         );
         assert_eq!(
@@ -1098,6 +1208,7 @@ mod tests {
                 points_every: None,
                 icon_levels: Default::default(),
                 earned_by: Vec::new(),
+                color: None,
             })
         );
     }
@@ -1136,6 +1247,7 @@ mod tests {
                 min_level: 8,
                 requires: vec!["reskilled:mining_sure_grip".into()],
                 also_needs: Default::default(),
+                icon: None,
                 effects: vec![
                     Effect::Attribute {
                         attribute: "minecraft:block_break_speed".into(),
@@ -1195,6 +1307,7 @@ mod tests {
                         label: Some("reskilled.lock.diamond_pickaxe".into()),
                         replace: false,
                         enchantment_level: None,
+                        icon: None,
                     },
                     LockEntry {
                         target: Target::Block(Matcher::AnyOf(vec![
@@ -1206,6 +1319,7 @@ mod tests {
                         label: None,
                         replace: true,
                         enchantment_level: None,
+                        icon: None,
                     },
                     LockEntry {
                         target: Target::Entity(Matcher::Id("minecraft:horse".into())),
@@ -1214,6 +1328,7 @@ mod tests {
                         label: None,
                         replace: false,
                         enchantment_level: None,
+                        icon: None,
                     },
                 ],
             })

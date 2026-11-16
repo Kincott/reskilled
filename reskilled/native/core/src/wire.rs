@@ -73,6 +73,9 @@ pub enum ToClient {
 pub struct ClientDefs {
     pub defs: Defs,
     pub labels: BTreeMap<String, BTreeMap<u32, Vec<String>>>,
+    /// The item drawn for each lock label on its skill's road.
+    #[serde(default)]
+    pub label_icons: BTreeMap<String, String>,
 }
 
 /// One piece of a definitions send.
@@ -142,6 +145,11 @@ pub fn client_defs_json(defs: &Defs) -> String {
             ..defs.clone()
         },
         labels,
+        label_icons: defs
+            .locks
+            .iter()
+            .filter_map(|entry| Some((entry.label.clone()?, entry.icon.clone()?)))
+            .collect(),
     };
     serde_json::to_string(&client)
         .expect("definitions always encode: string keys and finite numbers")
@@ -249,6 +257,7 @@ mod tests {
             points_every: None,
             icon_levels: Default::default(),
             earned_by: Vec::new(),
+            color: None,
         }
     }
 
@@ -401,6 +410,7 @@ mod tests {
             label: None,
             replace: false,
             enchantment_level: Some(5),
+            icon: None,
         };
         let defs = Defs {
             skills: [(MINING.into(), mining())].into(),
@@ -412,6 +422,7 @@ mod tests {
                     label: Some("reskilled.lock.diamond_tools".into()),
                     replace: false,
                     enchantment_level: None,
+                    icon: None,
                 },
                 sharpness.clone(),
             ],
@@ -430,6 +441,41 @@ mod tests {
         assert_eq!(
             client.labels[MINING][&16],
             vec!["reskilled.lock.diamond_tools".to_string()]
+        );
+    }
+
+    #[test]
+    fn client_defs_carry_lock_icons_by_label() {
+        // Given a labelled lock with an icon, and a labelled lock without one
+        let entry = |label: &str, icon: Option<&str>| LockEntry {
+            target: Target::Item(Matcher::Id("minecraft:diamond_axe".into())),
+            actions: vec![Action::Break],
+            requires: [(MINING.to_string(), 16)].into(),
+            label: Some(label.into()),
+            replace: false,
+            enchantment_level: None,
+            icon: icon.map(String::from),
+        };
+        let defs = Defs {
+            skills: [(MINING.into(), mining())].into(),
+            locks: vec![
+                entry("with_icon", Some("minecraft:netherite_axe")),
+                entry("without", None),
+            ],
+            ..Defs::default()
+        };
+
+        // When they are prepared for clients
+        let client: ClientDefs = serde_json::from_str(&client_defs_json(&defs)).unwrap();
+
+        // Then only the first label has its icon
+        assert_eq!(
+            client.label_icons,
+            [(
+                "with_icon".to_string(),
+                "minecraft:netherite_axe".to_string()
+            )]
+            .into()
         );
     }
 

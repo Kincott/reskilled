@@ -237,6 +237,7 @@ mod tests {
         cache.defs = Some(ClientDefs {
             defs,
             labels: Default::default(),
+            label_icons: Default::default(),
         });
         cache.state = state;
         cache.home = Some(("minecraft:overworld".into(), [10, 64, -3]));
