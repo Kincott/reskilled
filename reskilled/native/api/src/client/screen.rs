@@ -142,6 +142,9 @@ pub(super) struct Pen<'a> {
     pub(super) rules: &'a Rules,
     /// The perks whose area the player chose to see in the world.
     pub(super) shown_areas: &'a std::collections::BTreeSet<String>,
+    /// The client's tick, and the tick the player's last stand is ready again.
+    pub(super) now: u64,
+    pub(super) last_stand_ready: Option<u64>,
 }
 
 impl Pen<'_> {
@@ -273,6 +276,8 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
             tip: None,
             rules: &cache.rules,
             shown_areas: &cache.settings.shown_areas,
+            now: cache.ticks,
+            last_stand_ready: cache.last_stand_ready,
         };
         let shown = shown(defs, cache.selected);
         match cache.tab {

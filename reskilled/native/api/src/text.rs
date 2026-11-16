@@ -125,6 +125,8 @@ messages! {
     PERK_AT = "reskilled.ui.perk_at" => "%s perk \u{b7} level %s";
     AT_LEVEL = "reskilled.ui.at_level" => "Level %s";
     XP_CHIP = "reskilled.ui.xp_chip" => "%s XP";
+    READY = "reskilled.ui.ready" => "Ready";
+    READY_IN = "reskilled.ui.ready_in" => "Ready in %s";
     TAB_DISPLAY = "reskilled.ui.tab.display" => "Display";
     TAB_RULES = "reskilled.ui.tab.rules" => "Server rules";
     DONE = "reskilled.ui.done" => "Done";

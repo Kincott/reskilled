@@ -4,7 +4,7 @@
 
 use horizon_client::mod_api::Text;
 use skills_core::area::area_of;
-use skills_core::defs::{PerkDef, skill_rgb};
+use skills_core::defs::{Effect, PerkDef, skill_rgb};
 use skills_core::progress::{
     PlayerState, Request, level, mastered, own_level, points_available, switched_off,
 };
@@ -19,8 +19,8 @@ use super::screen::{
 };
 use crate::text::{
     AREA, AT_LEVEL, AT_TOP, GET, LEVEL, LEVEL_OF, LEVEL_UP_COST, MASTERED, OWNED, PERK_AT,
-    PERK_COST, PERK_POINTS_N, PROGRESS, SHARED_OWN, SWITCHED_OFF, TIP_NEED, VAL_OFF, VAL_ON,
-    XP_CHIP, label_name, number, perk_description, perk_name, say, skill_name,
+    PERK_COST, PERK_POINTS_N, PROGRESS, READY, READY_IN, SHARED_OWN, SWITCHED_OFF, TIP_NEED,
+    VAL_OFF, VAL_ON, XP_CHIP, label_name, number, perk_description, perk_name, say, skill_name,
 };
 
 /// The header's height, the road panel's top below the body's and its height, and the gap before the dock.
@@ -1006,6 +1006,13 @@ fn draw_needs(pen: &mut Pen<'_>, perk: &PerkDef, status: &PerkStatus, x: f32, y:
     let mut parts: Vec<(Text, u32)> = Vec::new();
     if matches!(status, PerkStatus::Owned) {
         parts.push((marked(true, say(&OWNED, &[])), GOLD));
+        if perk
+            .effects
+            .iter()
+            .any(|e| matches!(e, Effect::LastStand { .. }))
+        {
+            parts.push(last_stand_line(pen));
+        }
         if switched_off(state, &perk.id) {
             parts.push((say(&SWITCHED_OFF, &[]), DIM));
         }
@@ -1042,6 +1049,19 @@ fn draw_needs(pen: &mut Pen<'_>, perk: &PerkDef, status: &PerkStatus, x: f32, y:
         pen.host.text(pen.batch, &text, [at, y], colour, false);
         at += w + 10.0;
     }
+}
+
+/// Whether the player's last stand is ready, or how long it still rests ("Ready in 4:32").
+fn last_stand_line(pen: &Pen<'_>) -> (Text, u32) {
+    let left = pen
+        .last_stand_ready
+        .map_or(0, |ready| ready.saturating_sub(pen.now));
+    if left == 0 {
+        return (say(&READY, &[]), GREEN);
+    }
+    let seconds = left.div_ceil(20);
+    let clock = format!("{}:{:02}", seconds / 60, seconds % 60);
+    (say(&READY_IN, &[Text::literal(clock)]), GRAY)
 }
 
 /// What a click on a skill's page does: the right button goes Home; the raise raises `times` when it can be paid;
@@ -1093,7 +1113,6 @@ pub(super) fn click(
 #[cfg(test)]
 mod tests {
     use horizon_client::mod_api::HudBatch;
-    use skills_core::defs::Effect;
     use skills_core::progress::Request;
 
     use super::*;
@@ -1460,6 +1479,41 @@ mod tests {
         assert!(grip_area.is_empty());
         assert!(ward_area.contains("reskilled:mining_home_ward"));
         assert_eq!(with(|cache| cache.tab), Tab::Skill(1));
+    }
+
+    #[test]
+    fn an_owned_last_stand_shows_its_cooldown_in_the_dock() {
+        // Given Mining's road with Sure Grip owned and given a last stand, chosen for the dock
+        let _serial = exclusive();
+        let host = mining_open();
+        with(|cache| {
+            let grip = cache
+                .defs
+                .as_mut()
+                .unwrap()
+                .defs
+                .perks
+                .get_mut("reskilled:mining_sure_grip")
+                .unwrap();
+            grip.effects = vec![Effect::LastStand {
+                above: 0.0,
+                cooldown_seconds: 300,
+            }];
+            cache.selected_perk = Some("reskilled:mining_sure_grip".into());
+            cache.ticks = 100;
+        });
+
+        // When the page is drawn while it is ready, and again with 272 seconds left
+        draw(&host, &mut HudBatch::new([427, 240]), USUAL, [1.0, 1.0]);
+        let ready = host.drawn_text();
+        host.drawn.borrow_mut().clear();
+        with(|cache| cache.last_stand_ready = Some(100 + 272 * 20));
+        draw(&host, &mut HudBatch::new([427, 240]), USUAL, [1.0, 1.0]);
+        let resting = host.drawn_text();
+
+        // Then the dock says it is ready, then how long is left
+        assert!(ready.iter().any(|t| t == "Ready"), "{ready:?}");
+        assert!(resting.iter().any(|t| t == "Ready in 4:32"), "{resting:?}");
     }
 
     #[test]

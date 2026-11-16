@@ -191,6 +191,8 @@ pub struct ClientCache {
     pub anvil_result: Option<ItemStack>,
     /// The anvil result the player was warned about: a second click on it takes it.
     pub anvil_prompt: Option<ItemStack>,
+    /// The client tick the player's last stand is ready again; none when it is ready.
+    pub last_stand_ready: Option<u64>,
     /// The perk the skill page's dock tells about, chosen with a click.
     pub selected_perk: Option<String>,
     /// How far a long road is scrolled, in GUI pixels.
@@ -367,6 +369,10 @@ pub fn on_message(host: &mut dyn Host, channel: &str, data: &[u8]) {
             });
         }
         Ok(ToClient::Home { home }) => with(|cache| cache.home = home),
+        Ok(ToClient::LastStand { seconds }) => with(|cache| {
+            cache.last_stand_ready = (seconds > 0)
+                .then(|| cache.ticks + u64::from(seconds) * u64::from(TICKS_PER_SECOND));
+        }),
         Ok(ToClient::You { player, name }) => with(|cache| {
             cache.my_name = name;
             cache.me = Some(player);
@@ -548,6 +554,15 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[test]
+    fn the_client_counts_down_the_last_stand() {
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        with(|cache| cache.ticks = 40);
+        send_msg(&mut host, &ToClient::LastStand { seconds: 300 });
+        assert_eq!(with(|cache| cache.last_stand_ready), Some(40 + 6000));
     }
 
     #[test]

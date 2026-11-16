@@ -65,6 +65,8 @@ Mechanic perks
       two; a crop that grew still can.
 - [ ] Last Breath (Defense 16, Agility 12): a killing blow at any health leaves you at half a heart, then not
       again for 5 minutes; `/kill` still kills.
+- [ ] Last Breath's dock on the Defense road says "Ready", and after a save "Ready in 4:59" counting down; it
+      keeps counting after leaving and rejoining.
 - [ ] Home perks: set a bed, then check Hearth near it, Home Ward against a creeper, Safe Haven at night.
 - [ ] Restful Sleep: poisoned, get into bed: the poison lifts (no waking from its damage). Leave early: it comes
       back. Sleep the night through: it is gone and you are fully healed.

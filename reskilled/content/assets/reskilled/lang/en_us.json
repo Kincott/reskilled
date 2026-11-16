@@ -283,6 +283,8 @@
   "reskilled.ui.raise_own_to": "Raise your own level to %s",
   "reskilled.ui.raise_shift": "Shift: +5 levels",
   "reskilled.ui.raise_to": "Raise to level %s",
+  "reskilled.ui.ready": "Ready",
+  "reskilled.ui.ready_in": "Ready in %s",
   "reskilled.ui.requirements": "Requirements",
   "reskilled.ui.requires": "%s: %s %s",
   "reskilled.ui.reset": "Defaults",

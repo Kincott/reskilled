@@ -278,7 +278,8 @@ mod tests {
                 Job::SendHome(PLAYER),
                 Job::LiftShared(PLAYER),
                 Job::SyncAttributes(PLAYER),
-                Job::CheckEquipment(PLAYER)
+                Job::CheckEquipment(PLAYER),
+                Job::SendLastStand(PLAYER)
             ]
         );
         assert_eq!(online_players(), vec![PLAYER]);

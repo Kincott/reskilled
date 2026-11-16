@@ -362,12 +362,14 @@ pub(crate) mod tests {
                 Job::LiftShared(1),
                 Job::SyncAttributes(1),
                 Job::CheckEquipment(1),
+                Job::SendLastStand(1),
                 Job::SendDefs(2),
                 Job::SendRules(2),
                 Job::SendHome(2),
                 Job::LiftShared(2),
                 Job::SyncAttributes(2),
                 Job::CheckEquipment(2),
+                Job::SendLastStand(2),
             ]
         );
     }

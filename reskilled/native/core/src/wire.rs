@@ -63,6 +63,8 @@ pub enum ToClient {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         name: Option<String>,
     },
+    /// How long until the player's last stand is ready again, in seconds; 0 when it is ready.
+    LastStand { seconds: u32 },
     /// The player's home (respawn point): its dimension and block, or none; perks' areas are drawn around it.
     Home { home: Option<(String, [i32; 3])> },
     /// The player's XP level, and whether locks are off for them (creative or spectator, by the settings): the
@@ -367,6 +369,7 @@ mod tests {
                 player: u128::MAX - 7,
                 name: Some("Ann".into()),
             },
+            ToClient::LastStand { seconds: 295 },
             ToClient::Status {
                 levels: 31,
                 exempt: true,

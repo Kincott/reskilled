@@ -30,6 +30,8 @@ pub enum Job {
     SendRules(u128),
     /// Send the player where their home is.
     SendHome(u128),
+    /// Send the player how long their last stand still rests.
+    SendLastStand(u128),
     /// Lift the player to the skill levels they share.
     LiftShared(u128),
     /// A rider got on (or off) a vehicle, by the vehicle's entity id.
@@ -63,6 +65,8 @@ pub fn refresh(player: u128) {
         Job::LiftShared(player),
         Job::SyncAttributes(player),
         Job::CheckEquipment(player),
+        // After the attributes' sync, which works out the player's perks
+        Job::SendLastStand(player),
     ]);
 }
 
@@ -107,6 +111,7 @@ pub fn run(host: &mut dyn Host, jobs: Vec<Job>) {
             Job::ApplyDeath(player) => state::apply_death(host, player),
             Job::SendRules(player) => super::rules::send(host, player),
             Job::SendHome(player) => super::homes::send(host, player),
+            Job::SendLastStand(player) => super::mechanics::send_last_stand(host, player),
             Job::LiftShared(player) => super::sharing::lift(host, player),
             Job::CheckEquipment(_) | Job::Unequip { .. } => enforce::run_job(host, job),
             Job::SyncAttributes(_) | Job::Mount { .. } => effects::run_job(host, job),

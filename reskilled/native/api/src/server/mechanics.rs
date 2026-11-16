@@ -444,6 +444,25 @@ fn due(timers: &Mutex<BTreeMap<u128, u64>>, player: u128, every: u64) -> bool {
     }
 }
 
+/// Tells the player's client how many seconds their last stand still rests, when they have one.
+pub fn send_last_stand(_host: &mut dyn Host, player: u128) {
+    let Some((_, rest)) = effects_of(player).and_then(|e| e.last_stand) else {
+        return;
+    };
+    let ready_at = lock(&LAST_STAND_USED)
+        .get(&player)
+        .map_or(0, |used| used + u64::from(rest) * TICKS_PER_SECOND);
+    let left = ready_at.saturating_sub(queue::now());
+    let seconds = u32::try_from(left.div_ceil(TICKS_PER_SECOND)).unwrap_or(u32::MAX);
+    tell_last_stand(player, seconds);
+}
+
+fn tell_last_stand(player: u128, seconds: u32) {
+    let message = skills_core::wire::ToClient::LastStand { seconds };
+    let data = serde_json::to_vec(&message).expect("a last stand always encodes");
+    queue::send(player, crate::MSG_CHANNEL, data);
+}
+
 /// `/kill`'s damage type: an operator's kill goes through whatever the perks.
 const KILL_COMMAND: &str = "minecraft:generic_kill";
 
@@ -473,6 +492,7 @@ pub fn on_death(host: &mut dyn Host, entity: u32, kind: &str, damage_type: &str)
     lock(&LAST_STAND_USED).insert(player, now);
     lock(&LAST_STAND_SAVED).insert(player);
     host.action_bar(player, say(&LAST_STAND, &[]));
+    tell_last_stand(player, rest);
     Flow::Cancel
 }
 
@@ -878,6 +898,46 @@ mod tests {
         assert_eq!(saved, Flow::Cancel);
         assert_eq!(after_one, vec![(PLAYER, 1.0)]);
         assert_eq!(host.health_set, vec![(PLAYER, 1.0)]);
+    }
+
+    /// The last-stand messages the player's client was sent, in seconds.
+    fn last_stand_sent(host: &TestHost) -> Vec<u32> {
+        host.sent_to(PLAYER, crate::MSG_CHANNEL)
+            .iter()
+            .filter_map(|m| match serde_json::from_slice(m) {
+                Ok(skills_core::wire::ToClient::LastStand { seconds }) => Some(seconds),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_client_is_told_how_long_the_last_stand_rests() {
+        // Given a last stand resting 300 seconds
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "last_stand", "cooldown_seconds": 300}]),
+        );
+        tick(&mut host, 20.0);
+
+        // When the player asks before ever using it, it saves them, and 100 ticks later they join again
+        send_last_stand(&mut host, PLAYER);
+        on_death(
+            &mut host,
+            ENTITY,
+            "minecraft:player",
+            "minecraft:mob_attack",
+        );
+        for _ in 0..100 {
+            tick(&mut host, 20.0);
+        }
+        send_last_stand(&mut host, PLAYER);
+        tick(&mut host, 20.0);
+
+        // Then the client hears it is ready, then 300 seconds, then the 295 left
+        assert_eq!(last_stand_sent(&host), vec![0, 300, 295]);
     }
 
     #[test]
