@@ -268,12 +268,14 @@ mod tests {
         // When they log in
         dispatch_player_logged_in(&mut host, &mods(), PLAYER, "Ann");
 
-        // Then they get definitions, an attribute sync and an equipment check, and count as online
+        // Then they get definitions, the rules, their home, an attribute sync and an equipment check, and count as
+        // online
         assert_eq!(
             take_queued(),
             vec![
                 Job::SendDefs(PLAYER),
                 Job::SendRules(PLAYER),
+                Job::SendHome(PLAYER),
                 Job::LiftShared(PLAYER),
                 Job::SyncAttributes(PLAYER),
                 Job::CheckEquipment(PLAYER)

@@ -30,7 +30,9 @@ Screen and raising
 - [ ] A focus area can be added; the first is free.
 
 Perks
-- [ ] Buying a perk spends its points; switching off and refunding work as the server rules say.
+- [ ] Buying a perk spends its points; switching it off works as the server rules say.
+- [ ] Area on an owned Hearth, Home Ward, Safe Haven or Green Aura draws its box in the world (glowing edges,
+      faint walls, the perk's colour) around your bed, or around you for Green Aura; Area again hides it.
 - [ ] Hovering a perk shows its description.
 
 Locks

@@ -16,8 +16,8 @@ use super::queue::{self, Job};
 use super::state::{self, set_state, state_of};
 use super::uuid_text;
 use crate::text::{
-    FOCUS_ADDED, PERK_BOUGHT, PERK_REFUNDED, PERK_SWITCHED, RAISED, UNAVAILABLE, focus_name,
-    number, perk_name, refusal, say, skill_name,
+    FOCUS_ADDED, PERK_BOUGHT, PERK_SWITCHED, RAISED, UNAVAILABLE, focus_name, number, perk_name,
+    refusal, say, skill_name,
 };
 use crate::{ACT_CHANNEL, MAX_MESSAGE_BYTES, MSG_CHANNEL};
 
@@ -138,7 +138,6 @@ fn done_line(defs: &Defs, request: &Request, state: &PlayerState) -> Text {
         ),
         Request::BuyPerk { perk } => say(&PERK_BOUGHT, &[perk_name(defs, perk)]),
         Request::SwitchPerk { perk } => say(&PERK_SWITCHED, &[perk_name(defs, perk)]),
-        Request::RefundPerk { perk } => say(&PERK_REFUNDED, &[perk_name(defs, perk)]),
         Request::AddFocus { focus } => say(&FOCUS_ADDED, &[focus_name(defs, focus)]),
     }
 }

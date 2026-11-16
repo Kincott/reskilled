@@ -28,6 +28,8 @@ pub enum Job {
     ApplyDeath(u128),
     /// Send the player the server's rules.
     SendRules(u128),
+    /// Send the player where their home is.
+    SendHome(u128),
     /// Lift the player to the skill levels they share.
     LiftShared(u128),
     /// A rider got on (or off) a vehicle, by the vehicle's entity id.
@@ -57,6 +59,7 @@ pub fn refresh(player: u128) {
     lock(&JOBS).extend([
         Job::SendDefs(player),
         Job::SendRules(player),
+        Job::SendHome(player),
         Job::LiftShared(player),
         Job::SyncAttributes(player),
         Job::CheckEquipment(player),
@@ -102,6 +105,7 @@ pub fn run(host: &mut dyn Host, jobs: Vec<Job>) {
             Job::SendDefs(player) => data::send_defs(player),
             Job::ApplyDeath(player) => state::apply_death(host, player),
             Job::SendRules(player) => super::rules::send(host, player),
+            Job::SendHome(player) => super::homes::send(host, player),
             Job::LiftShared(player) => super::sharing::lift(host, player),
             Job::CheckEquipment(_) | Job::Unequip { .. } => enforce::run_job(host, job),
             Job::SyncAttributes(_) | Job::Mount { .. } => effects::run_job(host, job),

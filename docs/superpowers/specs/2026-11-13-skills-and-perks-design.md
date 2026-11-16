@@ -294,6 +294,11 @@ world (`Holder::Level`), sent to every player, and changed only by operators (ch
 - Restful Sleep (2026-11-16, after play): damage wakes a sleeping player, so poison kept the player from sleeping.
   Getting into bed now lifts the effects it clears; a full night ends them and heals; leaving early (or the game)
   brings them back as they were; dying drops them.
+- Perk refunds removed, and perk areas shown (2026-11-16, after play): the Refund button, the refund server rules and
+  the refund request are gone (operators can still `/skills reset`); rules saved with them load with the rest kept.
+  In its place an owned perk acting on an area (Hearth, Home Ward, Safe Haven, Green Aura) has an Area button that
+  draws that ground in the world as a box with glowing edges and faint walls in the perk's colour, around the
+  player's home (sent to their client) or around them; the choice is kept in the client settings.
 - Perk guide removed (2026-11-16, after play): the G page with animated scenes and value cards was taken out at
   the user's request; some perks had no scene. A perk's tooltip (name, description, cost, needs) is its only
   explanation, and every perk description is to be rewritten.

@@ -15,7 +15,7 @@ use horizon_client::mod_api::{
     RegisterCommandsEvent, ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent,
     ScreenRenderPostEvent, ServerDataLoadedEvent, ServerReloadListenerApplyEvent,
     ServerStoppedEvent, TickEvent, TimeSkipEvent, TooltipColorEvent, TooltipEvent, UseItemEvent,
-    UseItemOnEvent,
+    UseItemOnEvent, WorldSubmitEvent,
 };
 use skills_core::defs::Action;
 
@@ -359,6 +359,10 @@ impl Hooks for Mod {
     ) -> Flow {
         server::homes::set(host, event.player, event.dimension, event.pos, event.cause);
         Flow::Continue
+    }
+
+    fn world_submit(&self, host: &dyn Host, event: &mut WorldSubmitEvent<'_>) {
+        client::areas::draw(host, event.draw);
     }
 
     fn time_skip(&self, _host: &mut dyn Host, event: &mut TimeSkipEvent<'_>) -> Flow {

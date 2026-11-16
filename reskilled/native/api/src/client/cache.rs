@@ -58,6 +58,8 @@ pub struct ClientSettings {
     pub progress_sounds: bool,
     /// The low note when a lock refuses something.
     pub refusal_sound: bool,
+    /// The perks whose area the player chose to see in the world (Home Ward's, Safe Haven's...).
+    pub shown_areas: std::collections::BTreeSet<String>,
 }
 
 impl Default for ClientSettings {
@@ -74,6 +76,7 @@ impl Default for ClientSettings {
             click_sounds: true,
             progress_sounds: true,
             refusal_sound: true,
+            shown_areas: std::collections::BTreeSet::new(),
         }
     }
 }
@@ -159,6 +162,8 @@ const TICKS_PER_SECOND: u32 = 20;
 pub struct ClientCache {
     /// The player this client plays as, once the server says.
     pub me: Option<u128>,
+    /// Their home (respawn point) as the server last said: dimension and block.
+    pub home: Option<(String, [i32; 3])>,
     pub defs: Option<ClientDefs>,
     /// Requirements per item id, as the server answered.
     pub reqs: BTreeMap<String, Requirements>,
@@ -343,6 +348,7 @@ pub fn on_message(host: &mut dyn Host, channel: &str, data: &[u8]) {
                 });
             });
         }
+        Ok(ToClient::Home { home }) => with(|cache| cache.home = home),
         Ok(ToClient::You { player }) => with(|cache| {
             cache.me = Some(player);
             cache.outgoing.push(ToServer::Hello);
@@ -735,7 +741,7 @@ mod tests {
         let _serial = exclusive();
         let mut host = TestHost::default();
         let rules = skills_core::rules::Rules {
-            respec: skills_core::rules::Respec::Free,
+            perk_switches: false,
             ..Default::default()
         };
 

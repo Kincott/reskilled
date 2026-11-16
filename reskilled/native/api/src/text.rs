@@ -39,8 +39,6 @@ messages! {
     NOT_OWNED = "reskilled.msg.not_owned" => "You don't have that perk.";
     BUYING_OFF = "reskilled.msg.buying_off" => "Skills can't be bought here: level them by doing.";
     SWITCHES_OFF = "reskilled.msg.switches_off" => "Perk switching is off on this server.";
-    REFUNDS_OFF = "reskilled.msg.refunds_off" => "Perk refunds are off on this server.";
-    NEEDED_BY = "reskilled.msg.needed_by" => "Refund %s first: it needs this.";
     UNAVAILABLE = "reskilled.msg.unavailable" => "Can't do that right now.";
     SUMMARY = "reskilled.cmd.summary" => "XP levels: %s | Focus: %s";
     NO_FOCUS = "reskilled.cmd.no_focus" => "none";
@@ -49,7 +47,6 @@ messages! {
     RAISED = "reskilled.cmd.raised" => "%s is now level %s.";
     PERK_BOUGHT = "reskilled.cmd.perk_bought" => "Unlocked %s.";
     PERK_SWITCHED = "reskilled.cmd.perk_switched" => "Toggled %s.";
-    PERK_REFUNDED = "reskilled.cmd.perk_refunded" => "Refunded %s.";
     FOCUS_ADDED = "reskilled.cmd.focus_added" => "Focus added: %s.";
     SET_LEVEL = "reskilled.cmd.set" => "Set %s's %s to level %s.";
     SET_POINTS = "reskilled.cmd.points" => "Set %s's bonus points in %s to %s.";
@@ -90,14 +87,14 @@ messages! {
     AT_TOP = "reskilled.ui.at_top" => "Max level";
     PERK_POINTS = "reskilled.ui.perk_points" => "Perk points: %s";
     PERKS = "reskilled.ui.perks" => "Perks";
-    REFUND = "reskilled.ui.refund" => "Refund";
-    REFUND_COST = "reskilled.ui.refund_cost" => "Refund: %s XP levels";
-    REFUND_FREE = "reskilled.ui.refund_free" => "Refund: free";
     SWITCHED_OFF = "reskilled.ui.switched_off" => "Off: no effect until switched on.";
     PERK_COST = "reskilled.ui.perk_cost" => "%s perk points";
     PERK_OF = "reskilled.ui.perk_of" => "%s perk";
     TIP_NEED = "reskilled.ui.tip_need" => "%s %s";
     OWNED = "reskilled.ui.owned" => "Owned";
+    AREA = "reskilled.ui.area" => "Area";
+    AREA_SHOWN = "reskilled.ui.area_shown" => "Area shown in the world.";
+    AREA_HIDDEN = "reskilled.ui.area_hidden" => "Click Area to see it in the world.";
     GET = "reskilled.ui.get" => "Unlock";
     NEXT_UNLOCKS = "reskilled.ui.next_unlocks" => "Next unlocks";
     UNLOCK = "reskilled.ui.unlock" => "Level %s: %s";
@@ -130,18 +127,13 @@ messages! {
     RULE_PROGRESSION = "reskilled.ui.rule.progression" => "Skills grow by";
     RULE_EARN_RATE = "reskilled.ui.rule.earn_rate" => "Earning pace";
     RULE_SWITCHES = "reskilled.ui.rule.switches" => "Perk switches";
-    RULE_RESPEC = "reskilled.ui.rule.respec" => "Perk refunds";
-    RULE_RESPEC_COST = "reskilled.ui.rule.respec_cost" => "Refund cost";
     RULE_ENCHANT = "reskilled.ui.rule.enchant" => "Enchant locks";
     RULE_SHARING = "reskilled.ui.rule.sharing" => "Shared skills";
     VAL_LEVELS = "reskilled.ui.val.levels" => "XP levels";
     VAL_POINTS = "reskilled.ui.val.points" => "XP points";
-    VAL_N_LEVELS = "reskilled.ui.val.n_levels" => "%s levels";
     VAL_BUY = "reskilled.ui.val.buy" => "Buying";
     VAL_EARN = "reskilled.ui.val.earn" => "Doing";
     VAL_BOTH = "reskilled.ui.val.both" => "Both";
-    VAL_FREE = "reskilled.ui.val.free" => "Free";
-    VAL_PAID = "reskilled.ui.val.paid" => "Paid";
     VAL_PARTY = "reskilled.ui.val.party" => "Party";
     VAL_EVERYONE = "reskilled.ui.val.everyone" => "Everyone";
     HELP_COST = "reskilled.ui.help.cost" => "Pay raises in XP levels (worth more when you have many) or XP points.";
@@ -149,8 +141,6 @@ messages! {
     HELP_PROGRESSION = "reskilled.ui.help.progression" => "Skills are bought with XP, grow by doing, or both.";
     HELP_EARN_RATE = "reskilled.ui.help.earn_rate" => "How fast skills grow by doing.";
     HELP_SWITCHES = "reskilled.ui.help.switches" => "Players may switch owned perks off and on.";
-    HELP_RESPEC = "reskilled.ui.help.respec" => "Players may refund perks for their points.";
-    HELP_RESPEC_COST = "reskilled.ui.help.respec_cost" => "What a paid refund costs.";
     HELP_ENCHANT = "reskilled.ui.help.enchant" => "Enchanted gear needs the levels its enchantments ask for.";
     HELP_SHARING = "reskilled.ui.help.sharing" => "Who shares skill levels: nobody, a party, or everyone online.";
     RESET = "reskilled.ui.reset" => "Reset to defaults";
@@ -346,8 +336,6 @@ pub fn refusal(defs: &Defs, refusal: &Refusal, request: &Request) -> Text {
         Refusal::NotOwned => say(&NOT_OWNED, &[]),
         Refusal::BuyingOff => say(&BUYING_OFF, &[]),
         Refusal::SwitchesOff => say(&SWITCHES_OFF, &[]),
-        Refusal::RefundsOff => say(&REFUNDS_OFF, &[]),
-        Refusal::NeededBy { perk } => say(&NEEDED_BY, &[perk_name(defs, perk)]),
     }
 }
 

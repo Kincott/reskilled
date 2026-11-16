@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::defs::{PerkDef, Reward};
 use crate::registry::Defs;
-use crate::rules::{CostUnit, Respec, Rules};
+use crate::rules::{CostUnit, Rules};
 
 /// The save format of [`PlayerState`]: 2 keeps several focus areas.
 pub const STATE_FORMAT: u32 = 2;
@@ -108,10 +108,6 @@ pub enum Request {
     SwitchPerk {
         perk: String,
     },
-    /// Gives an owned perk back for its points.
-    RefundPerk {
-        perk: String,
-    },
 }
 
 /// Why a request was refused.
@@ -146,11 +142,6 @@ pub enum Refusal {
     NotOwned,
     BuyingOff,
     SwitchesOff,
-    RefundsOff,
-    /// Another owned perk needs this one.
-    NeededBy {
-        perk: String,
-    },
 }
 
 /// A granted request: the new state and the XP levels to take for it.
@@ -245,7 +236,7 @@ pub fn apply(
     apply_under(defs, &Rules::default(), state, xp_levels, req)
 }
 
-/// [`apply`] under the server's rules, which decide whether perks may be switched and refunded.
+/// [`apply`] under the server's rules, which decide how raises are paid and whether perks may be switched.
 pub fn apply_under(
     defs: &Defs,
     rules: &Rules,
@@ -260,7 +251,6 @@ pub fn apply_under(
         Request::BuyPerk { perk } => buy_perk(defs, state, perk),
         Request::AddFocus { focus } => add_focus(defs, state, xp_levels, focus),
         Request::SwitchPerk { perk } => switch_perk(rules, state, perk),
-        Request::RefundPerk { perk } => refund_perk(defs, rules, state, xp_levels, perk),
     }
 }
 
@@ -289,47 +279,6 @@ fn switch_perk(rules: &Rules, state: &PlayerState, perk: &str) -> Result<Outcome
     Ok(Outcome {
         state: next,
         levels_spent: 0,
-        points_spent: 0,
-    })
-}
-
-fn refund_perk(
-    defs: &Defs,
-    rules: &Rules,
-    state: &PlayerState,
-    xp_levels: u32,
-    perk: &str,
-) -> Result<Outcome, Refusal> {
-    let cost = match rules.respec {
-        Respec::Off => return Err(Refusal::RefundsOff),
-        Respec::Free => 0,
-        Respec::Paid => rules.respec_cost,
-    };
-    let skill = holder_of(state, perk).ok_or(Refusal::NotOwned)?;
-    let needing = defs
-        .perks
-        .values()
-        .find(|other| other.requires.iter().any(|r| r == perk) && owns(state, &other.id));
-    if let Some(other) = needing {
-        return Err(Refusal::NeededBy {
-            perk: other.id.clone(),
-        });
-    }
-    if xp_levels < cost {
-        return Err(Refusal::NotEnoughLevels { needed: cost });
-    }
-    let points = defs.perks.get(perk).map_or(0, |p| p.cost);
-    let mut next = state.clone();
-    let progress = next
-        .skills
-        .get_mut(&skill)
-        .expect("the holder is in the state");
-    progress.perks.remove(perk);
-    progress.disabled.remove(perk);
-    progress.points_spent = progress.points_spent.saturating_sub(points);
-    Ok(Outcome {
-        state: next,
-        levels_spent: cost,
         points_spent: 0,
     })
 }
@@ -568,7 +517,7 @@ pub fn switched_off(state: &PlayerState, perk: &str) -> bool {
 }
 
 /// Whether the perk was bought, under whichever skill it was saved.
-fn owns(state: &PlayerState, perk: &str) -> bool {
+pub fn owns(state: &PlayerState, perk: &str) -> bool {
     state
         .skills
         .values()
@@ -607,7 +556,7 @@ pub fn active_perks<'a>(defs: &'a Defs, state: &PlayerState) -> Vec<&'a PerkDef>
 mod tests {
     use super::*;
     use crate::defs::{CostCurve, FocusDef, PerkDef, Reward, SkillDef};
-    use crate::rules::{CostUnit, Respec, Rules};
+    use crate::rules::{CostUnit, Rules};
 
     const MINING: &str = "reskilled:mining";
     const MELEE: &str = "reskilled:melee";
@@ -1223,71 +1172,6 @@ mod tests {
 
         // Then it is refused
         assert_eq!(switched, Err(Refusal::SwitchesOff));
-    }
-
-    #[test]
-    fn a_refund_gives_the_points_back_at_the_rules_price() {
-        // Given a player owning both Mining perks, on a server where refunds cost 5 levels, and on one where they
-        // are free
-        let defs = defs();
-        let paid = rules(|r| {
-            r.respec = Respec::Paid;
-            r.respec_cost = 5;
-        });
-        let free = rules(|r| r.respec = Respec::Free);
-        let refund = |perk: &str| Request::RefundPerk { perk: perk.into() };
-
-        // When Deep Veins is refunded with 4 levels and with 5, and for free
-        let short = apply_under(&defs, &paid, &owns_both(), 4, &refund(DEEP_VEINS));
-        let bought = apply_under(&defs, &paid, &owns_both(), 5, &refund(DEEP_VEINS)).unwrap();
-        let gratis = apply_under(&defs, &free, &owns_both(), 0, &refund(DEEP_VEINS)).unwrap();
-
-        // Then the paid one needs 5 levels, takes them, and gives Deep Veins' 2 points back; the free one takes none
-        assert_eq!(short, Err(Refusal::NotEnoughLevels { needed: 5 }));
-        assert_eq!(bought.levels_spent, 5);
-        assert!(!bought.state.skills[MINING].perks.contains(DEEP_VEINS));
-        assert_eq!(bought.state.skills[MINING].points_spent, 1);
-        assert_eq!(gratis.levels_spent, 0);
-    }
-
-    #[test]
-    fn a_refund_is_refused_when_the_rules_forbid_it_or_another_perk_needs_it() {
-        // Given a player owning both Mining perks (Deep Veins needs Sure Grip)
-        let defs = defs();
-        let refund = |perk: &str| Request::RefundPerk { perk: perk.into() };
-
-        // When Sure Grip is refunded, refunds are off, and a perk they do not own is refunded
-        let needed = apply_under(
-            &defs,
-            &Rules::default(),
-            &owns_both(),
-            PLENTY,
-            &refund(SURE_GRIP),
-        );
-        let off = apply_under(
-            &defs,
-            &rules(|r| r.respec = Respec::Off),
-            &owns_both(),
-            PLENTY,
-            &refund(DEEP_VEINS),
-        );
-        let not_owned = apply_under(
-            &defs,
-            &Rules::default(),
-            &at_level(MINING, 12),
-            PLENTY,
-            &refund(DEEP_VEINS),
-        );
-
-        // Then each is refused for its reason
-        assert_eq!(
-            needed,
-            Err(Refusal::NeededBy {
-                perk: DEEP_VEINS.into()
-            })
-        );
-        assert_eq!(off, Err(Refusal::RefundsOff));
-        assert_eq!(not_owned, Err(Refusal::NotOwned));
     }
 
     #[test]

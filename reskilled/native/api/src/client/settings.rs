@@ -3,19 +3,18 @@
 
 use horizon_client::mod_api::Text;
 
-use skills_core::rules::{CostUnit, Progression, Respec, Rules, Sharing};
+use skills_core::rules::{CostUnit, Progression, Rules, Sharing};
 
 use super::cache::{ClientSettings, Corner, WarningPlace};
 use crate::text::{
     HELP_CHIMES, HELP_CLICKS, HELP_CORNER, HELP_COST, HELP_DIM, HELP_EARN_RATE, HELP_ENCHANT,
-    HELP_HIDE_MET, HELP_OWN, HELP_PLACE, HELP_POINTS, HELP_PROGRESSION, HELP_REFUSAL, HELP_RESPEC,
-    HELP_RESPEC_COST, HELP_SHARING, HELP_SHOW, HELP_STRIP, HELP_SWITCHES, HELP_TIME, Message,
-    OPT_CHIMES, OPT_CLICKS, OPT_CORNER, OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL,
-    OPT_SHOW, OPT_STRIP, OPT_TIME, RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS,
-    RULE_PROGRESSION, RULE_RESPEC, RULE_RESPEC_COST, RULE_SHARING, RULE_SWITCHES, VAL_ABOVE,
-    VAL_BOTH, VAL_BOTTOM_LEFT, VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN, VAL_EVERYONE, VAL_FREE,
-    VAL_LEVELS, VAL_N_LEVELS, VAL_OFF, VAL_ON, VAL_PAID, VAL_PARTY, VAL_POINTS, VAL_SECONDS,
-    VAL_TOP, VAL_TOP_LEFT, VAL_TOP_RIGHT, number, say,
+    HELP_HIDE_MET, HELP_OWN, HELP_PLACE, HELP_POINTS, HELP_PROGRESSION, HELP_REFUSAL, HELP_SHARING,
+    HELP_SHOW, HELP_STRIP, HELP_SWITCHES, HELP_TIME, Message, OPT_CHIMES, OPT_CLICKS, OPT_CORNER,
+    OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL, OPT_SHOW, OPT_STRIP, OPT_TIME,
+    RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS, RULE_PROGRESSION, RULE_SHARING,
+    RULE_SWITCHES, VAL_ABOVE, VAL_BOTH, VAL_BOTTOM_LEFT, VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN,
+    VAL_EVERYONE, VAL_LEVELS, VAL_OFF, VAL_ON, VAL_PARTY, VAL_POINTS, VAL_SECONDS, VAL_TOP,
+    VAL_TOP_LEFT, VAL_TOP_RIGHT, number, say,
 };
 
 /// The warning's lengths a click goes through, in seconds.
@@ -165,28 +164,23 @@ pub enum RuleChoice {
     Progression,
     EarnRate,
     PerkSwitches,
-    Respec,
-    RespecCost,
     EnchantmentLocks,
     Sharing,
 }
 
 /// The rules, in the tab's order.
-pub const RULES: [RuleChoice; 9] = [
+pub const RULES: [RuleChoice; 7] = [
     RuleChoice::Cost,
     RuleChoice::PointsPerLevel,
     RuleChoice::Progression,
     RuleChoice::EarnRate,
     RuleChoice::PerkSwitches,
-    RuleChoice::Respec,
-    RuleChoice::RespecCost,
     RuleChoice::EnchantmentLocks,
     RuleChoice::Sharing,
 ];
 
 const POINTS_PER_LEVEL: [u32; 3] = [10, 20, 50];
 const EARN_RATES: [u32; 3] = [50, 100, 200];
-const RESPEC_COSTS: [u32; 3] = [1, 5, 10];
 
 /// The value after `now` in `values`, round to the first.
 fn after(values: &[u32], now: u32) -> u32 {
@@ -202,8 +196,6 @@ impl RuleChoice {
             RuleChoice::Progression => &RULE_PROGRESSION,
             RuleChoice::EarnRate => &RULE_EARN_RATE,
             RuleChoice::PerkSwitches => &RULE_SWITCHES,
-            RuleChoice::Respec => &RULE_RESPEC,
-            RuleChoice::RespecCost => &RULE_RESPEC_COST,
             RuleChoice::EnchantmentLocks => &RULE_ENCHANT,
             RuleChoice::Sharing => &RULE_SHARING,
         }
@@ -216,8 +208,6 @@ impl RuleChoice {
             RuleChoice::Progression => &HELP_PROGRESSION,
             RuleChoice::EarnRate => &HELP_EARN_RATE,
             RuleChoice::PerkSwitches => &HELP_SWITCHES,
-            RuleChoice::Respec => &HELP_RESPEC,
-            RuleChoice::RespecCost => &HELP_RESPEC_COST,
             RuleChoice::EnchantmentLocks => &HELP_ENCHANT,
             RuleChoice::Sharing => &HELP_SHARING,
         }
@@ -244,15 +234,6 @@ impl RuleChoice {
             ),
             RuleChoice::EarnRate => percent(r.earn_rate),
             RuleChoice::PerkSwitches => on_off(r.perk_switches),
-            RuleChoice::Respec => say(
-                match r.respec {
-                    Respec::Off => &VAL_OFF,
-                    Respec::Free => &VAL_FREE,
-                    Respec::Paid => &VAL_PAID,
-                },
-                &[],
-            ),
-            RuleChoice::RespecCost => say(&VAL_N_LEVELS, &[number(r.respec_cost)]),
             RuleChoice::EnchantmentLocks => on_off(r.enchantment_locks),
             RuleChoice::Sharing => say(
                 match r.sharing {
@@ -286,14 +267,6 @@ impl RuleChoice {
             }
             RuleChoice::EarnRate => r.earn_rate = after(&EARN_RATES, r.earn_rate),
             RuleChoice::PerkSwitches => r.perk_switches = !r.perk_switches,
-            RuleChoice::Respec => {
-                r.respec = match r.respec {
-                    Respec::Off => Respec::Free,
-                    Respec::Free => Respec::Paid,
-                    Respec::Paid => Respec::Off,
-                }
-            }
-            RuleChoice::RespecCost => r.respec_cost = after(&RESPEC_COSTS, r.respec_cost),
             RuleChoice::EnchantmentLocks => r.enchantment_locks = !r.enchantment_locks,
             RuleChoice::Sharing => {
                 r.sharing = match r.sharing {

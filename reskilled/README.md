@@ -13,6 +13,8 @@ more. Everything is data, and the server's rules change in game.
   unlock; the gear opens Reskilled Options.
 - Shift-click a raise button to raise 5 levels at once, Ctrl-click to raise as many as your XP pays for.
 - Locked items show a padlock and their requirements in the tooltip. A refused action shows what it needs.
+- Perks that act around your bed or around you (Hearth, Home Ward, Safe Haven, Green Aura) have an **Area**
+  button: it shows the ground they cover in the world.
 - Focus areas (Fighting, Working, Roaming) give extra XP for their tasks; the first is free.
 - `/skills` lists your skills; `/skills raise <skill>`, `perk <perk>`, `focus <area>` and `party ...` do the
   rest from chat.
@@ -20,7 +22,7 @@ more. Everything is data, and the server's rules change in game.
 ## For server operators
 
 Reskilled Options' **Server rules** tab (operators only) sets how raises are paid (XP levels or points), perk
-switches and refunds, enchantment locks, shared skills (off, parties or everyone) and how skills grow (buying, doing
+switches, enchantment locks, shared skills (off, parties or everyone) and how skills grow (buying, doing
 or both). The rules are kept with the world.
 
 Operator commands: `/skills set <player> <skill> <level>`, `/skills points <player> <skill> <n>`,

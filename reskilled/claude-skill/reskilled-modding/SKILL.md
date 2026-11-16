@@ -62,5 +62,5 @@ diamonds or netherite already falls under the shipped tier locks.
 | `"#"` missing on a tag (`"minecraft:pickaxes"`) | file skipped |
 | Perk numbers in the description that differ from `effects` | players are told the wrong thing |
 
-Server rules (how raises are paid, refunds, enchantment locks on or off, shared skills, growing by doing) are set
+Server rules (how raises are paid, perk switches, enchantment locks on or off, shared skills, growing by doing) are set
 in game by operators, not in data.

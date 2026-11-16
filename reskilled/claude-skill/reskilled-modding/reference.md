@@ -137,7 +137,8 @@ Attribute operations: `add_value`, `add_multiplied_base`, `add_multiplied_total`
 | `home_ward` | `radius` | ≤ 64 |
 | `safe_haven` | `radius` | ≤ 64 |
 
-"Home" is the player's respawn point (bed or respawn anchor).
+"Home" is the player's respawn point (bed or respawn anchor). Perks with a `near_home`, `home_ward`, `safe_haven` or `crop_growth` effect get an
+Area button on the skills screen that draws the covered ground in the world.
 
 ## Focus areas
 
@@ -199,7 +200,7 @@ accessory slots ask Reskilled through `reskilled::may_equip` ([integration.md](i
 | `projectile_damage` | list of damage-type matchers (**adds up**) | `*:*arrow*`, `*:*trident*`, `*:*thrown*`, `*:*fireball*`, `*:*wind_charge*` |
 | `equip_slots` | list of `{"items": item matcher, "slot": "head"/"chest"/"legs"/"feet"/"offhand"}` (**adds up**, first match wins) | the four armor tags, elytra, shield |
 
-How raises are paid, refunds, enchantment locks on or off, shared skills and growing by doing are **server rules**,
+How raises are paid, perk switches, enchantment locks on or off, shared skills and growing by doing are **server rules**,
 set in game (Reskilled Options, Server rules tab, operators only) and kept with the world; they are not data.
 
 ## Removing

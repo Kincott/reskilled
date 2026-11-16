@@ -8,7 +8,10 @@ use horizon_client::mod_api::{
     AttachmentCodec, AttachmentError, AttachmentType, Compound, Holder, Host, Tag,
 };
 
-use super::lock;
+use skills_core::wire::ToClient;
+
+use super::{lock, queue};
+use crate::MSG_CHANNEL;
 
 const JSON_TAG: &str = "json";
 
@@ -69,6 +72,17 @@ pub fn set(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3], ca
     if let Err(error) = SAVED.set(host, Holder::Level, homes) {
         log::warn!("Reskilled could not keep the homes: {error:?}");
     }
+    queue::queue(queue::Job::SendHome(player));
+}
+
+/// Tells the player's client where their home is, for drawing perks' areas around it.
+pub fn send(host: &mut dyn Host, player: u128) {
+    ensure_loaded(host);
+    let message = ToClient::Home {
+        home: home_of(player),
+    };
+    let data = serde_json::to_vec(&message).expect("a home always encodes");
+    queue::send(player, MSG_CHANNEL, data);
 }
 
 /// The player's home, once the homes are read.
@@ -90,6 +104,8 @@ pub(crate) fn reset() {
 
 #[cfg(test)]
 mod tests {
+    use skills_core::wire::ToClient;
+
     use super::*;
     use crate::test_host::{TestHost, exclusive};
 
@@ -126,6 +142,49 @@ mod tests {
             Some(("minecraft:overworld".to_string(), [10, 64, 10]))
         );
         assert_eq!(home_of(PLAYER), None);
+    }
+
+    #[test]
+    fn the_player_is_told_their_home_when_it_changes_and_when_asked() {
+        // Given a player who sets their bed at 10 64 10, then loses it to a death with no bed
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        crate::server::queue::take_queued();
+        set(
+            &mut host,
+            PLAYER,
+            "minecraft:overworld",
+            [10, 64, 10],
+            "bed",
+        );
+        let after_bed = crate::server::queue::take_queued();
+        send(&mut host, PLAYER);
+        set(
+            &mut host,
+            PLAYER,
+            "minecraft:overworld",
+            [0, 0, 0],
+            "death_reset",
+        );
+        send(&mut host, PLAYER);
+        crate::server::queue::run(&mut host, Vec::new());
+
+        // Then each change queues a message for them, carrying the bed, then nothing
+        assert_eq!(after_bed, vec![crate::server::queue::Job::SendHome(PLAYER)]);
+        let told: Vec<ToClient> = host
+            .sent_to(PLAYER, crate::MSG_CHANNEL)
+            .iter()
+            .map(|m| serde_json::from_slice(m).unwrap())
+            .collect();
+        assert_eq!(
+            told,
+            vec![
+                ToClient::Home {
+                    home: Some(("minecraft:overworld".into(), [10, 64, 10]))
+                },
+                ToClient::Home { home: None },
+            ]
+        );
     }
 
     #[test]

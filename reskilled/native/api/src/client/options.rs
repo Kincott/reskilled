@@ -253,7 +253,7 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], mouse_button: i32) -
 #[cfg(test)]
 mod tests {
     use horizon_client::mod_api::HudBatch;
-    use skills_core::rules::{Respec, Rules};
+    use skills_core::rules::Rules;
     use skills_core::wire::ToServer;
 
     use super::*;
@@ -421,17 +421,17 @@ mod tests {
             cache.rules_editable = true;
             cache.defs = Some(Default::default());
         });
-        click(&host, SIZE, inside(&page(SIZE, 9).tabs[1]), LEFT_BUTTON);
-        let p = page(SIZE, 9);
+        click(&host, SIZE, inside(&page(SIZE, 7).tabs[1]), LEFT_BUTTON);
+        let p = page(SIZE, 7);
 
-        // When perk refunds are clicked, then a tick passes
-        click(&host, SIZE, inside(&p.buttons[5]), LEFT_BUTTON);
+        // When perk switches are clicked, then a tick passes
+        click(&host, SIZE, inside(&p.buttons[4]), LEFT_BUTTON);
         horizon_client::mod_api::dispatch_tick(&mut host, &mods());
         std::fs::remove_dir_all(&dir).unwrap();
 
-        // Then the refund rule moves from paid to off, and the server is asked for the new rules
+        // Then perk switches turn off, and the server is asked for the new rules
         let wanted = Rules {
-            respec: Respec::Off,
+            perk_switches: false,
             ..Rules::default()
         };
         let sent: Vec<ToServer> = host
@@ -450,22 +450,22 @@ mod tests {
         let _serial = exclusive();
         let (mut host, dir) = open("player");
         with(|cache| cache.options_tab = Tab::Rules);
-        let p = page(SIZE, 9);
+        let p = page(SIZE, 7);
 
-        // When the rules are drawn with the mouse on refunds, refunds are clicked, and a tick passes
-        let painted = drawn(&host, inside(&p.buttons[5]));
-        click(&host, SIZE, inside(&p.buttons[5]), LEFT_BUTTON);
+        // When the rules are drawn with the mouse on perk switches, they are clicked, and a tick passes
+        let painted = drawn(&host, inside(&p.buttons[4]));
+        click(&host, SIZE, inside(&p.buttons[4]), LEFT_BUTTON);
         horizon_client::mod_api::dispatch_tick(&mut host, &mods());
         std::fs::remove_dir_all(&dir).unwrap();
 
         // Then each rule shows on a greyed button, the tooltip says only operators may change it, and nothing is
         // asked
-        assert!(texts(&painted).iter().any(|t| t == "Perk refunds: Paid"));
+        assert!(texts(&painted).iter().any(|t| t == "Perk switches: On"));
         let greyed = painted
             .iter()
             .filter(|p| matches!(p, Paint::Sprite { name, .. } if name == "gui/sprites/widget/button_disabled"))
             .count();
-        assert_eq!(greyed, 10);
+        assert_eq!(greyed, 8);
         assert_eq!(
             tooltip(&painted).last().map(String::as_str),
             Some("Operators only.")

@@ -58,6 +58,8 @@ pub enum ToClient {
     },
     /// The player this client plays as, so it can read its own synced state.
     You { player: u128 },
+    /// The player's home (respawn point): its dimension and block, or none; perks' areas are drawn around it.
+    Home { home: Option<(String, [i32; 3])> },
     /// The player's XP level, and whether locks are off for them (creative or spectator, by the settings): the
     /// client has no other way to read either. Sent when one changes.
     Status { levels: u32, exempt: bool },

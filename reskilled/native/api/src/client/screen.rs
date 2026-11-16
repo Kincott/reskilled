@@ -2,13 +2,14 @@
 //! card and one skill with its perks; its clicks become requests the next tick sends (the screen hooks cannot send).
 
 use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
+use skills_core::area::area_of;
 use skills_core::defs::{PerkDef, Reward};
 use skills_core::progress::{
     PlayerState, Request, apply_under, earn_threshold, focus_cost, level, mastered, missing_skill,
     own_level, points_available, raise_cost, switched_off, total_points,
 };
 use skills_core::registry::Defs;
-use skills_core::rules::{CostUnit, Respec, Rules};
+use skills_core::rules::{CostUnit, Rules};
 use skills_core::wire::{ClientDefs, ToServer};
 
 use super::cache::{CLICK_SOUND, ClientCache, View, with};
@@ -19,14 +20,13 @@ use super::layout::{
 use super::paint::{self, DIM, GOLD, GRAY, GREEN, Look, RED, WHITE};
 use crate::MOD_ID;
 use crate::text::{
-    ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
-    FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
-    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_OF, PERK_POINTS, PERKS, PROGRESS,
-    RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT, RAISE_TO, REFUND, REFUND_COST,
-    REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT,
-    REWARD_TAME, REWARD_TRAVEL, SETTINGS, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, UNLOCK,
-    VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say,
-    skill_name,
+    ALL_UNLOCKED, AREA, AREA_HIDDEN, AREA_SHOWN, AT_TOP, BACK, COST, COST_POINTS, FOCUS,
+    FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE, FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED,
+    MISSING_PERK, NEEDS, NEXT_UNLOCKS, NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_OF,
+    PERK_POINTS, PERKS, PROGRESS, RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT,
+    RAISE_TO, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
+    REWARD_TRAVEL, SETTINGS, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, UNLOCK, VAL_OFF, VAL_ON,
+    WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -166,8 +166,10 @@ struct Pen<'a> {
     tip: Option<Vec<Text>>,
     /// Client ticks run, for the mastery glint and twinkles.
     ticks: u64,
-    /// The server's rules: whether perks may be switched and refunded.
+    /// The server's rules: whether perks may be switched, how raises are paid.
     rules: &'a Rules,
+    /// The perks whose area the player chose to see in the world.
+    shown_areas: &'a std::collections::BTreeSet<String>,
 }
 
 impl Pen<'_> {
@@ -271,6 +273,7 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
             tip: None,
             ticks: cache.ticks,
             rules: &cache.rules,
+            shown_areas: &cache.settings.shown_areas,
         };
         let shown = shown(defs, cache.selected);
         match cache.view {
@@ -764,36 +767,28 @@ fn draw_perk(pen: &mut Pen<'_>, row: &PerkRow, perk: &PerkDef) {
     }
 }
 
-/// What a refund costs under the rules, in XP levels.
-fn refund_cost(rules: &Rules) -> u32 {
-    match rules.respec {
-        Respec::Paid => rules.respec_cost,
-        Respec::Off | Respec::Free => 0,
-    }
-}
-
-/// An owned perk's end of the row: its switch and its refund button when the rules allow them, else "Owned".
+/// An owned perk's end of the row: its area button when it acts on an area, and its switch when the rules allow it,
+/// else "Owned".
 fn draw_owned(pen: &mut Pen<'_>, row: &PerkRow, perk: &PerkDef, right: f32, y: f32) {
-    let (switches, refunds) = (pen.rules.perk_switches, pen.rules.respec != Respec::Off);
-    if !switches && !refunds {
+    if area_of(perk).is_some() {
+        let look = if pen.shown_areas.contains(&perk.id) {
+            Look::Go
+        } else {
+            Look::Plain
+        };
+        pen.button(&row.area, &say(&AREA, &[]).plain(), look);
+    }
+    if !pen.rules.perk_switches {
         pen.text_right(&say(&OWNED, &[]).plain(), right, y, GOLD);
         return;
     }
-    if switches {
-        let on = !switched_off(pen.state, &perk.id);
-        let label = say(if on { &VAL_ON } else { &VAL_OFF }, &[]).plain();
-        pen.button(&row.buy, &label, if on { Look::Go } else { Look::Plain });
-    }
-    if refunds {
-        let affordable = pen.xp.is_some_and(|xp| xp >= refund_cost(pen.rules));
-        let look = if affordable { Look::Plain } else { Look::Off };
-        let at = if switches { &row.refund } else { &row.buy };
-        pen.button(at, &say(&REFUND, &[]).plain(), look);
-    }
+    let on = !switched_off(pen.state, &perk.id);
+    let label = say(if on { &VAL_ON } else { &VAL_OFF }, &[]).plain();
+    pen.button(&row.buy, &label, if on { Look::Go } else { Look::Plain });
 }
 
 /// A perk's tooltip: its name in bold and its skill; a bullet for each thing it does; then, after a gap, either
-/// that it is owned (and how to refund it) or its cost and needs, each marked met or not.
+/// that it is owned or its cost and needs, each marked met or not.
 fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
     let mut lines = vec![
@@ -811,10 +806,13 @@ fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
         if switched_off(state, &perk.id) {
             lines.push(say(&SWITCHED_OFF, &[]).with_color(DIM));
         }
-        match (pen.rules.respec, refund_cost(pen.rules)) {
-            (Respec::Off, _) => {}
-            (_, 0) => lines.push(say(&REFUND_FREE, &[]).with_color(GRAY)),
-            (_, cost) => lines.push(say(&REFUND_COST, &[number(cost)]).with_color(GRAY)),
+        if area_of(perk).is_some() {
+            let line = if pen.shown_areas.contains(&perk.id) {
+                &AREA_SHOWN
+            } else {
+                &AREA_HIDDEN
+            };
+            lines.push(say(line, &[]).with_color(GRAY));
         }
         return lines;
     }
@@ -954,6 +952,8 @@ enum Outcome {
     Open(usize),
     Back,
     OpenSettings,
+    /// Show the owned perk's area in the world, or stop.
+    ToggleArea(String),
 }
 
 /// A click on the screen: opens a skill, goes back, or queues a raise, perk or focus request the player can pay
@@ -981,6 +981,13 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
             }
             Outcome::Back => cache.view = View::Overview,
             Outcome::OpenSettings => cache.view = View::Settings,
+            Outcome::ToggleArea(perk) => {
+                let shown = &mut cache.settings.shown_areas;
+                if !shown.remove(&perk) {
+                    shown.insert(perk);
+                }
+                cache.settings.save(host);
+            }
         }
         if clicked && cache.settings.click_sounds {
             cache.sounds.push(CLICK_SOUND);
@@ -1058,34 +1065,16 @@ fn outcome(
                     perk: perk.id.clone(),
                 })
             }
-            Some(perk) if owns(state, &perk.id) && refunds_at(&cache.rules, xp, false) => {
-                Outcome::Ask(Request::RefundPerk {
-                    perk: perk.id.clone(),
-                })
-            }
             _ => Outcome::Nothing,
         },
-        Some(Button::RefundPerk(perk)) => match shown.perks.get(perk) {
-            Some(perk)
-                if owns(state, &perk.id)
-                    && refunds_at(&cache.rules, xp, cache.rules.perk_switches) =>
-            {
-                Outcome::Ask(Request::RefundPerk {
-                    perk: perk.id.clone(),
-                })
+        Some(Button::ToggleArea(perk)) => match shown.perks.get(perk) {
+            Some(perk) if owns(state, &perk.id) && area_of(perk).is_some() => {
+                Outcome::ToggleArea(perk.id.clone())
             }
             _ => Outcome::Nothing,
         },
         None => Outcome::Nothing,
     }
-}
-
-/// Whether a refund can be asked for: refunds on, the player able to pay, and the button where the click was (the
-/// refund button sits before the switch when there is one, else in the switch's place).
-fn refunds_at(rules: &Rules, xp: Option<u32>, beside_switch: bool) -> bool {
-    rules.respec != Respec::Off
-        && rules.perk_switches == beside_switch
-        && xp.is_some_and(|xp| xp >= refund_cost(rules))
 }
 
 /// The mouse wheel on the screen: moves the cards or the perk rows when there are more than fit.
@@ -2242,31 +2231,72 @@ mod tests {
     }
 
     #[test]
-    fn an_owned_perk_has_a_switch_and_a_refund_button() {
-        // Given Mining's view, Sure Grip owned (the first perk), refunds paid at 5 levels
+    fn an_owned_perk_has_a_switch_and_no_refund() {
+        // Given Mining's view, Sure Grip owned (the first perk)
         let _serial = exclusive();
         let mut host = mining_open();
         let grip = mining_view().rows[0];
 
-        // When the view is drawn with the mouse on Sure Grip, its switch is clicked, then its refund button
-        let drawn = drawn(&host, inside(&grip.rect));
-        let tip = tooltip(&host);
+        // When the view is drawn and its switch is clicked
+        let drawn = drawn(&host, AWAY);
         click(&host, SIZE, inside(&grip.buy), LEFT_BUTTON);
-        click(&host, SIZE, inside(&grip.refund), LEFT_BUTTON);
 
-        // Then the row shows "On" and "Refund", the tooltip names the refund's price, and both are asked for
-        contains(&drawn, &["On", "Refund"]);
-        assert!(tip.iter().any(|t| t == "Refund: 5 XP levels"), "{tip:?}");
-        let grip_id = "reskilled:mining_sure_grip".to_string();
+        // Then the row shows "On" and nothing else to click, and the switch is asked for
+        contains(&drawn, &["On"]);
+        assert!(!drawn.iter().any(|t| t == "Refund" || t == "Area"));
         assert_eq!(
             sent_acts(&mut host),
-            vec![
-                Request::SwitchPerk {
-                    perk: grip_id.clone()
-                },
-                Request::RefundPerk { perk: grip_id }
-            ]
+            vec![Request::SwitchPerk {
+                perk: "reskilled:mining_sure_grip".into()
+            }]
         );
+    }
+
+    #[test]
+    fn an_owned_perk_with_an_area_shows_it_in_the_world_at_a_click() {
+        // Given Mining's view, Sure Grip owned and given a 24-block area around home
+        let _serial = exclusive();
+        let mut host = mining_open();
+        with(|cache| {
+            let defs = cache.defs.as_mut().unwrap();
+            let grip = defs
+                .defs
+                .perks
+                .get_mut("reskilled:mining_sure_grip")
+                .unwrap();
+            grip.effects = vec![skills_core::defs::Effect::HomeWard { radius: 24 }];
+        });
+        let grip = mining_view().rows[0];
+
+        // When the view is drawn, its area button is clicked, the view is drawn again, and the button is clicked
+        // once more
+        let before = drawn(&host, inside(&grip.rect));
+        let tip_before = tooltip(&host);
+        click(&host, SIZE, inside(&grip.area), LEFT_BUTTON);
+        let shown = with(|cache| cache.settings.shown_areas.clone());
+        let tip_after = {
+            host.painted.borrow_mut().clear();
+            drawn(&host, inside(&grip.rect));
+            tooltip(&host)
+        };
+        click(&host, SIZE, inside(&grip.area), LEFT_BUTTON);
+
+        // Then the row has an Area button; the first click chooses to see the area (the tooltip says so) and the
+        // second stops; nothing is asked of the server
+        contains(&before, &["Area", "On"]);
+        assert!(
+            tip_before
+                .iter()
+                .any(|t| t == "Click Area to see it in the world."),
+            "{tip_before:?}"
+        );
+        assert_eq!(shown, ["reskilled:mining_sure_grip".to_string()].into());
+        assert!(
+            tip_after.iter().any(|t| t == "Area shown in the world."),
+            "{tip_after:?}"
+        );
+        assert!(with(|cache| cache.settings.shown_areas.is_empty()));
+        assert!(sent_acts(&mut host).is_empty());
     }
 
     #[test]
@@ -2287,44 +2317,22 @@ mod tests {
     }
 
     #[test]
-    fn the_rules_take_the_switch_and_refund_away() {
-        // Given Mining's view on a server with perk switches and refunds off
+    fn the_rules_take_the_switch_away() {
+        // Given Mining's view on a server with perk switches off
         let _serial = exclusive();
         let mut host = mining_open();
-        with(|cache| {
-            cache.rules.perk_switches = false;
-            cache.rules.respec = skills_core::rules::Respec::Off;
-        });
+        with(|cache| cache.rules.perk_switches = false);
         let grip = mining_view().rows[0];
 
-        // When it is drawn and both spots are clicked
+        // When it is drawn and the switch's spot and the area's are clicked
         let drawn = drawn(&host, AWAY);
         click(&host, SIZE, inside(&grip.buy), LEFT_BUTTON);
-        click(&host, SIZE, inside(&grip.refund), LEFT_BUTTON);
+        click(&host, SIZE, inside(&grip.area), LEFT_BUTTON);
 
-        // Then the row just says it is owned, and nothing is asked
+        // Then the row just says it is owned, and nothing is asked or chosen
         contains(&drawn, &["Owned"]);
-        assert!(!drawn.iter().any(|t| t == "Refund"));
         assert!(sent_acts(&mut host).is_empty());
-    }
-
-    #[test]
-    fn a_paid_refund_the_player_cannot_afford_is_not_asked() {
-        // Given Mining's view with 4 XP levels, refunds costing 5
-        let _serial = exclusive();
-        let mut host = mining_open();
-        with(|cache| cache.xp_levels = Some(4));
-
-        // When Sure Grip's refund button is clicked
-        click(
-            &host,
-            SIZE,
-            inside(&mining_view().rows[0].refund),
-            LEFT_BUTTON,
-        );
-
-        // Then nothing is asked
-        assert!(sent_acts(&mut host).is_empty());
+        assert!(with(|cache| cache.settings.shown_areas.is_empty()));
     }
 
     #[test]
