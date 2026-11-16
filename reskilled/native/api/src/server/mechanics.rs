@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Mutex;
 
 use horizon_client::mod_api::{
-    EquipmentSlot, Flow, Host, ItemStack, NativeEffect, NativeInventoryKind, RandomSource,
+    EquipmentSlot, Host, ItemStack, NativeEffect, NativeInventoryKind, RandomSource,
 };
 use skills_core::locks::{TargetKind, matches};
 
@@ -111,10 +111,12 @@ pub fn run_for(
     selected: usize,
     asleep: bool,
 ) {
-    // A player a last stand saved is left at half a heart, whatever the game or their regeneration did meanwhile
-    let health = if lock(&LAST_STAND_SAVED).remove(&player)
-        && host.set_player_status(player, Some(HALF_A_HEART), None, None)
-    {
+    // A player a last stand saved is told, and left at half a heart whatever regeneration did meanwhile
+    let saved = lock(&LAST_STAND_SAVED).remove(&player);
+    if saved {
+        host.action_bar(player, say(&LAST_STAND, &[]));
+    }
+    let health = if saved && host.set_player_status(player, Some(HALF_A_HEART), None, None) {
         HALF_A_HEART
     } else {
         health
@@ -466,34 +468,41 @@ fn tell_last_stand(player: u128, seconds: u32) {
 /// `/kill`'s damage type: an operator's kill goes through whatever the perks.
 const KILL_COMMAND: &str = "minecraft:generic_kill";
 
-/// A mob or player is about to die. A player whose last stand is ready, and who had at least its health floor (if
-/// it has one) before the blow, stays alive at half a heart (Horizon leaves a cancelled death at 1 health).
-pub fn on_death(host: &mut dyn Host, entity: u32, kind: &str, damage_type: &str) -> Flow {
-    if kind != "minecraft:player" || damage_type == KILL_COMMAND {
-        return Flow::Continue;
+/// A hit is about to take `amount` (after armour, effects and absorption) from an entity's health. A player whose
+/// last stand is ready, and whom the hit would kill, keeps half a heart: the hit takes the rest, the stand starts
+/// resting, and their next tick tells them. The death never happens, which a cancelled one could not undo in the
+/// game. `/kill` is never cut, nor a hit under the stand's health floor. Each hit lowers the health noted on the
+/// player's tick, so several in one tick count together.
+pub fn on_damage(entity: i32, kind: &str, damage_type: &str, amount: &mut f32) {
+    if kind != "minecraft:player" || amount.is_nan() {
+        return;
     }
-    let Some(player) = i32::try_from(entity).ok().and_then(player_of_entity) else {
-        return Flow::Continue;
+    let Some(player) = player_of_entity(entity) else {
+        return;
     };
-    let Some((above, rest)) = effects_of(player).and_then(|e| e.last_stand) else {
-        return Flow::Continue;
+    let mut health = lock(&HEALTH);
+    let Some(now_health) = health.get(&player).copied() else {
+        return;
     };
-    let healthy = above <= 0.0
-        || lock(&HEALTH)
+    let mut taken = amount.max(0.0);
+    let lethal = taken >= now_health;
+    if lethal
+        && damage_type != KILL_COMMAND
+        && let Some((above, rest)) = effects_of(player).and_then(|e| e.last_stand)
+    {
+        let now = queue::now();
+        let ready = lock(&LAST_STAND_USED)
             .get(&player)
-            .is_some_and(|health| *health >= above);
-    let now = queue::now();
-    let ready = lock(&LAST_STAND_USED)
-        .get(&player)
-        .is_none_or(|used| now >= used + u64::from(rest) * TICKS_PER_SECOND);
-    if !healthy || !ready {
-        return Flow::Continue;
+            .is_none_or(|used| now >= used + u64::from(rest) * TICKS_PER_SECOND);
+        if ready && (above <= 0.0 || now_health >= above) {
+            taken = (now_health - HALF_A_HEART).max(0.0);
+            *amount = taken;
+            lock(&LAST_STAND_USED).insert(player, now);
+            lock(&LAST_STAND_SAVED).insert(player);
+            tell_last_stand(player, rest);
+        }
     }
-    lock(&LAST_STAND_USED).insert(player, now);
-    lock(&LAST_STAND_SAVED).insert(player);
-    host.action_bar(player, say(&LAST_STAND, &[]));
-    tell_last_stand(player, rest);
-    Flow::Cancel
+    health.insert(player, (now_health - taken).max(0.0));
 }
 
 /// A mob of `kind` killed by a player is about to drop its XP: the player who hurt it last earns their kill
@@ -743,7 +752,7 @@ pub(crate) fn reset() {
 
 #[cfg(test)]
 mod tests {
-    use horizon_client::mod_api::{BlockStateId, Flow, ItemStack};
+    use horizon_client::mod_api::{BlockStateId, ItemStack};
     use serde_json::{Value, json};
     use skills_core::progress::{PlayerState, SkillProgress};
 
@@ -798,108 +807,6 @@ mod tests {
         run_for(host, PLAYER, OVERWORLD, FEET, 10.0, 0, true);
     }
 
-    #[test]
-    fn a_last_stand_saves_a_healthy_player_once_then_rests() {
-        // Given a last stand above 6 health resting 1 second, and a player at 10 health
-        let _serial = exclusive();
-        let mut host = TestHost::default();
-        owning(
-            &mut host,
-            json!([{"type": "last_stand", "above": 6.0, "cooldown_seconds": 1}]),
-        );
-        tick(&mut host, 10.0);
-
-        // When a blow kills them, another at once, and one after the rest while they were at 4 health
-        let first = on_death(&mut host, ENTITY, "minecraft:player", "minecraft:fall");
-        let again = on_death(&mut host, ENTITY, "minecraft:player", "minecraft:fall");
-        for _ in 0..25 {
-            tick(&mut host, 4.0);
-        }
-        let weak = on_death(&mut host, ENTITY, "minecraft:player", "minecraft:fall");
-
-        // Then only the first is survived, and they are told
-        assert_eq!(
-            (first, again, weak),
-            (Flow::Cancel, Flow::Continue, Flow::Continue)
-        );
-        assert_eq!(host.action_bars_of(PLAYER).len(), 1);
-    }
-
-    #[test]
-    fn a_last_stand_with_no_floor_saves_a_player_at_any_health_but_not_from_kill() {
-        // Given a last stand with no health floor resting 1 second, and a player at half a heart
-        let _serial = exclusive();
-        let mut host = TestHost::default();
-        owning(
-            &mut host,
-            json!([{"type": "last_stand", "cooldown_seconds": 1}]),
-        );
-        tick(&mut host, 1.0);
-
-        // When /kill strikes, then a lethal hit, another at once, and one after the rest
-        let killed = on_death(
-            &mut host,
-            ENTITY,
-            "minecraft:player",
-            "minecraft:generic_kill",
-        );
-        let first = on_death(
-            &mut host,
-            ENTITY,
-            "minecraft:player",
-            "minecraft:mob_attack",
-        );
-        let again = on_death(
-            &mut host,
-            ENTITY,
-            "minecraft:player",
-            "minecraft:mob_attack",
-        );
-        for _ in 0..25 {
-            tick(&mut host, 1.0);
-        }
-        let later = on_death(
-            &mut host,
-            ENTITY,
-            "minecraft:player",
-            "minecraft:out_of_world",
-        );
-
-        // Then /kill goes through, the first hit is survived, the next is not, and after the rest it saves again
-        assert_eq!(
-            (killed, first, again, later),
-            (Flow::Continue, Flow::Cancel, Flow::Continue, Flow::Cancel)
-        );
-    }
-
-    #[test]
-    fn a_saved_player_is_left_at_half_a_heart() {
-        // Given a last stand and a player at full health
-        let _serial = exclusive();
-        let mut host = TestHost::default();
-        owning(
-            &mut host,
-            json!([{"type": "last_stand", "cooldown_seconds": 300}]),
-        );
-        tick(&mut host, 20.0);
-
-        // When a killing blow is survived, and their next tick runs having healed back up
-        let saved = on_death(
-            &mut host,
-            ENTITY,
-            "minecraft:player",
-            "minecraft:mob_attack",
-        );
-        tick(&mut host, 20.0);
-        let after_one = host.health_set.clone();
-        tick(&mut host, 20.0);
-
-        // Then their health is set to half a heart on that tick, once
-        assert_eq!(saved, Flow::Cancel);
-        assert_eq!(after_one, vec![(PLAYER, 1.0)]);
-        assert_eq!(host.health_set, vec![(PLAYER, 1.0)]);
-    }
-
     /// The last-stand messages the player's client was sent, in seconds.
     fn last_stand_sent(host: &TestHost) -> Vec<u32> {
         host.sent_to(PLAYER, crate::MSG_CHANNEL)
@@ -911,9 +818,68 @@ mod tests {
             .collect()
     }
 
+    /// A hit of `amount` (after armour) on the player; what is left of it.
+    fn hit(damage_type: &str, amount: f32) -> f32 {
+        let mut amount = amount;
+        on_damage(ENTITY as i32, "minecraft:player", damage_type, &mut amount);
+        amount
+    }
+
     #[test]
-    fn the_client_is_told_how_long_the_last_stand_rests() {
-        // Given a last stand resting 300 seconds
+    fn a_killing_blow_is_cut_to_leave_half_a_heart_then_the_stand_rests() {
+        // Given a last stand resting 1 second, and a player at full health
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "last_stand", "cooldown_seconds": 1}]),
+        );
+        tick(&mut host, 20.0);
+
+        // When a 30-damage blow lands, another at once, a 5-damage one, and one after the rest at half a heart
+        let first = hit("minecraft:mob_attack", 30.0);
+        let again = hit("minecraft:mob_attack", 30.0);
+        for _ in 0..25 {
+            tick(&mut host, 1.0);
+        }
+        let light = hit("minecraft:mob_attack", 0.5);
+        let later = hit("minecraft:out_of_world", 4.0);
+
+        // Then the first leaves half a heart, the second goes through, a hit that does not kill is left alone, and
+        // after the rest it saves again (taking nothing from half a heart)
+        assert_eq!(first, 19.0);
+        assert_eq!(again, 30.0);
+        assert_eq!(light, 0.5);
+        assert_eq!(later, 0.0);
+    }
+
+    #[test]
+    fn kill_and_a_health_floor_are_respected() {
+        // Given a last stand with a floor of 6 health, a player at 4, and then one with no floor
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
+            &mut host,
+            json!([{"type": "last_stand", "above": 6.0, "cooldown_seconds": 300}]),
+        );
+        tick(&mut host, 4.0);
+
+        // When a killing blow lands under the floor, and /kill with no floor
+        let under = hit("minecraft:mob_attack", 10.0);
+        owning(
+            &mut host,
+            json!([{"type": "last_stand", "cooldown_seconds": 300}]),
+        );
+        tick(&mut host, 20.0);
+        let killed = hit("minecraft:generic_kill", 3.4e38);
+
+        // Then neither is cut
+        assert_eq!((under, killed), (10.0, 3.4e38));
+    }
+
+    #[test]
+    fn the_saved_player_is_told_and_held_at_half_a_heart_on_their_tick() {
+        // Given a last stand resting 300 seconds, and a player at full health saved from a killing blow
         let _serial = exclusive();
         let mut host = TestHost::default();
         owning(
@@ -921,22 +887,42 @@ mod tests {
             json!([{"type": "last_stand", "cooldown_seconds": 300}]),
         );
         tick(&mut host, 20.0);
+        hit("minecraft:mob_attack", 40.0);
 
-        // When the player asks before ever using it, it saves them, and 100 ticks later they join again
-        send_last_stand(&mut host, PLAYER);
-        on_death(
+        // When their next tick runs having healed back up, and another
+        tick(&mut host, 3.0);
+        let after_one = host.health_set.clone();
+        tick(&mut host, 3.0);
+
+        // Then that tick sets them to half a heart (once), tells them, and tells their client it rests 300 seconds
+        assert_eq!(after_one, vec![(PLAYER, 1.0)]);
+        assert_eq!(host.health_set, vec![(PLAYER, 1.0)]);
+        assert_eq!(host.action_bars_of(PLAYER).len(), 1);
+        assert_eq!(last_stand_sent(&host), vec![300]);
+    }
+
+    #[test]
+    fn the_client_is_told_how_long_the_last_stand_rests() {
+        // Given a last stand resting 300 seconds, used 100 ticks ago
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(
             &mut host,
-            ENTITY,
-            "minecraft:player",
-            "minecraft:mob_attack",
+            json!([{"type": "last_stand", "cooldown_seconds": 300}]),
         );
+        tick(&mut host, 20.0);
+        send_last_stand(&mut host, PLAYER);
+        tick(&mut host, 20.0);
+        hit("minecraft:mob_attack", 40.0);
         for _ in 0..100 {
             tick(&mut host, 20.0);
         }
+
+        // When they join again
         send_last_stand(&mut host, PLAYER);
         tick(&mut host, 20.0);
 
-        // Then the client hears it is ready, then 300 seconds, then the 295 left
+        // Then the client heard it was ready, then 300 seconds, then the 295 left
         assert_eq!(last_stand_sent(&host), vec![0, 300, 295]);
     }
 

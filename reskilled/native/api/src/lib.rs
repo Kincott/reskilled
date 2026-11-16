@@ -5,7 +5,7 @@ use horizon_client::mod_api::{
     ClientDisconnectingEvent, ContainerOpenedEvent, DestroyBlockEvent, EnchantItemEvent,
     EntityMountEvent, EntityTameEvent, ExplosionDetonateEvent, Flow, FurnaceExtractEvent,
     GuiRenderPostEvent, Hooks, Host, InteractEntityEvent, InventoryClickEvent,
-    ItemDecorationsEvent, ItemStack, KeyEvent, LevelHost, LivingDeathEvent,
+    ItemDecorationsEvent, ItemStack, KeyEvent, LevelHost, LivingDamagePreEvent,
     LivingEntityUseItemStartEvent, LivingExperienceDropEvent, LivingIncomingDamageEvent,
     LivingIncomingDamageV2Event, LootDropsEvent, ModifyDefaultComponentsEvent, NetFromClientEvent,
     NetFromServerEvent, OnEquipEvent, PerformCommandEvent, PerformConsoleCommandEvent,
@@ -393,8 +393,13 @@ impl Hooks for Mod {
         }
     }
 
-    fn living_death(&self, host: &mut dyn Host, event: &mut LivingDeathEvent<'_>) -> Flow {
-        server::mechanics::on_death(host, event.entity, event.kind, event.damage_type)
+    fn living_damage_pre(&self, event: &mut LivingDamagePreEvent<'_>) {
+        server::mechanics::on_damage(
+            event.entity,
+            event.kind,
+            event.damage_type,
+            &mut event.amount,
+        );
     }
 
     fn server_stopped(&self, _host: &mut dyn Host, _event: &mut ServerStoppedEvent) {
