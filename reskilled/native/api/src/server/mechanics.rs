@@ -437,7 +437,8 @@ pub fn on_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3
     });
 }
 
-/// A block broken by `player` drops `drops`: a placed block noted for salvage drops itself instead, and a noted
+/// A block broken by `player` drops `drops`: a placed block noted for salvage drops itself instead (unless it
+/// already does), and a noted
 /// ripe crop gives up one of its seeds to be planted again.
 pub fn on_drops(
     host: &dyn Host,
@@ -453,11 +454,16 @@ pub fn on_drops(
             .position(|(p, d, at, _)| *p == player && d == dimension && *at == pos);
         at.map(|at| salvage.remove(at).3)
     };
-    if let Some(block) = salvaged
-        && let Some(item) = host.item_from_snbt(&format!("{{id:\"{block}\",count:1}}"))
-    {
-        *drops = vec![item];
-        return;
+    if let Some(block) = salvaged {
+        // A block that already drops itself keeps that drop: it may carry what a bare item would lose (a shulker
+        // box's contents, a banner's patterns, a name).
+        if drops.iter().any(|stack| *stack.item == *block) {
+            return;
+        }
+        if let Some(item) = host.item_from_snbt(&format!("{{id:\"{block}\",count:1}}")) {
+            *drops = vec![item];
+            return;
+        }
     }
     let mut replants = lock(&REPLANTS);
     let Some(replant) = replants
@@ -915,6 +921,27 @@ mod tests {
             dropped,
             vec![vec!["minecraft:glass".to_string()], vec![], vec![]]
         );
+    }
+
+    #[test]
+    fn salvage_leaves_a_block_that_already_drops_itself_as_it_drops() {
+        // Given salvage, and a placed shulker box whose own drop carries its contents
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(&mut host, json!([{"type": "salvage"}]));
+        let pos = [1, 64, 0];
+        host.blocks
+            .insert(pos, ("minecraft:shulker_box".to_string(), vec![]));
+        let mut full = ItemStack::new("minecraft:shulker_box", 1);
+        full.damage = 7; // stands in for the contents component the bare item would lose
+
+        // When the player breaks it
+        on_break(&mut host, PLAYER, OVERWORLD, pos, true);
+        let mut drops = vec![full.clone()];
+        on_drops(&host, PLAYER, OVERWORLD, pos, &mut drops);
+
+        // Then its own drop is kept as it was, not swapped for a bare shulker box
+        assert_eq!(drops, vec![full]);
     }
 
     #[test]
