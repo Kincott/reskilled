@@ -42,7 +42,7 @@ const MARGIN: f32 = 8.0;
 const NAME_AFTER_BACK: f32 = 26.0;
 /// A card shows at most this many perk points as diamonds.
 const MOST_POINTS: usize = 8;
-/// The mastery shine crosses a card once every this many ticks.
+/// The glint on a mastered bar runs once every this many ticks, and the twinkles pulse at the same pace.
 const SHINE_TICKS: f64 = 60.0;
 /// Laid over the cards of skills outside the focus area under the mouse.
 const FADED: u32 = 0xA014_161C;
@@ -163,7 +163,7 @@ struct Pen<'a> {
     xp: Option<u32>,
     /// The tooltip to draw last, over everything.
     tip: Option<Vec<Text>>,
-    /// Client ticks run, for the mastery shine.
+    /// Client ticks run, for the mastery glint and twinkles.
     ticks: u64,
     /// The server's rules: whether perks may be switched and refunded.
     rules: &'a Rules,
@@ -191,7 +191,7 @@ impl Pen<'_> {
         paint::button(self.host, self.batch, r, label, look, hover);
     }
 
-    /// How far along its path the mastery shine is, 0 to 1, from the client's tick and the frame's part of it.
+    /// How far through its run the mastery glint is, 0 to 1, from the client's tick and the frame's part of it.
     fn sweep(&self) -> f32 {
         let partial = self
             .host
@@ -332,14 +332,12 @@ fn draw_overview(pen: &mut Pen<'_>, size: [f32; 2], cache: &ClientCache, shown: 
 fn draw_card(pen: &mut Pen<'_>, card: &Card, skill: &str) {
     let (d, state) = (pen.d, pen.state);
     let hover = pen.over(&card.rect);
-    pen.fill(
-        &card.rect,
-        if hover {
-            paint::CARD_HOVER
-        } else {
-            paint::CARD
-        },
-    );
+    let body = match (mastered(d, state, skill), hover) {
+        (true, _) => paint::MASTER_CARD,
+        (false, true) => paint::CARD_HOVER,
+        (false, false) => paint::CARD,
+    };
+    pen.fill(&card.rect, body);
     let rim = if hover {
         paint::FRAME
     } else {
@@ -363,7 +361,12 @@ fn draw_card(pen: &mut Pen<'_>, card: &Card, skill: &str) {
     let room = right - pen.width(&levels) - 4.0 - card.bar.x;
     let name = paint::fitted(pen.host, &skill_name(d, skill).plain(), room);
     pen.text(&name, card.bar.x, top, WHITE);
-    paint::bar(pen.host, pen.batch, &card.bar, now, most);
+    if mastered(d, state, skill) {
+        let along = pen.sweep();
+        paint::mastered_bar(pen.host, pen.batch, &card.bar, along);
+    } else {
+        paint::bar(pen.host, pen.batch, &card.bar, now, most);
+    }
     let points = points_available(d, state, skill) as usize;
     if !mastered(d, state, skill) {
         let diamonds = paint::POINT.repeat(points.min(MOST_POINTS));
@@ -402,20 +405,52 @@ fn draw_card(pen: &mut Pen<'_>, card: &Card, skill: &str) {
     }
 }
 
-/// What a mastered skill's card wears: a gold double frame, the crown on its icon, a band of light sweeping across
-/// every few seconds, and "Mastered" where its raise button was.
+/// What a mastered skill's card wears: a gold frame with brackets in its corners, two twinkles that take turns,
+/// and the crown with "Mastered" where its raise button was.
 fn draw_mastery(pen: &mut Pen<'_>, card: &Card) {
     let along = pen.sweep();
-    paint::shine(pen.host, pen.batch, &card.rect, along);
     paint::edge(pen.host, pen.batch, &card.rect, paint::FRAME_LIGHT);
-    paint::edge(pen.host, pen.batch, &card.rect.shrunk(1.0), paint::FRAME);
-    let at = [
-        card.slot.x + card.slot.w - paint::CROWN_SIZE[0] + 2.0,
-        card.slot.y - 3.0,
-    ];
-    paint::crown(pen.host, pen.batch, at);
+    paint::edge(
+        pen.host,
+        pen.batch,
+        &card.rect.shrunk(1.0),
+        paint::FRAME_DARK,
+    );
+    paint::corner_brackets(pen.host, pen.batch, &card.rect);
+    let twinkle = |phase: f32| (std::f32::consts::TAU * (along + phase)).sin().max(0.0);
+    let right = card.rect.x + card.rect.w - 9.0;
+    paint::sparkle(
+        pen.host,
+        pen.batch,
+        [right, card.rect.y + card.rect.h - 9.0],
+        twinkle(0.0),
+    );
+    paint::sparkle(
+        pen.host,
+        pen.batch,
+        [right - 14.0, card.bar.y + 8.0],
+        twinkle(0.5),
+    );
+    let label_y = card.bar.y + 6.0;
+    paint::crown(pen.host, pen.batch, [card.bar.x, label_y]);
     let label = say(&MASTERED, &[]).plain();
-    pen.text(&label, card.bar.x, card.bar.y + 6.0, GOLD);
+    pen.text(
+        &label,
+        card.bar.x + paint::CROWN_SIZE[0] + 2.0,
+        label_y,
+        GOLD,
+    );
+}
+
+/// A mastered skill's page: a gold plaque with the crown and "Mastered" where the raise button was.
+fn draw_mastered_plaque(pen: &mut Pen<'_>, r: &Rect) {
+    paint::plaque(pen.host, pen.batch, r);
+    let label = say(&MASTERED, &[]).plain();
+    let width = paint::CROWN_SIZE[0] + 3.0 + pen.width(&label);
+    let x = (r.x + (r.w - width) / 2.0).round();
+    let y = (r.y + (r.h - paint::GLYPH) / 2.0).round();
+    paint::crown(pen.host, pen.batch, [x, y]);
+    pen.text(&label, x + paint::CROWN_SIZE[0] + 3.0, y, GOLD);
 }
 
 /// XP levels enough to price any run of raises, without overflowing the points they stand for.
@@ -617,7 +652,12 @@ fn draw_summary(pen: &mut Pen<'_>, view: &Detail, skill: &str) {
     let (now, most) = (level(state, d, skill), d.max_level(skill));
     let levels = say(&LEVEL_OF, &[number(now), number(most)]).plain();
     pen.text(&levels, view.bar.x, view.slot.y + 2.0, WHITE);
-    paint::bar(pen.host, pen.batch, &view.bar, now, most);
+    if mastered(d, state, skill) {
+        let along = pen.sweep();
+        paint::mastered_bar(pen.host, pen.batch, &view.bar, along);
+    } else {
+        paint::bar(pen.host, pen.batch, &view.bar, now, most);
+    }
     let points = points_available(d, state, skill);
     let line = say(&PERK_POINTS, &[number(points)]).plain();
     pen.text(
@@ -654,16 +694,7 @@ fn draw_summary(pen: &mut Pen<'_>, view: &Detail, skill: &str) {
     }
     let Some(cost) = price(d, pen.rules, state, skill).filter(|_| pen.rules.buying()) else {
         if mastered(d, state, skill) {
-            let label = say(&MASTERED, &[]).plain();
-            paint::text_centred(pen.host, pen.batch, &label, &view.raise, GOLD);
-            paint::crown(
-                pen.host,
-                pen.batch,
-                [
-                    view.slot.x + view.slot.w - paint::CROWN_SIZE[0] + 2.0,
-                    view.slot.y - 3.0,
-                ],
-            );
+            draw_mastered_plaque(pen, &view.raise);
         } else {
             pen.button(&view.raise, &say(&AT_TOP, &[]).plain(), Look::Off);
         }
@@ -1284,17 +1315,33 @@ mod tests {
         let drawn = drawn(&host, AWAY);
         let painted = host.painted.borrow().clone();
 
-        // Then Melee's card has a gold frame, the crown over its icon and "Mastered" where its raise button was;
-        // Mining's has none of these
+        // Then Melee's card has a warm body in a gold frame, and "Mastered" with the crown just before it, inside
+        // the card; Mining's has none of these
+        let filled = |r: Rect, colour: u32| {
+            painted.iter().any(|p| matches!(p, Paint::Fill { rect, argb } if *rect == r.array() && *argb == colour))
+        };
         let gold_top = |r: Rect| {
             let top = [r.x, r.y, r.w, 1.0];
             painted.iter().any(|p| matches!(p, Paint::Fill { rect, argb } if *rect == top && *argb == paint::FRAME_LIGHT))
         };
-        let crowned = |r: Rect| {
-            painted.iter().any(|p| matches!(p, Paint::Fill { rect, argb } if *argb == paint::CROWN && r.contains(rect[0], rect[1])))
+        let crown_in = |r: Rect| {
+            painted
+                .iter()
+                .filter_map(|p| match p {
+                    Paint::Fill { rect, argb }
+                        if *argb == paint::CROWN && r.contains(rect[0], rect[1]) =>
+                    {
+                        Some(rect[0])
+                    }
+                    _ => None,
+                })
+                .fold(None, |most: Option<f32>, x| {
+                    Some(most.map_or(x, |m| m.max(x)))
+                })
         };
+        assert!(filled(melee.rect, paint::MASTER_CARD) && !filled(mining.rect, paint::MASTER_CARD));
         assert!(gold_top(melee.rect) && !gold_top(mining.rect));
-        assert!(crowned(melee.slot) && !crowned(mining.slot));
+        assert!(crown_in(melee.slot).is_none(), "the crown left the icon");
         assert_eq!(drawn.iter().filter(|t| *t == "Mastered").count(), 1);
         let label = painted.iter().find_map(|p| match p {
             Paint::Text { text, at, .. } if text == "Mastered" => Some(*at),
@@ -1306,47 +1353,63 @@ mod tests {
             && x + host.text_width("Mastered") <= melee.rect.x + melee.rect.w - 3.0
             && y + 8.0 <= melee.rect.y + melee.rect.h - 3.0;
         assert!(inside, "{label:?} leaves {:?}", melee.rect);
+        let crown_right = crown_in(melee.rect).expect("a crown on the card");
+        assert!(
+            crown_right < x && crown_right > x - 12.0,
+            "crown at {crown_right}, label at {x}"
+        );
+        assert!(crown_in(mining.rect).is_none());
     }
 
     #[test]
-    fn a_mastered_card_shines_with_a_band_that_moves() {
+    fn a_mastered_bar_carries_a_glint_that_moves_and_nothing_sweeps_the_card() {
         // Given Melee mastered
         let _serial = exclusive();
         let host = screen_open();
         melee_mastered();
-        let melee = cards()[0].rect;
-        let band = |host: &TestHost| -> Vec<[[f32; 2]; 4]> {
+        let bar = cards()[0].bar;
+        let glint = |host: &TestHost| -> Vec<[f32; 4]> {
             host.painted
                 .borrow()
                 .iter()
                 .filter_map(|p| match p {
-                    Paint::Quad { points, .. } => Some(*points),
+                    Paint::Fill { rect, argb } if *argb == paint::GLINT => Some(*rect),
                     _ => None,
                 })
                 .collect()
         };
+        let quads = |host: &TestHost| {
+            host.painted
+                .borrow()
+                .iter()
+                .filter(|p| matches!(p, Paint::Quad { .. }))
+                .count()
+        };
 
-        // When the overview is drawn, and again 10 ticks later
+        // When the overview is drawn while the glint crosses the bar (it starts off the bar's left end), and again
+        // 10 ticks later
+        with(|cache| cache.ticks = 6);
         drawn(&host, AWAY);
-        let first = band(&host);
+        let (first, first_quads) = (glint(&host), quads(&host));
         host.painted.borrow_mut().clear();
         with(|cache| cache.ticks += 10);
         drawn(&host, AWAY);
-        let later = band(&host);
+        let later = glint(&host);
 
-        // Then one translucent band lies on Melee's card, inside it, and it has moved along
-        assert_eq!((first.len(), later.len()), (1, 1));
-        for point in first[0].iter().chain(&later[0]) {
+        // Then the glint lies inside the bar and has moved along it, and no band is drawn across the card
+        assert!(!first.is_empty() && !later.is_empty());
+        for r in first.iter().chain(&later) {
             assert!(
-                point[0] >= melee.x && point[0] <= melee.x + melee.w,
-                "{point:?}"
+                r[0] >= bar.x && r[0] + r[2] <= bar.x + bar.w,
+                "{r:?} leaves {bar:?}"
             );
             assert!(
-                point[1] >= melee.y && point[1] <= melee.y + melee.h,
-                "{point:?}"
+                r[1] >= bar.y && r[1] + r[3] <= bar.y + bar.h,
+                "{r:?} leaves {bar:?}"
             );
         }
         assert_ne!(first, later);
+        assert_eq!(first_quads, 0);
     }
 
     #[test]

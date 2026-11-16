@@ -386,17 +386,92 @@ pub fn crown(host: &dyn Host, batch: &mut HudBatch, at: [f32; 2]) {
     });
 }
 
-/// A band of light across `r`, slanted, `along` of the way (0 to 1) from its left side to its right.
-pub fn shine(host: &dyn Host, batch: &mut HudBatch, r: &Rect, along: f32) {
-    const WIDTH: f32 = 10.0;
-    const SLANT: f32 = 6.0;
-    let x = r.x + along.clamp(0.0, 1.0) * (r.w - WIDTH - SLANT);
-    let (top, bottom) = (r.y, r.y + r.h);
-    let points = [
-        [x + SLANT, top],
-        [x + SLANT + WIDTH, top],
-        [x + WIDTH, bottom],
-        [x, bottom],
-    ];
-    host.quad(batch, points, 0x30FF_F6D8);
+/// A mastered card's warm body.
+pub const MASTER_CARD: u32 = 0xFF33_2B1D;
+/// The bright core of the glint that runs along a mastered bar, and its softer edges.
+pub const GLINT: u32 = 0xFFFF_FBEA;
+const GLINT_HALO: u32 = 0x99FF_F2C4;
+const BAR_GOLD_LIGHT: u32 = 0xFFFF_E79A;
+const BAR_GOLD_DARK: u32 = 0xFFB3_7F22;
+const PLAQUE: u32 = 0xFF4A_3A1B;
+const SPARK: u32 = 0x00FF_F6D2;
+
+/// A full bar in bevelled gold, with a glint `along` of the way (0 to 1) through its run. The glint enters from the
+/// left, crosses, and leaves on the right, so for part of the run none shows.
+pub fn mastered_bar(host: &dyn Host, batch: &mut HudBatch, r: &Rect, along: f32) {
+    fill(host, batch, r, OUTLINE);
+    let inner = r.shrunk(1.0);
+    fill(host, batch, &inner, BAR_FULL);
+    host.fill(batch, [inner.x, inner.y, inner.w, 1.0], BAR_GOLD_LIGHT);
+    if inner.h > 2.0 {
+        host.fill(
+            batch,
+            [inner.x, inner.y + inner.h - 1.0, inner.w, 1.0],
+            BAR_GOLD_DARK,
+        );
+    }
+    // The glint takes the first 60% of the run and rests for the rest.
+    let travel = (along / 0.6).min(2.0);
+    if travel >= 1.0 {
+        return;
+    }
+    let centre = (inner.x - 2.0 + travel * (inner.w + 4.0)).round();
+    for (offset, width, colour) in [
+        (-2.0, 1.0, GLINT_HALO),
+        (-1.0, 2.0, GLINT),
+        (1.0, 1.0, GLINT_HALO),
+    ] {
+        let left = (centre + offset).max(inner.x);
+        let right = (centre + offset + width).min(inner.x + inner.w);
+        if right > left {
+            host.fill(batch, [left, inner.y, right - left, inner.h], colour);
+        }
+    }
+}
+
+/// Small gold brackets in the four corners just inside `r`, each with a bright tip.
+pub fn corner_brackets(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
+    const ARM: f32 = 4.0;
+    let (left, top) = (r.x + 2.0, r.y + 2.0);
+    let (right, bottom) = (r.x + r.w - 3.0, r.y + r.h - 3.0);
+    for (x, y, dx, dy) in [
+        (left, top, 1.0, 1.0),
+        (right, top, -1.0, 1.0),
+        (left, bottom, 1.0, -1.0),
+        (right, bottom, -1.0, -1.0),
+    ] {
+        let along_x = if dx > 0.0 { x } else { x - ARM + 1.0 };
+        let along_y = if dy > 0.0 { y } else { y - ARM + 1.0 };
+        host.fill(batch, [along_x, y, ARM, 1.0], FRAME);
+        host.fill(batch, [x, along_y, 1.0, ARM], FRAME);
+        host.fill(batch, [x, y, 1.0, 1.0], BAR_GOLD_LIGHT);
+    }
+}
+
+/// A raised gold plaque, for a label of honour.
+pub fn plaque(host: &dyn Host, batch: &mut HudBatch, r: &Rect) {
+    fill(host, batch, r, OUTLINE);
+    let inner = r.shrunk(1.0);
+    fill(host, batch, &inner, PLAQUE);
+    bevel(host, batch, &inner, FRAME_LIGHT, FRAME_DARK);
+}
+
+/// A four-pointed twinkle centred on `at`, `strength` (0 to 1) bright.
+pub fn sparkle(host: &dyn Host, batch: &mut HudBatch, at: [f32; 2], strength: f32) {
+    let alpha = |a: f32| ((a * strength.clamp(0.0, 1.0) * 255.0) as u32) << 24 | SPARK;
+    if strength <= 0.05 {
+        return;
+    }
+    let [x, y] = at;
+    host.fill(batch, [x, y, 1.0, 1.0], alpha(1.0));
+    host.fill(batch, [x - 1.0, y, 1.0, 1.0], alpha(0.7));
+    host.fill(batch, [x + 1.0, y, 1.0, 1.0], alpha(0.7));
+    host.fill(batch, [x, y - 1.0, 1.0, 1.0], alpha(0.7));
+    host.fill(batch, [x, y + 1.0, 1.0, 1.0], alpha(0.7));
+    if strength > 0.6 {
+        host.fill(batch, [x - 2.0, y, 1.0, 1.0], alpha(0.3));
+        host.fill(batch, [x + 2.0, y, 1.0, 1.0], alpha(0.3));
+        host.fill(batch, [x, y - 2.0, 1.0, 1.0], alpha(0.3));
+        host.fill(batch, [x, y + 2.0, 1.0, 1.0], alpha(0.3));
+    }
 }

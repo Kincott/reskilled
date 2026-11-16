@@ -106,6 +106,8 @@ fn player(size: [u32; 2]) -> TestHost {
         cache.defs = Some(shipped());
         cache.state = state;
         cache.xp_levels = Some(23);
+        // A few ticks in, so the mastery glint is on its bar and a twinkle is lit.
+        cache.ticks = 9;
     });
     TestHost {
         open_screen: Some(MOD_ID.into()),
