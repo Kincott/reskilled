@@ -51,6 +51,8 @@ static SALVAGE: Mutex<Vec<Salvage>> = Mutex::new(Vec::new());
 static IN_BED: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
 /// Players who woke from a full sleep, rested on their next tick.
 static RESTED: Mutex<Vec<u128>> = Mutex::new(Vec::new());
+/// Players who just got into bed, cleansed on their next tick.
+static TO_CLEANSE: Mutex<Vec<u128>> = Mutex::new(Vec::new());
 /// The tick each player's home effects are next looked at.
 static HOME_DUE: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
 /// The ticks a night's sleep takes before the morning comes.
@@ -182,8 +184,11 @@ fn shorten_effects(host: &mut dyn Host, player: u128) {
     lock(&SEEN_EFFECTS).insert(player, next);
 }
 
+/// The player got into bed: their next tick clears the effects restful sleep clears, before one of them (poison)
+/// hurts them and the hurt wakes them.
 pub fn on_bed_enter(player: u128) {
     lock(&IN_BED).insert(player, queue::now());
+    lock(&TO_CLEANSE).push(player);
 }
 
 /// The player left their bed: after a full night's sleep they rest on their next tick.
@@ -194,22 +199,26 @@ pub fn on_bed_leave(player: u128) {
     }
 }
 
-/// A rested player with restful sleep is healed and loses the effects it clears.
+/// Restful sleep: a player who just got into bed loses the effects it clears, and one who woke from a full night
+/// is healed.
 fn rest(host: &mut dyn Host, player: u128) {
-    let rested = {
-        let mut rested = lock(&RESTED);
-        let before = rested.len();
-        rested.retain(|p| *p != player);
-        before != rested.len()
+    let taken = |list: &Mutex<Vec<u128>>| {
+        let mut list = lock(list);
+        let before = list.len();
+        list.retain(|p| *p != player);
+        before != list.len()
     };
-    let Some(effects) = effects_of(player).filter(|e| rested && !e.restful_sleep.is_empty()) else {
+    let (cleanse, rested) = (taken(&TO_CLEANSE), taken(&RESTED));
+    let Some(effects) = effects_of(player).filter(|e| !e.restful_sleep.is_empty()) else {
         return;
     };
-    if let Some((_, most)) = host.attribute(player, MAX_HEALTH) {
-        host.set_player_status(player, Some(most as f32), None, None);
+    if cleanse {
+        for effect in &effects.restful_sleep {
+            host.remove_effect(player, effect);
+        }
     }
-    for effect in &effects.restful_sleep {
-        host.remove_effect(player, effect);
+    if rested && let Some((_, most)) = host.attribute(player, MAX_HEALTH) {
+        host.set_player_status(player, Some(most as f32), None, None);
     }
 }
 
@@ -575,6 +584,7 @@ pub(crate) fn reset() {
     lock(&SALVAGE).clear();
     lock(&IN_BED).clear();
     lock(&RESTED).clear();
+    lock(&TO_CLEANSE).clear();
     lock(&HOME_DUE).clear();
 }
 
@@ -981,7 +991,7 @@ mod tests {
     }
 
     #[test]
-    fn a_full_sleep_heals_and_clears_but_a_nap_does_not() {
+    fn getting_into_bed_clears_and_a_full_sleep_heals() {
         // Given restful sleep clearing poison, and a poisoned player
         let _serial = exclusive();
         let mut host = TestHost::default();
@@ -997,14 +1007,16 @@ mod tests {
             particles: true,
         });
 
-        // When they nap for 10 ticks, then sleep 100, their tick running after each
+        // When they get into bed and their tick runs, nap for 10 ticks, then sleep 100
         on_bed_enter(PLAYER);
-        for _ in 0..10 {
+        tick(&mut host, 10.0);
+        let in_bed = host.active_effects.len();
+        for _ in 0..9 {
             tick(&mut host, 10.0);
         }
         on_bed_leave(PLAYER);
         tick(&mut host, 10.0);
-        let after_nap = (host.health_set.clone(), host.active_effects.len());
+        let after_nap = host.health_set.clone();
         on_bed_enter(PLAYER);
         for _ in 0..100 {
             tick(&mut host, 10.0);
@@ -1012,10 +1024,11 @@ mod tests {
         on_bed_leave(PLAYER);
         tick(&mut host, 10.0);
 
-        // Then the nap did nothing, and the sleep healed them to their 24 health and took the poison off
-        assert_eq!(after_nap, (vec![], 1));
+        // Then the poison is gone on their first tick in bed, so it cannot wake them; the nap heals nothing; the
+        // full sleep heals them to their 24 health
+        assert_eq!(in_bed, 0);
+        assert_eq!(after_nap, vec![]);
         assert_eq!(host.health_set, vec![(PLAYER, 24.0)]);
-        assert!(host.active_effects.is_empty());
     }
 
     #[test]

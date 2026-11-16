@@ -47,7 +47,8 @@ Mechanic perks
 - [ ] Replant: a ripe wheat crop broken comes back as a seedling, one seed fewer in the drops.
 - [ ] Last Stand: a lethal blow at high health leaves you at half a heart, once per cooldown.
 - [ ] Home perks: set a bed, then check Hearth near it, Home Ward against a creeper, Safe Haven at night.
-- [ ] Restful Sleep: a full night's sleep heals you and clears the listed effects.
+- [ ] Restful Sleep: getting into bed while poisoned clears the poison at once (no waking up from its damage);
+      a full night's sleep heals you.
 
 Server rules and persistence
 - [ ] The gear on the screen opens Reskilled Options; Server rules change in game and survive a reload of the world.

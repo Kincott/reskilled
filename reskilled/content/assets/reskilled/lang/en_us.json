@@ -137,7 +137,7 @@
   "reskilled.perk.building_home_ward": "Home Ward",
   "reskilled.perk.building_home_ward.desc": "Explosions within 24 blocks of your bed or anchor break no blocks. Only while you're online.",
   "reskilled.perk.building_restful_sleep": "Restful Sleep",
-  "reskilled.perk.building_restful_sleep.desc": "A full night's sleep heals you fully and clears harmful effects.",
+  "reskilled.perk.building_restful_sleep.desc": "Getting into bed clears harmful effects. A full night's sleep heals you fully.",
   "reskilled.perk.building_safe_haven": "Safe Haven",
   "reskilled.perk.building_safe_haven.desc": "No natural monster spawns within 32 blocks of your bed or anchor. Only while you're online.",
   "reskilled.perk.building_salvage": "Salvage",
