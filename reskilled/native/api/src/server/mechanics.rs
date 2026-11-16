@@ -1,7 +1,7 @@
 //! Perks that do something rather than change a number: a last stand against a lethal blow, a potion effect for a
 //! kill, crops growing around the player, and ripe crops planted again from their own seeds.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Mutex;
 
 use horizon_client::mod_api::{
@@ -71,6 +71,16 @@ const HOME_EFFECT_TICKS: i32 = 100;
 const HOME_EFFECT_TOP_UP: i32 = 25;
 const MONSTER: &str = "monster";
 const MAX_HEALTH: &str = "minecraft:max_health";
+/// The `age` each placed block had when it was placed (none for a block without one), most recent last.
+type PlacedAges = (
+    BTreeMap<(String, [i32; 3]), Option<String>>,
+    VecDeque<(String, [i32; 3])>,
+);
+static PLACED_AGES: Mutex<PlacedAges> = Mutex::new((BTreeMap::new(), VecDeque::new()));
+/// Placed blocks remembered at most.
+const PLACED_KEPT: usize = 65_536;
+/// Breaks whose drops get no bonus: player, dimension, position.
+static NO_BONUS: Mutex<BTreeSet<(u128, String, [i32; 3])>> = Mutex::new(BTreeSet::new());
 /// Ripe crops broken by players with replanting, waiting to be planted again.
 static REPLANTS: Mutex<Vec<Replant>> = Mutex::new(Vec::new());
 
@@ -479,13 +489,45 @@ pub fn on_kill(host: &dyn Host, entity: u32, kind: &str) {
     }
 }
 
-/// A player is breaking the block at `pos` (`placed` when a player had placed it): a block they placed is noted
-/// for salvage, and a ripe crop they replant is noted, to take a seed from its drops.
+/// A block placed at `pos`: its `age` then (a crop's stage), to tell later whether it grew.
+pub fn on_place(host: &dyn Host, dimension: &str, pos: [i32; 3]) {
+    let age = host
+        .level(dimension)
+        .and_then(|level| host.level_block_property(level, pos, AGE));
+    let mut placed = lock(&PLACED_AGES);
+    let spot = (dimension.to_string(), pos);
+    if placed.0.insert(spot.clone(), age).is_none() {
+        placed.1.push_back(spot);
+    }
+    while placed.1.len() > PLACED_KEPT {
+        if let Some(old) = placed.1.pop_front() {
+            placed.0.remove(&old);
+        }
+    }
+}
+
+/// Whether drop bonuses may add to the drops of the block `player` broke at `pos`: not when a player placed it and
+/// it has not grown since (planted and broken at once, it would give more than it took). Asked once per break.
+pub fn drop_bonus_allowed(player: u128, dimension: &str, pos: [i32; 3]) -> bool {
+    !lock(&NO_BONUS).remove(&(player, dimension.to_string(), pos))
+}
+
+/// A player is breaking the block at `pos` (`placed` when a player had placed it): a block they placed unchanged
+/// gets no drop bonus, a block they placed is noted for salvage, and a ripe crop they replant is noted, to take a
+/// seed from its drops.
 pub fn on_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3], placed: bool) {
-    let Some(effects) = effects_of(player) else {
+    let Some(level) = host.level(dimension) else {
         return;
     };
-    let Some(level) = host.level(dimension) else {
+    let age_then = lock(&PLACED_AGES).0.remove(&(dimension.to_string(), pos));
+    if placed {
+        let age_now = host.level_block_property(level, pos, AGE);
+        let grown = matches!(&age_then, Some(then) if *then != age_now);
+        if !grown {
+            lock(&NO_BONUS).insert((player, dimension.to_string(), pos));
+        }
+    }
+    let Some(effects) = effects_of(player) else {
         return;
     };
     let Some(block) = host.level_block(level, pos) else {
@@ -655,6 +697,8 @@ pub(crate) fn reset() {
     lock(&RESTED).clear();
     lock(&TO_CLEANSE).clear();
     lock(&LIFTED).clear();
+    *lock(&PLACED_AGES) = (BTreeMap::new(), VecDeque::new());
+    lock(&NO_BONUS).clear();
     lock(&SLEPT_THROUGH).clear();
     lock(&HOME_DUE).clear();
 }
@@ -1016,6 +1060,35 @@ mod tests {
             dropped,
             vec![vec!["minecraft:glass".to_string()], vec![], vec![]]
         );
+    }
+
+    #[test]
+    fn a_block_placed_and_broken_unchanged_gets_no_drop_bonus() {
+        // Given a potato planted (age 0) at one spot, another planted that grew to age 3, and a potato nobody planted
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(&mut host, json!([]));
+        let age = |n: &str| vec![("age".to_string(), n.to_string())];
+        let (planted, grown, wild) = ([1, 64, 0], [2, 64, 0], [3, 64, 0]);
+        for pos in [planted, grown] {
+            host.blocks
+                .insert(pos, ("minecraft:potatoes".into(), age("0")));
+            on_place(&host, OVERWORLD, pos);
+        }
+        host.blocks
+            .insert(grown, ("minecraft:potatoes".into(), age("3")));
+        host.blocks
+            .insert(wild, ("minecraft:potatoes".into(), age("0")));
+
+        // When the player breaks each (the first two at spots a player placed)
+        let mut allowed = Vec::new();
+        for (pos, placed) in [(planted, true), (grown, true), (wild, false)] {
+            on_break(&mut host, PLAYER, OVERWORLD, pos, placed);
+            allowed.push(drop_bonus_allowed(PLAYER, OVERWORLD, pos));
+        }
+
+        // Then only the potato broken as it was planted gets no bonus
+        assert_eq!(allowed, vec![false, true, true]);
     }
 
     #[test]

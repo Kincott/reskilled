@@ -45,6 +45,8 @@ Mechanic perks
 - [ ] Salvage: a placed glass block drops glass. A placed shulker box with items in it drops with its items.
       A placed bed and a placed door each drop one, whichever half is broken.
 - [ ] Replant: a ripe wheat crop broken comes back as a seedling, one seed fewer in the drops.
+- [ ] Bountiful Rows / Timber Sense: planting a potato (or placing a log) and breaking it at once never gives
+      two; a crop that grew still can.
 - [ ] Last Stand: a lethal blow at high health leaves you at half a heart, once per cooldown.
 - [ ] Home perks: set a bed, then check Hearth near it, Home Ward against a creeper, Safe Haven at night.
 - [ ] Restful Sleep: poisoned, get into bed: the poison lifts (no waking from its damage). Leave early: it comes

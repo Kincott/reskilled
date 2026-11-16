@@ -176,6 +176,7 @@ impl Hooks for Mod {
     fn place_block(&self, host: &mut dyn Host, event: &mut PlaceBlockEvent<'_>) {
         if let Some(player) = host.acting_player() {
             server::focus::on_place(&player.dimension, event.pos);
+            server::mechanics::on_place(host, &player.dimension, event.pos);
             if server::focus::rewarded(player.game_mode) {
                 server::earning::on_place(player.uuid, &player.dimension, event.pos);
             }
@@ -258,13 +259,15 @@ impl Hooks for Mod {
         let context = event.context;
         if let (Some(player), Some((pos, _))) = (context.player, context.block) {
             server::mechanics::on_drops(host, player, context.dimension, pos, event.drops);
-            server::effects::bonus_drops(
-                host,
-                player,
-                context.dimension,
-                context.table,
-                event.drops,
-            );
+            if server::mechanics::drop_bonus_allowed(player, context.dimension, pos) {
+                server::effects::bonus_drops(
+                    host,
+                    player,
+                    context.dimension,
+                    context.table,
+                    event.drops,
+                );
+            }
         }
     }
 
