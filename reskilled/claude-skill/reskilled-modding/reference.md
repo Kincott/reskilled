@@ -171,7 +171,8 @@ To add your skill to a shipped area, override the area in full (copy it, `"prior
 | `enchantment_level` | integer | 1 | enchantment targets only: the lock applies from this level up |
 
 An enchantment lock adds to the lock of any item carrying that enchantment, and the player is told which
-enchantment brings it. Ability locks are for other mods' code; see Reskilled's `INTEGRATION.md`.
+enchantment brings it. `equip` locks are checked on the game's own worn slots (armor, off hand); another mod's
+accessory slots ask Reskilled through `reskilled::may_equip` (Reskilled's `INTEGRATION.md`). Ability locks are for other mods' code; see Reskilled's `INTEGRATION.md`.
 
 ```json
 {"format": 1, "entries": [

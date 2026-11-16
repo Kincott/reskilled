@@ -40,6 +40,7 @@ perks, locks on a mod's items, settings entries, a retuned shipped perk and a re
 | Mod's darts earn Ranged XP | `settings/` `projectile_damage` | same |
 | Shift-click must not put on a locked modded wearable | `settings/` `equip_slots` | same |
 | Change costs, max level, perk point pace | `settings/`, priority 1, only those fields | reference.md, Settings |
+| Make a mod's own accessory slots (rings, amulets) respect equip locks | code: `reskilled::may_equip` / `may_wear` | Reskilled's `INTEGRATION.md`, Accessory slots |
 
 Modded gear that joins vanilla tags (`#minecraft:pickaxes`, `#minecraft:chest_armor`...) and is repaired with
 diamonds or netherite already falls under the shipped tier locks.

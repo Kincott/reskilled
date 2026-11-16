@@ -300,6 +300,26 @@ fn enchantments_of(stack: &ItemStack) -> Vec<(String, u32)> {
         .collect()
 }
 
+/// Whether the player may wear the stack outside the game's own slots (another mod's accessory slot): its item's
+/// `equip` locks and those its enchantments bring. With `tell`, a refusal gets the usual warning.
+pub(crate) fn may_wear_stack(
+    host: &mut dyn Host,
+    actor: &Actor,
+    stack: &ItemStack,
+    tell: bool,
+) -> bool {
+    if actor.exempt {
+        return true;
+    }
+    let enchanted = enchantments_of(stack);
+    let checks = [(TargetKind::Item, &*stack.item, Action::Equip)];
+    if tell {
+        guard_enchanted(host, actor, &checks, &enchanted) == Flow::Continue
+    } else {
+        first_unmet(host, actor.player, &checks, &enchanted).is_none()
+    }
+}
+
 /// A blow with what the main hand holds.
 pub fn on_attack(host: &mut dyn Host, actor: &Actor, main_hand: Option<&str>) -> Flow {
     main_hand.map_or(Flow::Continue, |item| {

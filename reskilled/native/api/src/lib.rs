@@ -20,7 +20,7 @@ use skills_core::defs::Action;
 
 mod client;
 pub mod integration;
-pub use integration::{has_perk, may_use_ability, skill_level};
+pub use integration::{has_perk, may_equip, may_use_ability, may_wear, skill_level};
 mod server;
 #[cfg(test)]
 mod test_host;

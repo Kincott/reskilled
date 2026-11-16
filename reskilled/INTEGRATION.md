@@ -75,6 +75,37 @@ fn try_dash(host: &mut dyn Host, player: u128) {
 for them (creative or spectator, by Reskilled's settings). When it is false, the player gets the same warning as
 for any other lock. A pack can retune or remove your lock in its own data.
 
+## Accessory slots (rings, amulets, belts)
+
+Reskilled checks `equip` locks on the game's own worn slots. Items in your mod's own slots are out of its sight, so
+ask it, the same optional way as for abilities:
+
+```rust
+// The player puts a stack into one of your accessory slots: accept it only when this is true.
+#[cfg(feature = "reskilled")]
+if !reskilled::may_equip(host, player, &stack) {
+    return false; // refused; the player was told what they need ("Needs Agility 10")
+}
+```
+
+`may_equip` counts the item's own `equip` locks and those its enchantments bring ("Protection III needs Agility 6"),
+and lets through players whose locks are off. A player's levels can drop later (a reset, a death penalty, a pack's
+new data on `/reload`), so check what they already wear now and then, for example when they log in and on your own
+slot screen opening, with `may_wear`, which answers without a message:
+
+```rust
+#[cfg(feature = "reskilled")]
+for (slot, stack) in worn_accessories(player) {
+    if !reskilled::may_wear(host, player, &stack) {
+        take_off_into_inventory(host, player, slot); // and tell the player as your mod does
+    }
+}
+```
+
+Lock your accessories in data like any item (`"target": {"item": {"id": "ringmod:swift_ring"}}`, `"actions":
+["equip"]`), and say in Reskilled's settings which worn slot a shift-click puts a modded wearable in (`equip_slots`)
+when it goes into one of the game's own slots.
+
 ## Reading a player's progress
 
 ```rust
