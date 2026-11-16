@@ -80,7 +80,8 @@ impl Hooks for Mod {
         server::state::logged_in(event.player, event.name);
     }
 
-    fn player_logged_out(&self, _host: &mut dyn Host, event: &mut PlayerLoggedOutEvent<'_>) {
+    fn player_logged_out(&self, host: &mut dyn Host, event: &mut PlayerLoggedOutEvent<'_>) {
+        server::enforce::on_logged_out(host, event.player);
         server::state::logged_out(event.player);
     }
 

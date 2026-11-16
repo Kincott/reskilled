@@ -265,10 +265,12 @@ pub fn on_use_item(host: &mut dyn Host, actor: &Actor, item: &str) -> Flow {
     flow
 }
 
-/// Using an item on a block: the item's use, and placing it when it is a block that a lock covers.
+/// Using an item on a block: the item's use, and placing it when it is a block that a lock covers. A refused one
+/// has its hand sent to the client again: the client already placed the block and took it from the stack, and the
+/// server corrects the block but not the stack.
 pub fn on_use_item_on(host: &mut dyn Host, actor: &Actor, item: &str) -> Flow {
     let enchanted = in_hand_enchantments(host, actor.player, item);
-    guard_enchanted(
+    let flow = guard_enchanted(
         host,
         actor,
         &[
@@ -276,7 +278,94 @@ pub fn on_use_item_on(host: &mut dyn Host, actor: &Actor, item: &str) -> Flow {
             (TargetKind::Block, item, Action::Place),
         ],
         &enchanted,
-    )
+    );
+    if flow == Flow::Cancel {
+        let main = host
+            .held_stack(actor.player)
+            .is_some_and(|stack| &*stack.item == item);
+        let slot = if main { actor.selected } else { OFF_HAND };
+        lock(&TO_RESEND).push((actor.player, actor.entity, slot));
+    }
+    flow
+}
+
+/// The off hand's place in `NativeInventoryKind::Player`'s numbering.
+const OFF_HAND: usize = 40;
+
+/// Hands a refused use on a block was in, by player, their entity and the slot, for the tick to send again.
+static TO_RESEND: Mutex<Vec<(u128, u32, usize)>> = Mutex::new(Vec::new());
+/// Stacks lifted out of a hand for one tick: the player, their entity, the slot and the stack.
+static LIFTED: Mutex<Vec<(u128, u32, usize, ItemStack)>> = Mutex::new(Vec::new());
+
+/// The stack in a slot of the player's (`Player` numbering).
+fn stack_at(host: &dyn Host, player: u128, slot: usize) -> Option<ItemStack> {
+    if slot == OFF_HAND {
+        host.player_equipment(player, EquipmentSlot::OffHand)
+    } else {
+        host.player_stacks(player)?.get(slot).cloned().flatten()
+    }
+}
+
+/// Sends the hands of refused uses to their clients again. The game sends a client only the slots that changed
+/// since it last did, and a refused use changes nothing on the server, so the stack is lifted out of the hand for
+/// one tick (the empty slot is sent) and put back the next (the real stack is sent). Each tick first puts back
+/// what an earlier tick lifted, then lifts what was refused since.
+pub fn resend_hands(host: &mut dyn Host) {
+    let lifted = std::mem::take(&mut *lock(&LIFTED));
+    for (player, entity, slot, stack) in lifted {
+        if let Err(stack) = put_back(host, player, entity, slot, stack) {
+            lock(&LIFTED).push((player, entity, slot, stack));
+        }
+    }
+    let mut wanted = std::mem::take(&mut *lock(&TO_RESEND));
+    wanted.dedup();
+    for (player, entity, slot) in wanted {
+        let Some(stack) = stack_at(host, player, slot) else {
+            continue;
+        };
+        let lifted = host.set_inventory_slot_typed(
+            player,
+            NativeInventoryKind::Player,
+            slot,
+            Some(&stack),
+            None,
+        );
+        if lifted.is_ok() {
+            lock(&LIFTED).push((player, entity, slot, stack));
+        }
+    }
+}
+
+/// Puts a lifted stack back in its slot; when the player filled the slot meanwhile, in their first free slot, else
+/// at their feet. Gives it back when none of these can be done, to be tried again.
+fn put_back(
+    host: &mut dyn Host,
+    player: u128,
+    entity: u32,
+    slot: usize,
+    stack: ItemStack,
+) -> Result<(), ItemStack> {
+    let kind = NativeInventoryKind::Player;
+    if host
+        .set_inventory_slot_typed(player, kind, slot, None, Some(stack.clone()))
+        .is_ok()
+    {
+        return Ok(());
+    }
+    let free = host
+        .player_stacks(player)
+        .and_then(|stacks| stacks.iter().position(Option::is_none));
+    if let Some(free) = free
+        && host
+            .set_inventory_slot_typed(player, kind, free, None, Some(stack.clone()))
+            .is_ok()
+    {
+        return Ok(());
+    }
+    match host.entity(entity) {
+        Some(at) => drop_at(host, at, stack),
+        None => Err(stack),
+    }
 }
 
 /// The enchantments of the stack the player holds that is this item: the main hand's, else the off hand's.
@@ -764,7 +853,28 @@ fn drop_at(host: &mut dyn Host, entity: EntityRef, stack: ItemStack) -> Result<(
 }
 
 /// Forgets what this module keeps for the running world, as the server stops.
+/// A player left: what was lifted out of their hand goes back at once, into their saved inventory.
+pub fn on_logged_out(host: &mut dyn Host, player: u128) {
+    lock(&TO_RESEND).retain(|(p, ..)| *p != player);
+    let lifted = std::mem::take(&mut *lock(&LIFTED));
+    for (p, entity, slot, stack) in lifted {
+        if p != player {
+            lock(&LIFTED).push((p, entity, slot, stack));
+            continue;
+        }
+        if let Err(stack) = put_back(host, p, entity, slot, stack) {
+            log::warn!(
+                "Reskilled could not give {} back to {p:032x} as they left; it is kept for their return",
+                stack.item
+            );
+            lock(&LIFTED).push((p, entity, slot, stack));
+        }
+    }
+}
+
 pub(crate) fn reset() {
+    lock(&TO_RESEND).clear();
+    lock(&LIFTED).clear();
     lock(&LAST_REFUSAL).clear();
     lock(&EQUIPMENT_CLICKS).clear();
     lock(&HAND_EQUIPS).clear();
@@ -1014,6 +1124,69 @@ mod tests {
         // Then the placing is cancelled
         assert_eq!(flow, Flow::Cancel);
         assert_eq!(host.action_bars_of(PLAYER), vec!["Needs Mining 10"]);
+    }
+
+    /// Two server ticks of the job queue.
+    fn two_ticks(host: &mut TestHost) -> [Option<ItemStack>; 2] {
+        crate::server::queue::run(host, vec![]);
+        let first = host.slots[0].clone();
+        crate::server::queue::run(host, vec![]);
+        [first, host.slots[0].clone()]
+    }
+
+    #[test]
+    fn a_refused_placing_sends_the_hand_back_to_the_client() {
+        // Given a level-1 player with five TNT in their hand (Mining 10 to place)
+        let _serial = exclusive();
+        let (mut host, actor) = setup(false);
+        let tnt = ItemStack::new("minecraft:tnt", 5);
+        host.slots = vec![Some(tnt.clone())];
+
+        // When they click a block with it, and two ticks pass
+        on_use_item_on(&mut host, &actor, "minecraft:tnt");
+        let [first, second] = two_ticks(&mut host);
+
+        // Then the hand is empty for one tick, so the game sends the client the slot (which it guessed had placed
+        // one), and the five are back the next tick, so it is sent again as it really is
+        assert_eq!(first, None);
+        assert_eq!(second, Some(tnt));
+    }
+
+    #[test]
+    fn a_hand_filled_meanwhile_gets_the_stack_elsewhere() {
+        // Given the refused TNT lifted out of the hand for a tick
+        let _serial = exclusive();
+        let (mut host, actor) = setup(false);
+        let tnt = ItemStack::new("minecraft:tnt", 5);
+        host.slots = vec![Some(tnt.clone()), None];
+        on_use_item_on(&mut host, &actor, "minecraft:tnt");
+        crate::server::queue::run(&mut host, vec![]);
+
+        // When the player puts a stick in that slot before the next tick
+        let stick = ItemStack::new("minecraft:stick", 1);
+        host.slots[0] = Some(stick.clone());
+        crate::server::queue::run(&mut host, vec![]);
+
+        // Then the stick stays and the TNT goes to the next free slot: nothing is lost or made
+        assert_eq!(host.slots[0], Some(stick));
+        assert_eq!(host.slots[1], Some(tnt));
+    }
+
+    #[test]
+    fn a_player_who_leaves_while_lifted_keeps_the_stack() {
+        // Given the refused TNT lifted out of the hand for a tick
+        let _serial = exclusive();
+        let (mut host, actor) = setup(false);
+        let tnt = ItemStack::new("minecraft:tnt", 5);
+        host.slots = vec![Some(tnt.clone())];
+        on_use_item_on(&mut host, &actor, "minecraft:tnt");
+        crate::server::queue::run(&mut host, vec![]);
+
+        // When they leave before the next tick
+        on_logged_out(&mut host, PLAYER);
+
+        // Then the stack is back in their hand at once
+        assert_eq!(host.slots[0], Some(tnt));
     }
 
     #[test]

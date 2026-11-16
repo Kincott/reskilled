@@ -100,6 +100,7 @@ pub fn forget(player: u128) {
 /// Does the jobs, then sends what is waiting, at most 32 messages a player.
 pub fn run(host: &mut dyn Host, jobs: Vec<Job>) {
     TICKS.fetch_add(1, Ordering::Relaxed);
+    enforce::resend_hands(host);
     for job in jobs {
         match job {
             Job::SendDefs(player) => data::send_defs(player),
