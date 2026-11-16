@@ -23,6 +23,9 @@ const TICKS_PER_SECOND: u64 = 20;
 const REPLANT_TICKS: u64 = 40;
 const CROPS: &str = "#minecraft:crops";
 const AGE: &str = "age";
+const PART: &str = "part";
+const HALF: &str = "half";
+const BITES: &str = "bites";
 /// `Level.setBlock`'s usual flags: tell neighbours and clients.
 const UPDATE_ALL: i32 = 3;
 
@@ -411,8 +414,13 @@ pub fn on_break(host: &mut dyn Host, player: u128, dimension: &str, pos: [i32; 3
     let Some(block) = host.level_block(level, pos) else {
         return;
     };
-    // A planted crop has an age; its harvest is not salvaged.
-    if placed && effects.salvage && host.level_block_property(level, pos, AGE).is_none() {
+    // A planted crop has an age; its harvest is not salvaged. Half of a two-block piece (a bed's part, a door's or
+    // tall plant's half) is not either: the other half drops the piece, so salvaging this one would drop it twice.
+    // Nor is an eaten cake, which would come back whole.
+    let whole_block = [AGE, PART, HALF, BITES]
+        .iter()
+        .all(|property| host.level_block_property(level, pos, property).is_none());
+    if placed && effects.salvage && whole_block {
         let mut salvage = lock(&SALVAGE);
         salvage.retain(|(_, d, p, _)| d != dimension || *p != pos);
         salvage.push((player, dimension.to_string(), pos, block.clone()));
@@ -921,6 +929,34 @@ mod tests {
             dropped,
             vec![vec!["minecraft:glass".to_string()], vec![], vec![]]
         );
+    }
+
+    #[test]
+    fn salvage_leaves_half_pieces_and_eaten_cakes_alone() {
+        // Given salvage, and a placed bed's foot and a placed door's top, which drop nothing (the other half drops
+        // the bed or the door), and a placed cake with slices eaten
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        owning(&mut host, json!([{"type": "salvage"}]));
+        let halves = [
+            ([1, 64, 0], "minecraft:red_bed", ("part", "foot")),
+            ([3, 65, 0], "minecraft:oak_door", ("half", "upper")),
+            ([5, 64, 0], "minecraft:cake", ("bites", "4")),
+        ];
+
+        // When the player breaks each
+        let mut dropped = Vec::new();
+        for (pos, block, (key, value)) in halves {
+            let properties = vec![(key.to_string(), value.to_string())];
+            host.blocks.insert(pos, (block.to_string(), properties));
+            on_break(&mut host, PLAYER, OVERWORLD, pos, true);
+            let mut drops = Vec::new();
+            on_drops(&host, PLAYER, OVERWORLD, pos, &mut drops);
+            dropped.push(drops);
+        }
+
+        // Then they drop nothing, so no piece is dropped twice and no eaten cake comes back whole
+        assert_eq!(dropped, vec![vec![], vec![], vec![]]);
     }
 
     #[test]
