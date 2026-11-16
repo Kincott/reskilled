@@ -49,6 +49,10 @@ pub struct TestHost {
     pub summoned: Vec<(String, String, [f64; 3], Compound)>,
     /// Stacks put into item entities, by entity id.
     pub item_entities: Vec<(u32, ItemStack)>,
+    /// Whether putting a stack into an item entity fails.
+    pub set_item_entity_fails: bool,
+    /// Entities removed: dimension, id.
+    pub removed_entities: Vec<(String, u32)>,
     /// Commands run as the console.
     pub commands: Vec<String>,
     /// `give_levels` refuses, as it does for a single-player world's owner outside their own hooks.
@@ -285,7 +289,15 @@ impl Host for TestHost {
     }
 
     fn set_item_entity(&mut self, _dimension: &str, id: u32, stack: ItemStack) -> bool {
+        if self.set_item_entity_fails {
+            return false;
+        }
         self.item_entities.push((id, stack));
+        true
+    }
+
+    fn remove_entity(&mut self, dimension: &str, id: u32) -> bool {
+        self.removed_entities.push((dimension.to_string(), id));
         true
     }
 

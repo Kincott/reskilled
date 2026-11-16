@@ -687,10 +687,20 @@ fn drop_at(host: &mut dyn Host, entity: EntityRef, stack: ItemStack) -> Result<(
         ("PickupDelay".into(), Tag::Short(PICKUP_DELAY_TICKS)),
     ]
     .into();
-    match host.summon(dimension, ITEM_ENTITY, pos, nbt) {
-        Some(id) if host.set_item_entity(dimension, id, stack.clone()) => Ok(()),
-        _ => Err(stack),
+    let Some(id) = host.summon(dimension, ITEM_ENTITY, pos, nbt) else {
+        return Err(stack);
+    };
+    if host.set_item_entity(dimension, id, stack.clone()) {
+        return Ok(());
     }
+    // The placeholder would otherwise lie there as a free copy of the item.
+    if !host.remove_entity(dimension, id) {
+        log::warn!(
+            "Reskilled could not remove the placeholder {} it summoned",
+            stack.item
+        );
+    }
+    Err(stack)
 }
 
 /// Forgets what this module keeps for the running world, as the server stops.
@@ -713,7 +723,7 @@ mod tests {
     use crate::server::data::tests::load;
     use crate::server::queue::{Job, run, take_queued};
     use crate::server::state::set_state;
-    use crate::test_host::{PLAYER_POSITION, SUMMONED_ID, TestHost, exclusive};
+    use crate::test_host::{OVERWORLD, PLAYER_POSITION, SUMMONED_ID, TestHost, exclusive};
 
     const PLAYER: u128 = 0xfeed;
     const ENTITY: u32 = 42;
@@ -1530,6 +1540,27 @@ mod tests {
 
         // Then it goes back on rather than vanish
         assert_eq!(host.worn(EquipmentSlot::Chest), Some(&chestplate()));
+    }
+
+    #[test]
+    fn a_drop_that_cannot_take_the_real_stack_leaves_no_copy_behind() {
+        // Given a full inventory, and a world that makes the item entity but will not put the real stack in it
+        let _serial = exclusive();
+        let (mut host, _) = setup(false);
+        host.fill_inventory();
+        host.wear(EquipmentSlot::Chest, chestplate());
+        host.set_item_entity_fails = true;
+
+        // When it is taken off
+        run(&mut host, vec![unequip_job(Return::Inventory)]);
+
+        // Then it goes back on, and the placeholder item entity is removed rather than left as a free copy
+        assert_eq!(host.worn(EquipmentSlot::Chest), Some(&chestplate()));
+        assert_eq!(host.summoned.len(), 1);
+        assert_eq!(
+            host.removed_entities,
+            vec![(OVERWORLD.to_string(), SUMMONED_ID)]
+        );
     }
 
     #[test]
