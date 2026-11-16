@@ -69,6 +69,9 @@ const MARKER: u32 = 0xFFFF_FFFF;
 const DIMMED: u32 = 0xA810_1218;
 pub const PERK_OPEN: u32 = 0xFF67_C14A;
 const PERK_OWNED: u32 = 0xFFF2_C14E;
+/// The line joining a perk to one it requires: gold once that one is owned.
+pub const PERK_OWNED_LINE: u32 = 0xFFF2_C14E;
+const PERK_NEEDED_LINE: u32 = 0xFF3A_4152;
 const SELECTED: u32 = 0xFFFF_FFFF;
 const FRAMES: &str = "gui/sprites/advancements/";
 const UNTINTED: u32 = 0xFFFF_FFFF;
@@ -665,6 +668,40 @@ fn draw_road(
         }
     }
     let shown = dock_perk(d, state, r, chosen, Some(pen.mouse)).map(|p| p.id.clone());
+    // Each perk joined to the perks it requires, at the nodes' middle height, behind the frames
+    for (id, rect) in &r.nodes {
+        let Some(perk) = d.perks.get(id) else {
+            continue;
+        };
+        for needed in &perk.requires {
+            let Some((_, other)) = r.nodes.iter().find(|(o, _)| o == needed) else {
+                continue;
+            };
+            let (a, b) = (
+                other.x + (other.w / 2.0).floor(),
+                rect.x + (rect.w / 2.0).floor(),
+            );
+            let (from, to) = (a.min(b), a.max(b));
+            let (from, to) = (from.max(inner.x), to.min(inner.x + inner.w - 1.0));
+            if to <= from {
+                continue;
+            }
+            let colour = if owns(state, needed) {
+                PERK_OWNED_LINE
+            } else {
+                PERK_NEEDED_LINE
+            };
+            pen.fill(
+                &Rect {
+                    x: from,
+                    y: rect.y + 13.0,
+                    w: to - from + 1.0,
+                    h: 1.0,
+                },
+                colour,
+            );
+        }
+    }
     let capstone = r.nodes.last().map(|(id, _)| id.clone());
     for (id, rect) in &r.nodes {
         let Some(perk) = d.perks.get(id) else {
@@ -1352,6 +1389,27 @@ mod tests {
         assert!(filled_in(&host, &around, PERK_OPEN));
         assert!(filled_in(&host, &node(&r, "deep_veins"), PADLOCK_EDGE));
         assert!(!filled_in(&host, &node(&r, "sure_grip"), PADLOCK_EDGE));
+    }
+
+    #[test]
+    fn a_required_perk_is_joined_to_its_perk() {
+        // Given Mining's road, where Rich Seams requires Sure Grip (owned)
+        let _serial = exclusive();
+        let host = mining_open();
+        let r = laid_out();
+        let (grip, seams) = (node(&r, "sure_grip"), node(&r, "rich_seams"));
+
+        // When the page is drawn
+        draw(&host, &mut HudBatch::new([427, 240]), USUAL, [1.0, 1.0]);
+
+        // Then a gold line runs between their centres at the nodes' middle height
+        let from = grip.x + (grip.w / 2.0).floor();
+        let to = seams.x + (seams.w / 2.0).floor();
+        let joined = host.painted.borrow().iter().any(|p| {
+            matches!(p, Paint::Fill { rect, argb } if *argb == PERK_OWNED_LINE
+                && rect[0] == from && rect[0] + rect[2] == to + 1.0 && rect[1] == grip.y + 13.0)
+        });
+        assert!(joined);
     }
 
     #[test]
