@@ -69,7 +69,6 @@ messages! {
     REQUIRES = "reskilled.ui.requires" => "%s: %s %s";
     REQUIREMENTS = "reskilled.ui.requirements" => "Requirements";
     YOU_HAVE = "reskilled.ui.you_have" => "(you: %s)";
-    TITLE = "reskilled.ui.title" => "Reskilled";
     LEVEL = "reskilled.ui.level" => "%s/%s";
     LEVEL_OF = "reskilled.ui.level_of" => "Level %s of %s";
     PROGRESS = "reskilled.ui.progress" => "Progress: %s/%s";

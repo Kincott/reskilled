@@ -12,7 +12,6 @@ pub const FRAME_LIGHT: u32 = 0xFFD9_B45A;
 pub const FRAME: u32 = 0xFFA8_7F32;
 pub const FRAME_DARK: u32 = 0xFF6B_4E1C;
 pub const BODY: u32 = 0xFF1C_1F27;
-pub const HEADER: u32 = 0xFF27_2B36;
 pub const CARD_EDGE: u32 = 0xFF41_485A;
 pub const INSET: u32 = 0xFF12_1419;
 pub const BAR_FILL: u32 = 0xFF5F_C63A;
@@ -72,22 +71,6 @@ fn bevel(host: &dyn Host, batch: &mut HudBatch, r: &Rect, light: u32, dark: u32)
     host.fill(batch, [r.x, r.y + 1.0, 1.0, r.h - 1.0], light);
     host.fill(batch, [r.x + 1.0, r.y + r.h - 1.0, r.w - 1.0, 1.0], dark);
     host.fill(batch, [r.x + r.w - 1.0, r.y + 1.0, 1.0, r.h - 2.0], dark);
-}
-
-/// The window: a dark body in a brass frame with a black outline, and its header band.
-pub fn panel(host: &dyn Host, batch: &mut HudBatch, r: &Rect, header: f32) {
-    fill(host, batch, r, OUTLINE);
-    let frame = r.shrunk(1.0);
-    fill(host, batch, &frame, FRAME);
-    bevel(host, batch, &frame, FRAME_LIGHT, FRAME_DARK);
-    let body = r.shrunk(3.0);
-    fill(host, batch, &body, BODY);
-    host.fill(batch, [body.x, body.y, body.w, header - 3.0], HEADER);
-    host.fill(
-        batch,
-        [body.x, body.y + header - 3.0, body.w, 1.0],
-        FRAME_DARK,
-    );
 }
 
 /// A sunken square for an icon.

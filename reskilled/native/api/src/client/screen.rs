@@ -13,7 +13,7 @@ use skills_core::rules::{CostUnit, Rules};
 use skills_core::wire::{ClientDefs, ToServer};
 
 use super::cache::{CLICK_SOUND, ClientCache, Tab, with};
-use super::layout::{HEADER_H, Rect, Scroll, panel};
+use super::layout::{Rect, Scroll};
 use super::paint::{self, DIM, GOLD, GRAY, GREEN, Look, RED, WHITE};
 use crate::MOD_ID;
 use crate::text::{
@@ -21,8 +21,8 @@ use crate::text::{
     FOCUS_GIVES, LEVEL_OF, MASTERED, MISSING_PERK, NEEDS, NOT_ENOUGH_POINTS, OPEN_HINT, OWNED,
     PERK_COST, PERK_OF, PERK_POINTS, RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT,
     RAISE_TO, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT, REWARD_TAME,
-    REWARD_TRAVEL, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, WAITING, focus_name, label_name,
-    number, perk_description, perk_name, say, skill_name,
+    REWARD_TRAVEL, SHARED_OWN, SWITCHED_OFF, TIP_NEED, WAITING, focus_name, label_name, number,
+    perk_description, perk_name, say, skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -30,9 +30,6 @@ pub const LEFT_BUTTON: i32 = 0;
 pub const RIGHT_BUTTON: i32 = 1;
 /// Raises one Shift-click asks for.
 const SHIFT_RAISES: u32 = 5;
-/// Where a header's text sits below the window's top, and its side margin.
-const HEADER_TEXT: f32 = 7.0;
-const MARGIN: f32 = 8.0;
 /// A perk's description wraps at this width in its tooltip.
 const TIP_WIDTH: f32 = 190.0;
 
@@ -262,17 +259,8 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
     }
     with(|cache| {
         let Some(defs) = &cache.defs else {
-            let window = panel(size);
-            paint::panel(host, batch, &window, HEADER_H);
-            let title = say(&TITLE, &[]).plain();
-            host.text(
-                batch,
-                &title,
-                [window.x + MARGIN, window.y + HEADER_TEXT],
-                GOLD,
-                true,
-            );
-            paint::text_centred(host, batch, &say(&WAITING, &[]).plain(), &window, GRAY);
+            let body = window_now(size, cache).body;
+            paint::text_centred(host, batch, &say(&WAITING, &[]).plain(), &body, GRAY);
             return;
         };
         let mut pen = Pen {
@@ -1369,7 +1357,7 @@ pub(crate) mod tests {
         let flow = click(&host, SIZE, [SIZE[0] / 2.0, SIZE[1] / 2.0], LEFT_BUTTON);
 
         // Then it says it is waiting, and the click is taken without doing anything
-        contains(&drawn, &["Reskilled", "Waiting for the server..."]);
+        contains(&drawn, &["Waiting for the server..."]);
         assert_eq!(flow, Flow::Cancel);
         assert_eq!(with(|cache| cache.tab), Tab::Home);
     }

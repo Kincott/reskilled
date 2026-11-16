@@ -1,10 +1,5 @@
-//! Geometry the screen's pages share, in GUI pixels: rectangles, the small centred panel shown while the server's
-//! definitions are on their way, and scroll bars. No host: pure geometry.
+//! Geometry the screen's pages share, in GUI pixels: rectangles and scroll bars. No host: pure geometry.
 
-pub const PANEL_W: f32 = 300.0;
-pub const PANEL_H: f32 = 208.0;
-/// The title band at the top of the window.
-pub const HEADER_H: f32 = 22.0;
 /// The scroll bar's track, inside the window's right padding.
 const TRACK_W: f32 = 3.0;
 
@@ -37,16 +32,6 @@ impl Rect {
     }
 }
 
-/// The window, centred on whole pixels and never off the top left of a screen smaller than it.
-pub fn panel(size: [f32; 2]) -> Rect {
-    Rect {
-        x: ((size[0] - PANEL_W) / 2.0).floor().max(0.0),
-        y: ((size[1] - PANEL_H) / 2.0).floor().max(0.0),
-        w: PANEL_W,
-        h: PANEL_H,
-    }
-}
-
 /// A scroll bar: the track and the thumb in it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Scroll {
@@ -70,28 +55,4 @@ pub(super) fn scroll(area: &Rect, first: usize, shown: usize, total: usize) -> O
         ..track
     };
     Some(Scroll { track, thumb })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const SMALLEST: [f32; 2] = [320.0, 240.0];
-    const USUAL: [f32; 2] = [427.0, 240.0];
-
-    #[test]
-    fn the_window_is_centred_and_fits_the_smallest_screen() {
-        // Given the game's smallest screen and a usual one
-        // When the window is placed on each
-        let small = panel(SMALLEST);
-        let usual = panel(USUAL);
-
-        // Then it is whole on both, in the middle
-        assert_eq!(
-            (small.x, small.y, small.w, small.h),
-            (10.0, 16.0, 300.0, 208.0)
-        );
-        assert_eq!((usual.x, usual.y), (63.0, 16.0));
-        assert!(small.x + small.w <= SMALLEST[0] && small.y + small.h <= SMALLEST[1]);
-    }
 }
