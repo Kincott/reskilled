@@ -2,7 +2,7 @@
 //! lock names (an ability is something with no item, block or entity behind it, such as a dash), and whether they
 //! may wear an item in a slot of the other mod's own (an accessory slot). Another
 //! native mod lists Reskilled as an optional dependency and calls these behind `#[cfg(feature = "reskilled")]`;
-//! see `INTEGRATION.md`. Call them on the server.
+//! see `claude-skill/reskilled-modding/integration.md`. Call them on the server.
 
 use horizon_client::mod_api::{Flow, Host, ItemStack};
 use skills_core::defs::{Action, TargetKind};
