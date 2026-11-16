@@ -2,7 +2,6 @@
 //! screen and a usual one. The tests check nothing leaves the window; with `SKILLS_PREVIEW_DIR` set they also
 //! write every scene's drawing calls there as JSON, which `tools/preview.py` renders to pictures.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -10,29 +9,26 @@ use horizon_client::mod_api::{
     Host, HudBatch, ItemStack, Text, dispatch_gui_render_post, dispatch_item_decorations,
     dispatch_tooltip,
 };
-use skills_core::defs::{Action, DefKind, GuideAction};
-use skills_core::guide::{caption_values, frame_at};
+use skills_core::defs::{Action, DefKind};
 use skills_core::locks::Requirements;
 use skills_core::progress::{PlayerState, SkillProgress};
 use skills_core::registry::{SourceFile, build};
 use skills_core::wire::{ClientDefs, client_defs_json};
 
 use super::cache::{View, WARNING_TICKS, Warning, with};
-use super::layout::{detail, overview, page, panel};
+use super::layout::{detail, overview, panel};
 use super::screen::draw;
 use crate::MOD_ID;
 use crate::test_host::{Paint, TestHost, exclusive, mods, spans_of};
-use crate::text::caption_text;
 
 const SMALLEST: [u32; 2] = [320, 240];
 const USUAL: [u32; 2] = [427, 240];
-const FOLDERS: [(&str, DefKind); 6] = [
+const FOLDERS: [(&str, DefKind); 5] = [
     ("skills", DefKind::Skill),
     ("perks", DefKind::Perk),
     ("focus", DefKind::Focus),
     ("locks", DefKind::Lock),
     ("settings", DefKind::Settings),
-    ("guides", DefKind::Guide),
 ];
 const AWAY: [f32; 2] = [1.0, 1.0];
 
@@ -45,13 +41,7 @@ fn shipped() -> ClientDefs {
     let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../content/data/reskilled");
     let mut files = Vec::new();
     for (folder, kind) in FOLDERS {
-        let entries = match fs::read_dir(data.join("reskilled").join(folder)) {
-            Ok(entries) => entries,
-            // Guides are the one folder a pack may leave out.
-            Err(_) if folder == "guides" => continue,
-            Err(error) => panic!("the shipped {folder} folder: {error}"),
-        };
-        for entry in entries {
+        for entry in fs::read_dir(data.join("reskilled").join(folder)).unwrap() {
             let path = entry.unwrap().path();
             let name = path.file_stem().unwrap().to_str().unwrap().to_string();
             files.push(SourceFile {
@@ -151,19 +141,9 @@ fn scene(host: &TestHost, name: &str, size: [u32; 2], mouse: [f32; 2]) -> Vec<Pa
 }
 
 fn save(host: &TestHost, name: &str, size: [u32; 2]) -> Vec<Paint> {
-    save_naming(host, name, size, &BTreeMap::new())
-}
-
-/// [`save`], with the block state strings behind the scene's state ids, so the preview can tell its blocks apart.
-fn save_naming(
-    host: &TestHost,
-    name: &str,
-    size: [u32; 2],
-    states: &BTreeMap<u32, String>,
-) -> Vec<Paint> {
     let painted = host.painted.borrow().clone();
     if let Some(dir) = std::env::var_os("SKILLS_PREVIEW_DIR") {
-        let scene = serde_json::json!({"size": size, "paints": painted, "states": states});
+        let scene = serde_json::json!({"size": size, "paints": painted});
         let path = PathBuf::from(dir).join(format!("{name}.json"));
         fs::write(path, serde_json::to_string(&scene).unwrap()).unwrap();
     }
@@ -436,162 +416,4 @@ fn the_warning_the_badge_and_the_item_tooltip_draw() {
             "\u{2718} Break: Gathering 16 (you: 6)",
         ]
     );
-}
-
-/// Gives every block state the shipped guides show a made-up id, as if the game had resolved it (the test host has
-/// no table of states); the state strings by id, for the preview.
-fn known_states() -> BTreeMap<u32, String> {
-    let strings: Vec<String> = with(|cache| {
-        let defs = &cache.defs.as_ref().unwrap().defs;
-        defs.guides
-            .values()
-            .flat_map(|guide| &guide.steps)
-            .filter_map(|step| match &step.action {
-                GuideAction::Place(blocks) => Some(blocks.iter().map(|b| b.block.clone())),
-                _ => None,
-            })
-            .flatten()
-            .collect()
-    });
-    let mut states = BTreeMap::new();
-    for state in strings {
-        if !states.values().any(|known| *known == state) {
-            let id = 1000 + states.len() as u32;
-            super::scene::remember(&state, horizon_client::mod_api::BlockStateId(id));
-            states.insert(id, state);
-        }
-    }
-    states
-}
-
-/// Opens the guide page on `perk`, its scene `ticks` in.
-fn open_guide(perk: &str, ticks: u64) {
-    with(|cache| {
-        let defs = cache.defs.as_ref().unwrap();
-        let owner = &defs.defs.perks[perk].skill;
-        cache.selected = defs.defs.skills.keys().position(|id| id == owner).unwrap();
-        cache.guide_perk = super::screen::shown(defs, cache.selected)
-            .perks
-            .iter()
-            .position(|p| p.id == perk)
-            .unwrap();
-        cache.view = View::Guide;
-        cache.guide_started = 0;
-        cache.ticks = ticks;
-    });
-}
-
-#[test]
-fn the_guide_fits_the_window() {
-    for size in [SMALLEST, USUAL] {
-        // Given the shipped mod, a player a few hours in, and every perk with a scene and Steady Hand (a card)
-        let _serial = exclusive();
-        let host = player(size);
-        let states = known_states();
-        let sizef = [size[0] as f32, size[1] as f32];
-        let p = page(sizef);
-        let mut perks: Vec<(String, Vec<f32>)> = with(|cache| {
-            let defs = &cache.defs.as_ref().unwrap().defs;
-            defs.guides
-                .iter()
-                .map(|(perk, guide)| {
-                    let captions = guide.steps.iter().filter_map(|step| match step.action {
-                        GuideAction::Caption(_) => Some(step.at),
-                        _ => None,
-                    });
-                    (perk.clone(), captions.collect())
-                })
-                .collect()
-        });
-        assert!(
-            perks
-                .iter()
-                .any(|(p, _)| p == "reskilled:gathering_sapling_keeper"),
-            "Replant has no scene"
-        );
-        perks.push((skill("melee_steady_hand"), vec![0.0]));
-
-        for (perk, captions) in &perks {
-            let path = perk.split_once(':').unwrap().1;
-            for (n, at) in captions.iter().enumerate() {
-                // When its page is drawn just after each caption appears
-                let ticks = (at * 20.0).round() as u64 + 2;
-                open_guide(perk, ticks);
-                // The attack speed the client would read for Steady Hand's card holding a sword (-2.4), with the
-                // owned perk's 10% of the base of 4 on it.
-                with(|cache| {
-                    cache
-                        .attributes
-                        .insert("minecraft:attack_speed".into(), 2.0);
-                });
-                host.painted.borrow_mut().clear();
-                draw(&host, &mut HudBatch::new(size), sizef, AWAY);
-                let name = format!("guide_{path}_{}_{}", size[0], n + 1);
-                let painted = save_naming(&host, &name, size, &states);
-
-                // Then all its text and icons are inside the window, no text over another, the caption and the
-                // card lines whole, and a scene page shows blocks
-                assert_inside_window(&host, &painted, size, &name);
-                assert_no_text_overlap(&host, &painted, &name);
-                let (guide, perk_def, lines) = with(|cache| {
-                    let defs = &cache.defs.as_ref().unwrap().defs;
-                    let perk_def = defs.perks[perk].clone();
-                    let lines = super::guide::card_texts(&perk_def, &cache.attributes, false);
-                    (defs.guides.get(perk).cloned(), perk_def, lines)
-                });
-                let rows = |text: &str, w: f32| super::paint::wrapped(&host, text, w).len();
-                let card_rows: usize = lines.iter().map(|(text, _)| rows(text, p.lines.w)).sum();
-                // Two rows: the footer may take the third when its needs wrap.
-                assert!(card_rows <= 2, "{name}: card lines {lines:?} may be cut");
-                let cut: Vec<&String> = painted
-                    .iter()
-                    .filter_map(|paint| match paint {
-                        Paint::Text { text, .. } if text.contains("...") => Some(text),
-                        _ => None,
-                    })
-                    .collect();
-                assert!(cut.is_empty(), "{name}: {cut:?} is cut short");
-                let Some(guide) = guide else {
-                    continue;
-                };
-                let frame = frame_at(&guide, ticks as f32 / 20.0);
-                let caption = frame.caption.expect("a caption is up");
-                let text = caption_text(&caption, &caption_values(&perk_def, &caption)).plain();
-                assert!(rows(&text, p.caption.w) <= 2, "{name}: {text:?} is cut");
-                let blocks = painted.iter().find_map(|paint| match paint {
-                    Paint::Scene { blocks, .. } => Some(blocks.len()),
-                    _ => None,
-                });
-                assert!(blocks.is_some_and(|n| n > 0), "{name}: an empty scene");
-            }
-        }
-    }
-}
-
-#[test]
-fn a_perk_with_two_needs_shows_both() {
-    for size in [SMALLEST, USUAL] {
-        // Given the shipped mod and Replant, which needs Gathering 16 and Agility 8, for a player with neither
-        let _serial = exclusive();
-        let host = player(size);
-        let states = known_states();
-
-        // When its guide page is drawn
-        open_guide(&skill("gathering_sapling_keeper"), 2);
-        host.painted.borrow_mut().clear();
-        let sizef = [size[0] as f32, size[1] as f32];
-        draw(&host, &mut HudBatch::new(size), sizef, AWAY);
-        let painted = save_naming(&host, &format!("guide_needs_{}", size[0]), size, &states);
-
-        // Then both needs are there in full, with the cost and Locked, inside the window and clear of each other
-        let drawn = host.drawn_text();
-        for whole in ["Needs Gathering 16", "Needs Agility 8", "Locked"] {
-            assert!(
-                drawn.iter().any(|t| t == whole),
-                "{whole} missing from {drawn:?}"
-            );
-        }
-        assert_inside_window(&host, &painted, size, "needs");
-        assert_no_text_overlap(&host, &painted, "needs");
-    }
 }

@@ -29,47 +29,10 @@ Operator commands: `/skills set <player> <skill> <level>`, `/skills points <play
 ## For pack makers
 
 Every skill, perk, focus area, lock and setting is a JSON file under `data/<namespace>/reskilled/<folder>/`
-(`skills`, `perks`, `focus`, `locks`, `settings`, `guides`). The files this mod ships have priority 0. To change one, ship a
+(`skills`, `perks`, `focus`, `locks`, `settings`). The files this mod ships have priority 0. To change one, ship a
 file with the same id and `"priority": 1` or more in your pack's data; lock files add up, and an entry with
 `"replace": true` drops earlier locks on the same target. `settings` files merge field by field, highest priority
 last. `/reload` applies changes, and gear a player may no longer wear comes off.
-
-Perks that work by a mechanic rather than a number also have a guide: a short scene of blocks the skills screen
-plays when a player presses G over the perk. Guides are files in the `guides` folder, one per perk, merged by `perk`
-with the same priorities. A caption never types a perk's numbers: it has a `%s` for each of its `args`, filled from
-the perk's effects, so a pack that retunes a perk keeps a true guide. Replant's, shortened:
-
-```json
-{
-  "format": 1,
-  "perk": "reskilled:gathering_sapling_keeper",
-  "priority": 0,
-  "seconds": 8,
-  "view": {"center": [1.5, 1.0, 0.5], "yaw": 35, "pitch": 30, "scale": 24, "spin": 4},
-  "steps": [
-    {"at": 0, "place": [{"pos": [1, 0, 0], "block": "minecraft:farmland[moisture=7]"},
-                        {"pos": [1, 1, 0], "block": "minecraft:wheat[age=7]"}]},
-    {"at": 0, "caption": {"key": "reskilled.guide.gathering_sapling_keeper.1", "text": "A ripe crop is broken."}},
-    {"at": 3, "remove": [[1, 1, 0]]},
-    {"at": 3, "icon": {"item": "minecraft:wheat_seeds", "at": [0.62, 0.3]}},
-    {"at": 4, "place": [{"pos": [1, 1, 0], "block": "minecraft:wheat[age=0]"}]},
-    {"at": 4, "caption": {"key": "reskilled.guide.gathering_sapling_keeper.2",
-                          "text": "It is planted again with one of its own seeds."}}
-  ]
-}
-```
-
-`view` sets where the scene is seen from: `center` (the scene point in the middle), `yaw` and `pitch` in degrees,
-`scale` in pixels per block, and `spin` in degrees a second (0 holds still). Steps run in time order, each starting
-before `seconds`, and the scene loops at `seconds`; a step does one thing. Besides `place`, `remove` and `caption`
-there are `icon` (an item, `{"item": "minecraft:wheat_seeds", "at": [x, y]}`), `effect` (a potion effect's icon,
-`{"effect": "minecraft:strength", "at": [x, y]}`), `hearts` (a heart bar of so many half hearts, at most 40) and
-`clear` (`"icons"` or `"hearts"`). An overlay's `at` is fractions of the scene box, 0 to 1 from its top left. An arg
-reads `{"effect": "crop_growth", "field": "chance", "as": "percent"}`, with `as` one of `number`, `percent`,
-`seconds`, `blocks` or `hearts`. When it loads the data the server checks that each placed block and its property
-keys exist and that each arg names a real value of the perk, and drops a bad file with an error. A property value
-the block does not have (`age=9` on wheat) is only warned about in the client log, and that block is left out of the
-scene. A perk without a guide shows its exact values instead, with its description under them.
 
 Other mods can add their own unlockables, including abilities with no item behind them: see
 [INTEGRATION.md](INTEGRATION.md).

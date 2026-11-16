@@ -113,10 +113,6 @@ pub struct TestHost {
     pub blocks_set: Vec<(String, [i32; 3], horizon_client::mod_api::BlockStateId)>,
     /// Each block's default state, as `default_state` gives it.
     pub default_states: HashMap<String, u32>,
-    /// The properties of each default state, by state id and name, as `block_state_property` gives them.
-    pub state_properties: HashMap<(u32, String), String>,
-    /// The client player's attribute values, as `local_attribute` reads them.
-    pub local_attributes: HashMap<String, f64>,
 }
 
 /// A block's properties, as pairs of name and value.
@@ -153,16 +149,6 @@ pub enum Paint {
     /// The game's menu background over `rect`.
     Background {
         rect: [f32; 4],
-    },
-    /// A scene of blocks drawn into `rect` (x0, y0, x1, y1): each block's place and state id, and the view (its
-    /// centre, turn, tilt and pixels per block).
-    Scene {
-        rect: [f32; 4],
-        blocks: Vec<([i32; 3], u32)>,
-        center: [f32; 3],
-        yaw: f32,
-        pitch: f32,
-        scale: f32,
     },
     Tooltip {
         lines: Vec<String>,
@@ -440,16 +426,6 @@ impl Host for TestHost {
             .map(|id| horizon_client::mod_api::BlockStateId(*id))
     }
 
-    fn block_state_property(
-        &self,
-        state: horizon_client::mod_api::BlockStateId,
-        key: &str,
-    ) -> Option<&str> {
-        self.state_properties
-            .get(&(state.0, key.to_string()))
-            .map(String::as_str)
-    }
-
     fn set_block_property(&mut self, pos: [i32; 3], key: &str, value: &str) -> bool {
         let Some((_, properties)) = self.blocks.get_mut(&pos) else {
             return false;
@@ -582,39 +558,6 @@ impl Host for TestHost {
         });
     }
 
-    fn sprite(&self, _batch: &mut HudBatch, name: &str, _src: [f32; 4], dst: [f32; 4]) -> bool {
-        self.painted.borrow_mut().push(Paint::Sprite {
-            name: name.to_string(),
-            rect: dst,
-        });
-        true
-    }
-
-    fn draw_scene(
-        &self,
-        _batch: &mut HudBatch,
-        rect: [f32; 4],
-        blocks: &[horizon_client::mod_api::NativeSceneBlock<'_>],
-        view: horizon_client::mod_api::NativeSceneView,
-    ) {
-        self.painted.borrow_mut().push(Paint::Scene {
-            rect,
-            blocks: blocks.iter().map(|b| (b.pos, b.state.0)).collect(),
-            center: view.center,
-            yaw: view.yaw,
-            pitch: view.pitch,
-            scale: view.scale,
-        });
-    }
-
-    fn block_sprites_version(&self) -> u64 {
-        0
-    }
-
-    fn local_attribute(&mut self, name: &str) -> Option<f64> {
-        self.local_attributes.get(name).copied()
-    }
-
     fn draw_menu_background(&self, _batch: &mut HudBatch, rect: [f32; 4], _in_world: bool) {
         self.painted.borrow_mut().push(Paint::Background { rect });
     }
@@ -739,7 +682,6 @@ pub fn exclusive() -> MutexGuard<'static, ()> {
     crate::server::sharing::reset();
     crate::server::earning::reset();
     crate::client::cache::reset();
-    crate::client::scene::reset();
     crate::text::shipped_english::reset();
     logged();
     guard

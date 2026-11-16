@@ -287,6 +287,9 @@ world (`Holder::Level`), sent to every player, and changed only by operators (ch
   levels. Arcane became magic and enchanted gear: Spellward, Runeblade, Warding Runes, Antidote, Living Runes; no
   shipped perk raises XP gain any more. The table and mock-ups above still show Taming as first designed.
 - Skill strip: a display setting showing the player's skills and levels beside the inventory and crafting table.
+- Perk guide removed (2026-11-16, after play): the G page with animated scenes and value cards was taken out at
+  the user's request; some perks had no scene. A perk's tooltip (name, description, cost, needs) is its only
+  explanation, and every perk description is to be rewritten.
 
 ## 8. Data
 

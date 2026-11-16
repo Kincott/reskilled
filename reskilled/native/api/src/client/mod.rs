@@ -2,14 +2,12 @@
 
 pub mod badge;
 pub mod cache;
-pub mod guide;
 pub mod keys;
 pub mod layout;
 pub mod options;
 pub mod paint;
 #[cfg(test)]
 mod preview;
-pub mod scene;
 pub mod screen;
 pub mod settings;
 pub mod strip;

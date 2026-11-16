@@ -191,7 +191,6 @@ mod tests {
                 Paint::Tooltip { .. }
                 | Paint::Quad { .. }
                 | Paint::Sprite { .. }
-                | Paint::Scene { .. }
                 | Paint::Background { .. } => panic!("{paint:?}"),
             };
             let fits = px >= x && py >= y && px + pw <= x + w && py + ph <= y + h;

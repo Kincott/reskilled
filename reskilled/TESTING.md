@@ -29,10 +29,9 @@ Screen and raising
 - [ ] Clicking raise many times fast never takes more levels than the skill went up by (the same-tick fix).
 - [ ] A focus area can be added; the first is free.
 
-Perks and the guide
+Perks
 - [ ] Buying a perk spends its points; switching off and refunding work as the server rules say.
-- [ ] G over a mechanic perk (Replant, Salvage, Last Stand...) plays its scene; the captions show the perk's numbers.
-- [ ] A number perk without a scene shows its exact values.
+- [ ] Hovering a perk shows its description.
 
 Locks
 - [ ] An iron pickaxe's tooltip shows the padlock and "Mining 8"; breaking with it below 8 is refused with that line.

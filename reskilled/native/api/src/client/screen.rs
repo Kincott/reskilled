@@ -27,7 +27,6 @@ use crate::text::{
     REWARD_TAME, REWARD_TRAVEL, SETTINGS, SHARED_OWN, SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF, VAL_ON,
     WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say, skill_name,
 };
-use crate::text::{GUIDE_HINT, key_name};
 
 /// The mouse buttons the screen answers, by GLFW index.
 pub const LEFT_BUTTON: i32 = 0;
@@ -55,24 +54,24 @@ const PREVIEW_LINE: f32 = 9.0;
 const PREVIEW_LINES: usize = 2;
 
 /// A perk as the screen shows it.
-pub(super) enum PerkStatus {
+enum PerkStatus {
     Owned,
     Buyable,
     Locked(Text),
 }
 
 /// The selected skill's perks, by the level they need, then id.
-pub(super) fn perks_of<'a>(defs: &'a Defs, skill: &str) -> Vec<&'a PerkDef> {
+fn perks_of<'a>(defs: &'a Defs, skill: &str) -> Vec<&'a PerkDef> {
     let mut perks: Vec<&PerkDef> = defs.perks.values().filter(|p| p.skill == skill).collect();
     perks.sort_by(|a, b| (a.min_level, &a.id).cmp(&(b.min_level, &b.id)));
     perks
 }
 
-pub(super) fn owns(state: &PlayerState, perk: &str) -> bool {
+fn owns(state: &PlayerState, perk: &str) -> bool {
     state.skills.values().any(|p| p.perks.contains(perk))
 }
 
-pub(super) fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
+fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkStatus {
     if owns(state, &perk.id) {
         return PerkStatus::Owned;
     }
@@ -93,14 +92,14 @@ pub(super) fn status(defs: &Defs, state: &PlayerState, perk: &PerkDef) -> PerkSt
 }
 
 /// What the screen lists, in display order: skills by id, the selected one's perks, the focus areas by id.
-pub(super) struct Shown<'a> {
-    pub skills: Vec<&'a String>,
-    pub selected: usize,
-    pub perks: Vec<&'a PerkDef>,
-    pub focus: Vec<&'a String>,
+struct Shown<'a> {
+    skills: Vec<&'a String>,
+    selected: usize,
+    perks: Vec<&'a PerkDef>,
+    focus: Vec<&'a String>,
 }
 
-pub(super) fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
+fn shown(defs: &ClientDefs, selected: usize) -> Shown<'_> {
     let skills: Vec<&String> = defs.defs.skills.keys().collect();
     let selected = selected.min(skills.len().saturating_sub(1));
     let perks = skills
@@ -241,12 +240,9 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
     if host.mod_screen() != Some(MOD_ID) {
         return;
     }
-    match with(|cache| cache.view) {
-        View::Settings => return super::options::draw(host, batch, size, mouse),
-        // A guide whose perk is gone switches back to the skill page, drawn below this frame.
-        View::Guide if super::guide::draw(host, batch, size, mouse) => return,
-        View::Guide => {}
-        View::Overview | View::Skill => {}
+    if with(|cache| cache.view) == View::Settings {
+        super::options::draw(host, batch, size, mouse);
+        return;
     }
     host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);
     with(|cache| {
@@ -279,20 +275,11 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
         match cache.view {
             View::Overview => draw_overview(&mut pen, size, cache, &shown),
             View::Skill => draw_skill(&mut pen, size, cache, defs, &shown),
-            View::Settings | View::Guide => {}
+            View::Settings => {}
         }
         if let Some(lines) = pen.tip.take() {
             host.gui_tooltip(pen.batch, &lines, mouse);
         }
-        let hovered = (cache.view == View::Skill)
-            .then(|| {
-                let rows = detail(size, shown.perks.len(), cache.first_perk).rows;
-                rows.iter()
-                    .find(|row| row.rect.contains(mouse[0], mouse[1]))
-                    .map(|row| row.index)
-            })
-            .flatten();
-        cache.hovered_perk = hovered;
     });
 }
 
@@ -773,21 +760,10 @@ fn draw_owned(pen: &mut Pen<'_>, row: &PerkRow, perk: &PerkDef, right: f32, y: f
     }
 }
 
-/// A perk's tooltip: its name, what it does, what it costs, and what it needs, each need green once met; last, the
-/// key that opens its guide.
+/// A perk's tooltip: its name, what it does, what it costs, and what it needs, each need green once met.
 fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
-    let mut lines = perk_tip_body(pen, perk, status);
-    let key = pen.host.mod_key(
-        MOD_ID,
-        super::keys::GUIDE_KEY,
-        super::keys::DEFAULT_GUIDE_KEY,
-    );
-    lines.push(say(&GUIDE_HINT, &[key_name(&key)]).with_color(DIM));
-    lines
-}
-
-fn perk_tip_body(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
+    let met = |met: bool| if met { GREEN } else { RED };
     let mut lines = vec![perk_name(d, &perk.id).with_color(GOLD)];
     let does = perk_description(perk).plain();
     let wrapped = paint::wrapped(pen.host, &does, TIP_WIDTH);
@@ -808,15 +784,8 @@ fn perk_tip_body(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text
         }
         return lines;
     }
-    lines.extend(need_lines(d, state, perk));
-    lines
-}
-
-/// What a perk the player lacks costs and needs, each line green once met.
-pub(super) fn need_lines(d: &Defs, state: &PlayerState, perk: &PerkDef) -> Vec<Text> {
-    let met = |met: bool| if met { GREEN } else { RED };
     let enough = points_available(d, state, &perk.skill) >= perk.cost;
-    let mut lines = vec![say(&PERK_COST, &[number(perk.cost)]).with_color(met(enough))];
+    lines.push(say(&PERK_COST, &[number(perk.cost)]).with_color(met(enough)));
     if perk.min_level > 1 {
         let reached = own_level(state, d, &perk.skill) >= perk.min_level;
         let needs = [skill_name(d, &perk.skill), number(perk.min_level)];
@@ -880,10 +849,8 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
     if host.mod_screen() != Some(MOD_ID) {
         return Flow::Continue;
     }
-    match with(|cache| cache.view) {
-        View::Settings => return super::options::click(host, size, at, button),
-        View::Guide => return super::guide::click(host, size, at, button),
-        View::Overview | View::Skill => {}
+    if with(|cache| cache.view) == View::Settings {
+        return super::options::click(host, size, at, button);
     }
     with(|cache| {
         let outcome = match &cache.defs {
@@ -1029,7 +996,7 @@ pub fn scroll(host: &dyn Host, amount: f64) -> Flow {
         match cache.view {
             View::Overview => cache.first_row = stepped(cache.first_row, last_first_row(skills)),
             View::Skill => cache.first_perk = stepped(cache.first_perk, last_first_perk(perks)),
-            View::Settings | View::Guide => {}
+            View::Settings => {}
         }
     });
     Flow::Cancel
@@ -1544,14 +1511,13 @@ mod tests {
         // When the screen is drawn
         drawn(&host, inside(&row.rect));
 
-        // Then one tooltip names it, its cost and the level it needs, then how to open its guide
+        // Then one tooltip names it, its cost and the level it needs
         assert_eq!(
             tooltip(&host),
             vec![
                 "Mining deep veins",
                 "Cost: 1 perk points",
-                "Needs Mining 16",
-                "Press G to see it in action"
+                "Needs Mining 16"
             ]
         );
     }
@@ -1571,9 +1537,11 @@ mod tests {
         // When the mouse is over it
         drawn(&host, inside(&row.rect));
 
-        // Then its tooltip also says it needs Melee 20, before the guide hint
-        let tip = tooltip(&host);
-        assert_eq!(tip[tip.len() - 2], "Needs Melee 20");
+        // Then its tooltip also says it needs Melee 20
+        assert_eq!(
+            tooltip(&host).last().map(String::as_str),
+            Some("Needs Melee 20")
+        );
     }
 
     #[test]

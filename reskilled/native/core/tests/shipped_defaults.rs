@@ -4,42 +4,20 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use skills_core::defs::{Action, DefKind, Effect, GuideAction, Matcher, Reward, Settings};
+use skills_core::defs::{Action, DefKind, Effect, Matcher, Reward, Settings};
 use skills_core::locks::{Facts, TargetKind, requirements_for};
 use skills_core::registry::{Defs, SourceFile, build};
 
 const CONTENT: &str = "../../content";
-const FOLDERS: [(&str, DefKind); 6] = [
+const FOLDERS: [(&str, DefKind); 5] = [
     ("skills", DefKind::Skill),
     ("perks", DefKind::Perk),
     ("focus", DefKind::Focus),
     ("locks", DefKind::Lock),
     ("settings", DefKind::Settings),
-    ("guides", DefKind::Guide),
 ];
 const POINTS_AT_MAX: u32 = 16;
 const CAPSTONE_LEVEL: u32 = 24;
-/// The perks whose effect is a mechanic rather than a number, each explained by a scene.
-const MECHANIC_PERKS: [&str; 12] = [
-    "defense_braced_stance",
-    "melee_planted_feet",
-    "agility_soft_landing",
-    "gathering_foragers_pace",
-    "gathering_sapling_keeper",
-    "arcane_deep_lore",
-    "arcane_quiet_mind",
-    "building_salvage",
-    "building_restful_sleep",
-    "building_hearth",
-    "building_home_ward",
-    "building_safe_haven",
-];
-/// How far a scene's blocks may reach from its view center along each axis, its widest extent, and its loop.
-const SCENE_REACH: f32 = 6.0;
-const SCENE_SPAN: i32 = 6;
-const SCENE_SECONDS: std::ops::RangeInclusive<f32> = 6.0..=10.0;
-/// About two rows of the guide page's caption at the game's font.
-const CAPTION_CHARS: usize = 80;
 
 const MELEE: &str = "reskilled:melee";
 const RANGED: &str = "reskilled:ranged";
@@ -812,98 +790,5 @@ fn every_text_key_exists_in_en_us() {
         let path = perk.id.split_once(':').unwrap().1;
         assert_eq!(perk.name, format!("reskilled.perk.{path}"));
         assert_eq!(perk.description, format!("reskilled.perk.{path}.desc"));
-    }
-}
-
-#[test]
-fn every_mechanic_perk_has_a_guide() {
-    // Given the shipped data
-    let defs = defaults();
-
-    // When the guides are looked up by perk
-    let missing: Vec<&str> = MECHANIC_PERKS
-        .iter()
-        .copied()
-        .filter(|path| !defs.guides.contains_key(&format!("reskilled:{path}")))
-        .collect();
-
-    // Then every mechanic perk has one, and there are no others
-    assert_eq!(missing, Vec::<&str>::new());
-    assert_eq!(defs.guides.len(), MECHANIC_PERKS.len());
-}
-
-#[test]
-fn shipped_guides_fit_their_box() {
-    // Given the shipped guides
-    let defs = defaults();
-    assert!(!defs.guides.is_empty(), "no guides shipped");
-
-    for (perk, guide) in &defs.guides {
-        // When their placed blocks are collected
-        let placed: Vec<[i32; 3]> = guide
-            .steps
-            .iter()
-            .filter_map(|step| match &step.action {
-                GuideAction::Place(blocks) => Some(blocks.iter().map(|b| b.pos)),
-                _ => None,
-            })
-            .flatten()
-            .collect();
-
-        // Then each scene has blocks, all near its view center, no wider than the box, in a short loop
-        assert!(!placed.is_empty(), "{perk}: no blocks");
-        for pos in &placed {
-            for axis in 0..3 {
-                let off = (pos[axis] as f32 + 0.5 - guide.view.center[axis]).abs();
-                assert!(
-                    off <= SCENE_REACH,
-                    "{perk}: {pos:?} is {off} from the center"
-                );
-            }
-        }
-        for axis in 0..3 {
-            let low = placed.iter().map(|p| p[axis]).min().unwrap();
-            let high = placed.iter().map(|p| p[axis]).max().unwrap();
-            assert!(
-                high - low < SCENE_SPAN,
-                "{perk}: {} blocks wide",
-                high - low + 1
-            );
-        }
-        assert!(
-            SCENE_SECONDS.contains(&guide.seconds),
-            "{perk}: {} seconds",
-            guide.seconds
-        );
-    }
-}
-
-#[test]
-fn every_caption_key_has_english() {
-    // Given the shipped guides and the English text
-    let defs = defaults();
-    assert!(!defs.guides.is_empty(), "no guides shipped");
-    let lang_path = content().join("assets/reskilled/lang/en_us.json");
-    let english: BTreeMap<String, String> =
-        serde_json::from_str(&fs::read_to_string(lang_path).unwrap()).unwrap();
-
-    for (perk, guide) in &defs.guides {
-        let path = perk.split_once(':').unwrap().1;
-        let captions = guide.steps.iter().filter_map(|step| match &step.action {
-            GuideAction::Caption(caption) => Some(caption),
-            _ => None,
-        });
-        for (n, caption) in captions.enumerate() {
-            // When each caption is checked against the English file
-            let text = &caption.text;
-
-            // Then its key is numbered under the perk, the English is its fallback, a %s stands for each value,
-            // it types no number of its own, and it fits two rows of the page
-            assert_eq!(caption.key, format!("reskilled.guide.{path}.{}", n + 1));
-            assert_eq!(english.get(&caption.key), Some(text), "{}", caption.key);
-            assert_eq!(text.matches("%s").count(), caption.args.len(), "{text}");
-            assert!(!text.chars().any(|c| c.is_ascii_digit()), "{text}");
-            assert!(text.chars().count() <= CAPTION_CHARS, "{text}");
-        }
     }
 }

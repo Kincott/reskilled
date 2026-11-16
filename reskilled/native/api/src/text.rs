@@ -94,7 +94,6 @@ messages! {
     SWITCHED_OFF = "reskilled.ui.switched_off" => "Switched off: it does nothing until switched on.";
     PERK_COST = "reskilled.ui.perk_cost" => "Cost: %s perk points";
     OWNED = "reskilled.ui.owned" => "Owned";
-    LOCKED = "reskilled.ui.locked" => "Locked";
     GET = "reskilled.ui.get" => "Unlock";
     NEXT_UNLOCKS = "reskilled.ui.next_unlocks" => "Next unlocks";
     UNLOCK = "reskilled.ui.unlock" => "Level %s: %s";
@@ -191,33 +190,6 @@ messages! {
     ACTION_PLACE = "reskilled.ui.action.place" => "Place";
     ACTION_MOUNT = "reskilled.ui.action.mount" => "Ride";
     ACTION_INTERACT = "reskilled.ui.action.interact" => "Interact";
-    GUIDE_HINT = "reskilled.ui.guide_hint" => "Press %s to see it in action";
-    REPLAY = "reskilled.ui.replay" => "Replay";
-    CARD_ATTRIBUTE = "reskilled.card.attribute" => "%s: %s -> %s (%s)";
-    CARD_ATTRIBUTE_CHANGE = "reskilled.card.attribute_change" => "%s: %s";
-    CARD_MOUNT = "reskilled.card.mount_attribute" => "%s of your mount: %s";
-    CARD_DAMAGE_DEALT = "reskilled.card.damage_dealt" => "%s damage dealt x%s";
-    CARD_DAMAGE_TAKEN = "reskilled.card.damage_taken" => "%s damage taken x%s";
-    CARD_EXTRA_DROP = "reskilled.card.extra_drop" => "%s chance of an extra drop";
-    CARD_CROP_GROWTH = "reskilled.card.crop_growth" => "%s chance for each nearby crop to grow a stage";
-    CARD_ENCHANTED_WEAPON = "reskilled.card.enchanted_weapon" => "+%s damage per enchantment on your weapon, up to %s";
-    CARD_ENCHANTED_ARMOR = "reskilled.card.enchanted_armor" => "%s less damage taken per enchantment on your armor, up to %s";
-    CARD_SHORTER_EFFECTS = "reskilled.card.shorter_effects" => "Harmful effects last %s as long";
-    CARD_RUNE_REPAIR = "reskilled.card.rune_repair" => "Enchanted gear mends %s durability every %s seconds";
-    CARD_LAST_STAND = "reskilled.card.last_stand" => "With %s hearts or more, a killing blow leaves half a heart; then it rests %s seconds";
-    CARD_HOME_WARD = "reskilled.card.home_ward" => "Explosions break no blocks within %s blocks of your bed or respawn anchor";
-    CARD_SAFE_HAVEN = "reskilled.card.safe_haven" => "No monsters spawn within %s blocks of your bed or respawn anchor";
-    CARD_NEAR_HOME = "reskilled.card.near_home" => "Its effect is on within %s blocks of your bed or respawn anchor";
-    CARD_XP_GAIN = "reskilled.card.xp_gain" => "You get %s of the XP you pick up";
-    CARD_ANVIL_COST = "reskilled.card.anvil_cost" => "Anvil work costs %s of its usual levels";
-    DAMAGE_MELEE = "reskilled.damage.melee" => "Melee";
-    DAMAGE_PROJECTILE = "reskilled.damage.projectile" => "Projectile";
-    DAMAGE_FALL = "reskilled.damage.fall" => "Fall";
-    DAMAGE_FIRE = "reskilled.damage.fire" => "Fire";
-    DAMAGE_EXPLOSION = "reskilled.damage.explosion" => "Explosion";
-    DAMAGE_ENDER_PEARL = "reskilled.damage.ender_pearl" => "Ender pearl";
-    DAMAGE_MAGIC = "reskilled.damage.magic" => "Magic";
-    DAMAGE_ANY = "reskilled.damage.any" => "All";
 }
 
 pub fn say(message: &Message, args: &[Text]) -> Text {
@@ -315,55 +287,6 @@ pub fn label_name(key: &str) -> Text {
     Text::translate_with_fallback(key, &english(key, &fallback_name(last)), &[])
 }
 
-/// The card lines a perk's effects give by key (`CardLine::Value`), with their English.
-const CARD_VALUES: &[Message] = &[
-    CARD_ENCHANTED_WEAPON,
-    CARD_ENCHANTED_ARMOR,
-    CARD_SHORTER_EFFECTS,
-    CARD_RUNE_REPAIR,
-    CARD_LAST_STAND,
-    CARD_HOME_WARD,
-    CARD_SAFE_HAVEN,
-    CARD_NEAR_HOME,
-    CARD_XP_GAIN,
-    CARD_ANVIL_COST,
-];
-
-/// A card line named by its key, filled with `args`; a key this mod has no English for reads as itself.
-pub fn card_value(key: &str, args: &[Text]) -> Text {
-    match CARD_VALUES.iter().find(|message| message.key == key) {
-        Some(message) => say(message, args),
-        None => Text::translate_with_fallback(key, &english(key, key), args),
-    }
-}
-
-/// An attribute's name on a perk's card (`minecraft:attack_speed`, "Attack speed"), from
-/// `reskilled.attribute.<path>`, falling back to the id's path as a phrase.
-pub fn attribute_name(attribute: &str) -> Text {
-    let path = attribute
-        .split_once(':')
-        .map_or(attribute, |(_, path)| path);
-    let key = format!("reskilled.attribute.{path}");
-    Text::translate_with_fallback(&key, &english(&key, &fallback_name(path)), &[])
-}
-
-/// A guide caption, its `%s` filled with `values`, falling back to the guide file's own English.
-pub fn caption_text(caption: &skills_core::defs::Caption, values: &[String]) -> Text {
-    let args: Vec<Text> = values.iter().map(|v| Text::literal(v.clone())).collect();
-    Text::translate_with_fallback(&caption.key, &english(&caption.key, &caption.text), &args)
-}
-
-/// A key's name for the player (`key.keyboard.g`, "G"): the game's line for it when there is one, else the key's
-/// own name in capitals.
-pub fn key_name(key: &str) -> Text {
-    let bare = key
-        .strip_prefix("key.keyboard.")
-        .or_else(|| key.strip_prefix("key.mouse."))
-        .unwrap_or(key);
-    let fallback = bare.replace('.', " ").to_uppercase();
-    Text::translate_with_fallback(key, &english(key, &fallback), &[])
-}
-
 /// Why a request was refused, in words.
 pub fn refusal(defs: &Defs, refusal: &Refusal, request: &Request) -> Text {
     match refusal {
@@ -445,36 +368,5 @@ mod tests {
                 "Weird".to_string()
             ]
         );
-    }
-
-    #[test]
-    fn every_shipped_attribute_has_a_card_name() {
-        // Given the mod's English language file and its shipped perks
-        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../content");
-        let english: BTreeMap<String, String> = serde_json::from_str(
-            &std::fs::read_to_string(format!("{root}/assets/reskilled/lang/en_us.json")).unwrap(),
-        )
-        .unwrap();
-        let perks = std::fs::read_dir(format!("{root}/data/reskilled/reskilled/perks")).unwrap();
-
-        // When each attribute a perk's effects name is looked up
-        let mut missing = Vec::new();
-        for file in perks {
-            let json: serde_json::Value =
-                serde_json::from_str(&std::fs::read_to_string(file.unwrap().path()).unwrap())
-                    .unwrap();
-            for effect in json["effects"].as_array().unwrap() {
-                if let Some(attribute) = effect["attribute"].as_str() {
-                    let path = attribute.split_once(':').map_or(attribute, |(_, p)| p);
-                    let key = format!("reskilled.attribute.{path}");
-                    if !english.contains_key(&key) {
-                        missing.push(key);
-                    }
-                }
-            }
-        }
-
-        // Then each has an English name
-        assert_eq!(missing, Vec::<String>::new());
     }
 }
