@@ -26,6 +26,8 @@ pub const WHITE: u32 = 0xFF_FFFF;
 pub const GRAY: u32 = 0xA8_ADB8;
 pub const DIM: u32 = 0x6C_7280;
 pub const GOLD: u32 = 0xF2_C14E;
+/// A skill tab's mark while the skill has perk points to spend.
+pub const PIP: u32 = 0xFFF5_C451;
 pub const GREEN: u32 = 0x7F_DB5A;
 pub const RED: u32 = 0xFF_6B5E;
 /// A line of the game's font is 8 pixels tall.
@@ -257,7 +259,7 @@ pub fn padlock(host: &dyn Host, batch: &mut HudBatch, at: [f32; 2]) {
 
 /// Draws pixel art from rows of letters with its top left at `at`, one fill for each run of a colour; `colour`
 /// names each letter's colour, none for a clear pixel.
-fn pixel_art(
+pub(crate) fn pixel_art(
     host: &dyn Host,
     batch: &mut HudBatch,
     at: [f32; 2],

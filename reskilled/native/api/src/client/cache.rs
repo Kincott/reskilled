@@ -130,16 +130,13 @@ impl ClientSettings {
     }
 }
 
-/// The screen's two views.
+/// The screen's tabs: Home, a skill's road (by the skill's place in id order), and Options.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum View {
-    /// Every skill as a card.
+pub enum Tab {
     #[default]
-    Overview,
-    /// One skill with its perks.
-    Skill,
-    /// The player's display settings.
-    Settings,
+    Home,
+    Skill(usize),
+    Options,
 }
 
 /// A lock just refused an action: what the warning over the HUD says, and for how many more ticks.
@@ -177,8 +174,12 @@ pub struct ClientCache {
     pub exempt: bool,
     /// The skill the screen's skill view shows, by its place in id order.
     pub selected: usize,
-    /// Which of the screen's views is up.
-    pub view: View,
+    /// The open tab.
+    pub tab: Tab,
+    /// The first skill tab shown, when there are more than fit.
+    pub first_tab: usize,
+    /// The tab Options returns to.
+    pub return_tab: Tab,
     /// The first row of skill cards on show, and the first perk row, when there are more than fit.
     pub first_row: usize,
     pub first_perk: usize,
@@ -939,14 +940,14 @@ mod tests {
         // Given a client whose screen was last on a skill's view
         let _serial = exclusive();
         let mut host = TestHost::default();
-        with(|cache| cache.view = View::Skill);
+        with(|cache| cache.tab = Tab::Skill(cache.selected));
 
         // When the server asks it to open the skills screen (/skills open)
         send_msg(&mut host, &ToClient::Open);
 
         // Then the mod's screen opens on the overview
         assert_eq!(host.screens_opened, vec!["reskilled"]);
-        assert_eq!(with(|cache| cache.view), View::Overview);
+        assert_eq!(with(|cache| cache.tab), Tab::Home);
     }
 
     #[test]

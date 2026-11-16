@@ -12,7 +12,7 @@ use skills_core::registry::Defs;
 use skills_core::rules::{CostUnit, Rules};
 use skills_core::wire::{ClientDefs, ToServer};
 
-use super::cache::{CLICK_SOUND, ClientCache, View, with};
+use super::cache::{CLICK_SOUND, ClientCache, Tab, with};
 use super::layout::{
     Button, Card, Detail, GEAR_ROOM, HEADER_H, PerkRow, Rect, Scroll, detail, hit_detail,
     hit_overview, last_first_perk, last_first_row, overview, panel,
@@ -232,10 +232,56 @@ impl Pen<'_> {
 pub fn open(host: &mut dyn Host) {
     if host.mod_screen_open(MOD_ID) {
         with(|cache| {
-            cache.view = View::Overview;
+            cache.tab = Tab::Home;
             cache.first_row = 0;
         });
     }
+}
+
+/// The window as it stands: its tabs for the skills the client knows, scrolled to the cache's first tab.
+fn window_now(size: [f32; 2], cache: &ClientCache) -> super::window::WindowLayout {
+    let skills = cache.defs.as_ref().map_or(0, |d| d.defs.skills.len());
+    super::window::window(size, skills, cache.first_tab)
+}
+
+/// Opens a tab: a skill's selects that skill, Options remembers the tab it was opened from.
+fn open_tab(cache: &mut ClientCache, tab: Tab) {
+    if tab == cache.tab {
+        return;
+    }
+    match tab {
+        Tab::Skill(i) => {
+            cache.selected = i;
+            cache.first_perk = 0;
+        }
+        Tab::Options => cache.return_tab = cache.tab,
+        Tab::Home => cache.first_row = 0,
+    }
+    cache.tab = tab;
+}
+
+/// A click on the window's tabs or their scroll arrows; true when it was one.
+fn click_window(size: [f32; 2], at: [f32; 2]) -> bool {
+    with(|cache| {
+        let w = window_now(size, cache);
+        let in_arrow = |r: Option<Rect>| r.is_some_and(|r| r.contains(at[0], at[1]));
+        let clicked = if in_arrow(w.scroll_left) {
+            cache.first_tab = cache.first_tab.saturating_sub(1);
+            true
+        } else if in_arrow(w.scroll_right) {
+            cache.first_tab += 1;
+            true
+        } else if let Some(tab) = super::window::hit_tab(&w, at[0], at[1]) {
+            open_tab(cache, tab);
+            true
+        } else {
+            return false;
+        };
+        if cache.settings.click_sounds {
+            cache.sounds.push(CLICK_SOUND);
+        }
+        clicked
+    })
 }
 
 /// Draws the screen when it is this mod's that is open.
@@ -243,11 +289,22 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
     if host.mod_screen() != Some(MOD_ID) {
         return;
     }
-    if with(|cache| cache.view) == View::Settings {
+    host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);
+    with(|cache| {
+        let w = window_now(size, cache);
+        super::window::draw_window(
+            host,
+            batch,
+            &w,
+            cache.tab,
+            cache.defs.as_ref(),
+            &cache.state,
+        );
+    });
+    if with(|cache| cache.tab) == Tab::Options {
         super::options::draw(host, batch, size, mouse);
         return;
     }
-    host.fill(batch, [0.0, 0.0, size[0], size[1]], paint::SHADE);
     with(|cache| {
         let Some(defs) = &cache.defs else {
             let window = panel(size);
@@ -276,10 +333,10 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
             shown_areas: &cache.settings.shown_areas,
         };
         let shown = shown(defs, cache.selected);
-        match cache.view {
-            View::Overview => draw_overview(&mut pen, size, cache, &shown),
-            View::Skill => draw_skill(&mut pen, size, cache, defs, &shown),
-            View::Settings => {}
+        match cache.tab {
+            Tab::Home => draw_overview(&mut pen, size, cache, &shown),
+            Tab::Skill(_) => draw_skill(&mut pen, size, cache, defs, &shown),
+            Tab::Options => {}
         }
         if let Some(lines) = pen.tip.take() {
             host.gui_tooltip(pen.batch, &lines, mouse);
@@ -962,10 +1019,13 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
     if host.mod_screen() != Some(MOD_ID) {
         return Flow::Continue;
     }
-    if with(|cache| cache.view) == View::Settings {
+    if with(|cache| cache.tab) == Tab::Options {
+        if button == LEFT_BUTTON && click_window(size, at) {
+            return Flow::Cancel;
+        }
         return super::options::click(host, size, at, button);
     }
-    with(|cache| {
+    let clicked = with(|cache| {
         let outcome = match &cache.defs {
             Some(defs) => outcome(cache, defs, size, at, button, raises_wanted(host)),
             None => Outcome::Nothing,
@@ -977,10 +1037,10 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
             Outcome::Open(skill) => {
                 cache.selected = skill;
                 cache.first_perk = 0;
-                cache.view = View::Skill;
+                cache.tab = Tab::Skill(cache.selected);
             }
-            Outcome::Back => cache.view = View::Overview,
-            Outcome::OpenSettings => cache.view = View::Settings,
+            Outcome::Back => cache.tab = Tab::Home,
+            Outcome::OpenSettings => open_tab(cache, Tab::Options),
             Outcome::ToggleArea(perk) => {
                 let shown = &mut cache.settings.shown_areas;
                 if !shown.remove(&perk) {
@@ -992,7 +1052,11 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], button: i32) -> Flow
         if clicked && cache.settings.click_sounds {
             cache.sounds.push(CLICK_SOUND);
         }
+        clicked
     });
+    if !clicked && button == LEFT_BUTTON {
+        click_window(size, at);
+    }
     Flow::Cancel
 }
 
@@ -1027,13 +1091,13 @@ fn outcome(
         }
         _ => Outcome::Nothing,
     };
-    let hit = match (cache.view, button) {
-        (View::Skill, RIGHT_BUTTON) => Some(Button::Back),
-        (View::Overview, LEFT_BUTTON) => {
+    let hit = match (cache.tab, button) {
+        (Tab::Skill(_), RIGHT_BUTTON) => Some(Button::Back),
+        (Tab::Home, LEFT_BUTTON) => {
             let o = overview(size, shown.skills.len(), cache.first_row, shown.focus.len());
             hit_overview(&o, at[0], at[1])
         }
-        (View::Skill, LEFT_BUTTON) => {
+        (Tab::Skill(_), LEFT_BUTTON) => {
             let view = detail(size, shown.perks.len(), cache.first_perk);
             hit_detail(&view, at[0], at[1])
         }
@@ -1095,17 +1159,17 @@ pub fn scroll(host: &dyn Host, amount: f64) -> Flow {
                 now
             }
         };
-        match cache.view {
-            View::Overview => cache.first_row = stepped(cache.first_row, last_first_row(skills)),
-            View::Skill => cache.first_perk = stepped(cache.first_perk, last_first_perk(perks)),
-            View::Settings => {}
+        match cache.tab {
+            Tab::Home => cache.first_row = stepped(cache.first_row, last_first_row(skills)),
+            Tab::Skill(_) => cache.first_perk = stepped(cache.first_perk, last_first_perk(perks)),
+            Tab::Options => {}
         }
     });
     Flow::Cancel
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::collections::BTreeMap;
 
     use horizon_client::mod_api::{Flow, HudBatch};
@@ -1231,7 +1295,7 @@ mod tests {
         let host = screen_open();
         with(|cache| {
             cache.selected = 1;
-            cache.view = View::Skill;
+            cache.tab = Tab::Skill(cache.selected);
         });
         host
     }
@@ -1272,6 +1336,12 @@ mod tests {
         detail(SIZE, 3, 0)
     }
 
+    /// Whether something drawn at height `y` is in the tabs' row above the frame, which the old views' tests
+    /// leave out until those views go.
+    pub(crate) fn in_tab_row(y: f32) -> bool {
+        y < super::super::window::window(SIZE, 0, 0).frame.y
+    }
+
     fn inside(r: &Rect) -> [f32; 2] {
         [r.x + 2.0, r.y + 2.0]
     }
@@ -1310,7 +1380,13 @@ mod tests {
                 "Working",
             ],
         );
-        assert_eq!(host.icons.borrow().len(), 2);
+        let cards = host
+            .icons
+            .borrow()
+            .iter()
+            .filter(|(_, at)| !in_tab_row(at[1]))
+            .count();
+        assert_eq!(cards, 2);
         assert_eq!(tooltip(&host), Vec::<String>::new());
     }
 
@@ -1339,6 +1415,7 @@ mod tests {
             host.icons
                 .borrow()
                 .iter()
+                .filter(|(_, at)| !in_tab_row(at[1]))
                 .map(|(item, _)| item.clone())
                 .filter(|i| i.contains("pickaxe"))
                 .collect()
@@ -1350,13 +1427,13 @@ mod tests {
         host.icons.borrow_mut().clear();
         with(|cache| {
             cache.selected = 1;
-            cache.view = View::Skill;
+            cache.tab = Tab::Skill(cache.selected);
         });
         drawn(&host, AWAY);
         let view = shown(&host);
         host.icons.borrow_mut().clear();
         with(|cache| {
-            cache.view = View::Overview;
+            cache.tab = Tab::Home;
             cache.state.skills.get_mut(MINING).unwrap().level = 16;
         });
         drawn(&host, AWAY);
@@ -1496,7 +1573,7 @@ mod tests {
         let _serial = exclusive();
         let host = screen_open();
         melee_mastered();
-        with(|cache| cache.view = View::Skill);
+        with(|cache| cache.tab = Tab::Skill(cache.selected));
 
         // When its page is drawn
         let drawn = drawn(&host, AWAY);
@@ -1516,7 +1593,7 @@ mod tests {
         draw(&host, &mut HudBatch::new([427, 240]), SIZE, AWAY);
         with(|cache| {
             cache.selected = 1;
-            cache.view = View::Skill;
+            cache.tab = Tab::Skill(cache.selected);
         });
         draw(&host, &mut HudBatch::new([427, 240]), SIZE, AWAY);
 
@@ -1524,6 +1601,7 @@ mod tests {
         for paint in host.painted.borrow().iter() {
             let (x, y, w, h) = match paint {
                 Paint::Text { text, at, .. } => (at[0], at[1], host.text_width(text), 8.0),
+                Paint::Item { at, .. } if in_tab_row(at[1]) => continue,
                 Paint::Item { at, size, .. } => (at[0], at[1], *size, *size),
                 _ => continue,
             };
@@ -1548,7 +1626,10 @@ mod tests {
         // Then Mining's view is up: its level, its points, the owned perk, the one to unlock, and the one that
         // needs a higher level
         assert_eq!(flow, Flow::Cancel);
-        assert_eq!(with(|cache| (cache.view, cache.selected)), (View::Skill, 1));
+        assert_eq!(
+            with(|cache| (cache.tab, cache.selected)),
+            (Tab::Skill(1), 1)
+        );
         contains(
             &drawn,
             &[
@@ -1938,7 +2019,7 @@ mod tests {
         // Then it says it is waiting, and the click is taken without doing anything
         contains(&drawn, &["Reskilled", "Waiting for the server..."]);
         assert_eq!(flow, Flow::Cancel);
-        assert_eq!(with(|cache| cache.view), View::Overview);
+        assert_eq!(with(|cache| cache.tab), Tab::Home);
     }
 
     #[test]
@@ -1949,7 +2030,7 @@ mod tests {
 
         // When Mining's raise button is clicked on its card, then on its own view, then a tick passes
         let flow = click(&host, SIZE, inside(&cards()[1].raise), LEFT_BUTTON);
-        let still = with(|cache| cache.view);
+        let still = with(|cache| cache.tab);
         click(&host, SIZE, inside(&cards()[1].rect), LEFT_BUTTON);
         click(&host, SIZE, inside(&mining_view().raise), LEFT_BUTTON);
         let sent = requests_sent(&mut host);
@@ -1960,7 +2041,7 @@ mod tests {
             times: 1,
         });
         assert_eq!(flow, Flow::Cancel);
-        assert_eq!(still, View::Overview);
+        assert_eq!(still, Tab::Home);
         assert_eq!(sent, vec![raise.clone(), raise]);
     }
 
@@ -2019,7 +2100,7 @@ mod tests {
         );
 
         // Then the options take over the screen
-        assert_eq!(with(|cache| cache.view), View::Settings);
+        assert_eq!(with(|cache| cache.tab), Tab::Options);
     }
 
     #[test]
@@ -2046,7 +2127,13 @@ mod tests {
         host.eye = Some([3.0, 70.5, -8.0]);
 
         // When bare window is clicked and a tick passes, then Mining's card and another tick
-        click(&host, SIZE, inside(&panel(SIZE)), LEFT_BUTTON);
+        let body = super::super::window::window(SIZE, 2, 0).body;
+        click(
+            &host,
+            SIZE,
+            [body.x + 2.0, body.y + body.h - 2.0],
+            LEFT_BUTTON,
+        );
         horizon_client::mod_api::dispatch_tick(&mut host, &mods());
         let after_nothing = host.sounds.len();
         click(&host, SIZE, inside(&cards()[1].rect), LEFT_BUTTON);
@@ -2077,7 +2164,7 @@ mod tests {
         host.drawn.borrow_mut().clear();
         with(|cache| {
             cache.selected = 1;
-            cache.view = View::Skill;
+            cache.tab = Tab::Skill(cache.selected);
         });
         let page = drawn(&host, AWAY);
 
@@ -2102,7 +2189,7 @@ mod tests {
         host.drawn.borrow_mut().clear();
         with(|cache| {
             cache.selected = 1;
-            cache.view = View::Skill;
+            cache.tab = Tab::Skill(cache.selected);
         });
         let page = drawn(&host, AWAY);
 
@@ -2217,13 +2304,13 @@ mod tests {
 
         // When the back button is clicked, the view is opened again, and the right button is pressed anywhere
         click(&host, SIZE, inside(&mining_view().back), LEFT_BUTTON);
-        let after_back = with(|cache| cache.view);
-        with(|cache| cache.view = View::Skill);
+        let after_back = with(|cache| cache.tab);
+        with(|cache| cache.tab = Tab::Skill(cache.selected));
         click(&host, SIZE, AWAY, RIGHT_BUTTON);
 
         // Then both lead back to the overview
-        assert_eq!(after_back, View::Overview);
-        assert_eq!(with(|cache| cache.view), View::Overview);
+        assert_eq!(after_back, Tab::Home);
+        assert_eq!(with(|cache| cache.tab), Tab::Home);
     }
 
     fn sent_acts(host: &mut TestHost) -> Vec<Request> {
@@ -2234,6 +2321,86 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Where the tab for `tab` is, at the usual size.
+    fn tab_at(tab: Tab) -> [f32; 2] {
+        let skills = with(|cache| cache.defs.as_ref().map_or(0, |d| d.defs.skills.len()));
+        let w = super::super::window::window(SIZE, skills, 0);
+        let rect = w.tabs.iter().find(|(t, _)| *t == tab).unwrap().1;
+        [rect.x + 4.0, rect.y + 6.0]
+    }
+
+    #[test]
+    fn clicking_a_tab_opens_it() {
+        // Given the screen open on Home
+        let _serial = exclusive();
+        let host = screen_open();
+
+        // When Mining's tab (the second skill) is clicked, then Options
+        click(&host, SIZE, tab_at(Tab::Skill(1)), LEFT_BUTTON);
+        let after_skill = with(|cache| (cache.tab, cache.selected));
+        click(&host, SIZE, tab_at(Tab::Options), LEFT_BUTTON);
+
+        // Then Mining's tab opens, then Options, which remembers the tab before it
+        assert_eq!(after_skill, (Tab::Skill(1), 1));
+        assert_eq!(
+            with(|cache| (cache.tab, cache.return_tab)),
+            (Tab::Options, Tab::Skill(1))
+        );
+    }
+
+    #[test]
+    fn the_tabs_are_drawn_with_a_pip_for_points() {
+        // Given Mining with points to spend and Melee with none
+        let _serial = exclusive();
+        let host = screen_open();
+
+        // When the screen is drawn
+        drawn(&host, AWAY);
+
+        // Then each skill tab shows its icon, and a gold pip marks Mining's tab only
+        let icons = host.icons.borrow().clone();
+        assert!(
+            icons
+                .iter()
+                .any(|(item, _)| item == "minecraft:iron_pickaxe")
+        );
+        let pips = host
+            .painted
+            .borrow()
+            .iter()
+            .filter(|p| matches!(p, Paint::Fill { argb, .. } if *argb == paint::PIP))
+            .count();
+        assert_eq!(pips, 1);
+    }
+
+    #[test]
+    fn before_the_definitions_every_tab_waits() {
+        // Given the screen open before the server sent the definitions
+        let _serial = exclusive();
+        let mut host = TestHost {
+            open_screen: Some(MOD_ID.into()),
+            ..TestHost::default()
+        };
+        with(|cache| cache.defs = None);
+
+        // When it is drawn on Home and on Options, and the body is clicked
+        let home = drawn(&host, AWAY);
+        with(|cache| cache.tab = Tab::Options);
+        let options = drawn(&host, AWAY);
+        click(&host, SIZE, [SIZE[0] / 2.0, SIZE[1] / 2.0], LEFT_BUTTON);
+
+        // Then both wait, and nothing is asked
+        assert!(
+            home.iter().any(|t| t == "Waiting for the server..."),
+            "{home:?}"
+        );
+        assert!(
+            options.iter().any(|t| t == "Waiting for the server..."),
+            "{options:?}"
+        );
+        assert!(sent_acts(&mut host).is_empty());
     }
 
     #[test]

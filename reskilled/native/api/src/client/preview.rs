@@ -15,7 +15,7 @@ use skills_core::progress::{PlayerState, SkillProgress};
 use skills_core::registry::{SourceFile, build};
 use skills_core::wire::{ClientDefs, client_defs_json};
 
-use super::cache::{View, WARNING_TICKS, Warning, with};
+use super::cache::{Tab, WARNING_TICKS, Warning, with};
 use super::layout::{detail, overview, panel};
 use super::screen::draw;
 use crate::MOD_ID;
@@ -125,7 +125,7 @@ fn open_skill(path: &str) {
             .keys()
             .position(|id| *id == skill(path))
             .unwrap();
-        cache.view = View::Skill;
+        cache.tab = Tab::Skill(cache.selected);
         cache.first_perk = 0;
     });
 }
@@ -158,6 +158,7 @@ fn assert_inside_window(host: &TestHost, painted: &[Paint], size: [u32; 2], what
     for paint in painted {
         let (x, y, w, h) = match paint {
             Paint::Text { text, at, .. } => (at[0], at[1], host.text_width(text), 8.0),
+            Paint::Item { at, .. } if crate::client::screen::tests::in_tab_row(at[1]) => continue,
             Paint::Item { at, size, .. } => (at[0], at[1], *size, *size),
             _ => continue,
         };
@@ -201,7 +202,7 @@ fn the_shipped_overview_fits_the_window() {
         // Then its eight skills and three focus areas are all there, inside the window, no text over another
         let cards = painted
             .iter()
-            .filter(|p| matches!(p, Paint::Item { .. }))
+            .filter(|p| matches!(p, Paint::Item { at, .. } if !crate::client::screen::tests::in_tab_row(at[1])))
             .count();
         assert_eq!(cards, 8);
         assert_inside_window(&host, &painted, size, "overview");
@@ -272,7 +273,7 @@ fn hovering_shows_one_tooltip() {
         USUAL,
         over(&detail(size, 5, 0).rows[1].rect),
     );
-    with(|cache| cache.view = View::Settings);
+    with(|cache| cache.tab = Tab::Options);
     let page = super::options::page(size, 11);
     scene(&host, "options", USUAL, over(&page.buttons[3]));
     with(|cache| cache.options_tab = super::options::Tab::Rules);

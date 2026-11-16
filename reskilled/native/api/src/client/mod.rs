@@ -11,6 +11,8 @@ pub mod paint;
 mod preview;
 pub mod screen;
 pub mod settings;
+pub mod steve;
 pub mod strip;
 pub mod tooltip;
 pub mod warning;
+pub mod window;

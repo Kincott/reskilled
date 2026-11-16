@@ -6,7 +6,7 @@ use horizon_client::mod_api::{Flow, Host, HudBatch, Text};
 use skills_core::rules::Rules;
 use skills_core::wire::ToServer;
 
-use super::cache::{CLICK_SOUND, ClientSettings, View, with};
+use super::cache::{CLICK_SOUND, ClientSettings, Tab as WindowTab, with};
 use super::layout::Rect;
 use super::paint::{GLYPH, fitted};
 use super::screen::{LEFT_BUTTON, RIGHT_BUTTON};
@@ -198,7 +198,7 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, size: [f32; 2], mouse: [f32; 
 pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], mouse_button: i32) -> Flow {
     with(|cache| {
         if mouse_button == RIGHT_BUTTON {
-            cache.view = View::Overview;
+            cache.tab = WindowTab::Home;
             return;
         }
         if mouse_button != LEFT_BUTTON {
@@ -213,7 +213,7 @@ pub fn click(host: &dyn Host, size: [f32; 2], at: [f32; 2], mouse_button: i32) -
         let editable = cache.options_tab == Tab::Display || cache.rules_editable;
         let mut clicked = true;
         if on(&p.done) {
-            cache.view = View::Overview;
+            cache.tab = WindowTab::Home;
         } else if on(&p.tabs[0]) {
             cache.options_tab = Tab::Display;
         } else if on(&p.tabs[1]) {
@@ -258,7 +258,7 @@ mod tests {
 
     use super::*;
     use crate::MOD_ID;
-    use crate::client::cache::{ClientSettings, Corner, View, WarningPlace, with};
+    use crate::client::cache::{ClientSettings, Corner, Tab as WindowTab, WarningPlace, with};
     use crate::test_host::{Paint, TestHost, exclusive, mods};
 
     const SIZE: [f32; 2] = [427.0, 240.0];
@@ -274,7 +274,7 @@ mod tests {
         let dir =
             std::env::temp_dir().join(format!("reskilled_options_{name}_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        with(|cache| cache.view = View::Settings);
+        with(|cache| cache.tab = WindowTab::Options);
         let host = TestHost {
             open_screen: Some(MOD_ID.into()),
             config: Some(dir.clone()),
@@ -484,14 +484,14 @@ mod tests {
 
         // When done is clicked, the options are opened again and the right button pressed
         click(&host, SIZE, inside(&page(SIZE, 11).done), LEFT_BUTTON);
-        let after_done = with(|cache| cache.view);
-        with(|cache| cache.view = View::Settings);
+        let after_done = with(|cache| cache.tab);
+        with(|cache| cache.tab = WindowTab::Options);
         click(&host, SIZE, AWAY, RIGHT_BUTTON);
         std::fs::remove_dir_all(&dir).unwrap();
 
         // Then both lead back to the skills
-        assert_eq!(after_done, View::Overview);
-        assert_eq!(with(|cache| cache.view), View::Overview);
+        assert_eq!(after_done, WindowTab::Home);
+        assert_eq!(with(|cache| cache.tab), WindowTab::Home);
     }
 
     #[test]

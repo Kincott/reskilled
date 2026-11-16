@@ -29,7 +29,7 @@ mod tests {
 
     use super::*;
     use crate::MOD_ID;
-    use crate::client::cache::{View, with};
+    use crate::client::cache::{Tab, with};
     use crate::test_host::{TestHost, exclusive, mods};
 
     #[test]
@@ -51,14 +51,14 @@ mod tests {
     }
 
     #[test]
-    fn k_closes_the_screen_and_reopens_it_on_the_overview() {
+    fn k_closes_the_screen_and_reopens_it_on_home() {
         // Given the skills screen open on a skill's view
         let _serial = exclusive();
         let mut host = TestHost {
             open_screen: Some(MOD_ID.into()),
             ..TestHost::default()
         };
-        with(|cache| cache.view = View::Skill);
+        with(|cache| cache.tab = Tab::Skill(1));
 
         // When K goes down, and again once the world is played
         dispatch_key(&mut host, &mods(), "key.keyboard.k", true);
@@ -67,10 +67,10 @@ mod tests {
         host.playing = true;
         dispatch_key(&mut host, &mods(), "key.keyboard.k", true);
 
-        // Then the first press closes it, and the second opens it on the overview
+        // Then the first press closes it, and the second opens it on Home
         assert_eq!(closed, vec![MOD_ID]);
         assert_eq!(host.screens_opened, vec![MOD_ID]);
-        assert_eq!(with(|cache| cache.view), View::Overview);
+        assert_eq!(with(|cache| cache.tab), Tab::Home);
     }
 
     #[test]
