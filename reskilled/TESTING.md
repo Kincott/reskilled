@@ -10,7 +10,15 @@ cd reskilled/content && cargo horizon-mod build && cd ../..
 ~/Applications/horizon/horizon-launcher native-build reskilled/native --instance skills-dev --trust-native-code
 ```
 
-Make a new creative world with cheats on, then `/gamemode survival` and `/xp add @s 200 levels`.
+Start the game with the content mod (without `--dev-mod` the log says "Reskilled loaded 0 skills" and the screen
+is empty):
+
+```sh
+~/Applications/horizon/horizon-launcher play --instance skills-dev --world reskilled-test --creative \
+  --arg=--dev-mod --arg="$PWD/reskilled/content/target/horizon-mod/reskilled.hmod"
+```
+
+In the new world, `/gamemode survival` and `/xp add @s 200 levels`.
 
 ## Single player
 
