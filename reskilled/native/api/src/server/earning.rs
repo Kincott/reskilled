@@ -1,14 +1,16 @@
-//! Skills that grow by doing their work, under the server's rule: hooks note the work as it happens (blocks broken
-//! with the skill's tools, blows, projectile hits, hits taken, distance, enchanting, taming and breeding), and the
-//! player's own tick turns it into progress, at the rule's pace, climbing levels as it fills.
+//! Skills that grow by doing their work, under the server's rule: hooks note the work as it happens, and each skill's
+//! `earned_by` rules (in its data file) say what that work is worth to it; the player's own tick turns it into
+//! progress, at the rule's pace, climbing levels as it fills. No skill id or item is named here: a pack's own skills
+//! grow the same way, and the settings' `not_creatures` and `projectile_damage` lists say which blows and hits count.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Mutex;
 
 use horizon_client::mod_api::Host;
-use skills_core::defs::{Matcher, TargetKind};
-use skills_core::locks::matches;
+use skills_core::defs::{EarnRule, Matcher, TargetKind};
+use skills_core::locks::{Facts, NoFacts, matches};
 use skills_core::progress::{earn, level};
+use skills_core::registry::Defs;
 
 use super::data::{HostFacts, current};
 use super::effects::player_of_entity;
@@ -17,96 +19,99 @@ use super::state::{set_state, state_of};
 use super::{lock, rules, sharing};
 use crate::text::{RAISED, number, say, skill_name};
 
-/// The skills work grows, by their shipped ids; a pack without one of them grows nothing there.
-const MINING: &str = "reskilled:mining";
-const GATHERING: &str = "reskilled:gathering";
-const MELEE: &str = "reskilled:melee";
-const RANGED: &str = "reskilled:ranged";
-const DEFENSE: &str = "reskilled:defense";
-const AGILITY: &str = "reskilled:agility";
-const ARCANE: &str = "reskilled:arcane";
-const BUILDING: &str = "reskilled:building";
-/// What work is worth, in actions: a block broken or placed, a blow or a hit is one; enchanting is five; each block
-/// travelled a twentieth.
-const ENCHANTING: f64 = 5.0;
 /// The spots blocks were placed at that already counted, oldest first; at most this many are kept.
 const BUILT_KEPT: usize = 65_536;
-const PER_BLOCK: f64 = 0.05;
 const HUNDREDTHS: f64 = 100.0;
 const PERCENT: u64 = 100;
 
 /// Work each player did since their last tick, per skill, in hundredths of an action.
-static PENDING: Mutex<BTreeMap<u128, BTreeMap<&'static str, u64>>> = Mutex::new(BTreeMap::new());
+static PENDING: Mutex<BTreeMap<u128, BTreeMap<String, u64>>> = Mutex::new(BTreeMap::new());
 
-fn note(player: u128, skill: &'static str, actions: f64) {
+fn note(player: u128, skill: &str, actions: f64) {
     let hundredths = (actions * HUNDREDTHS).round().max(0.0) as u64;
+    if hundredths == 0 {
+        return;
+    }
     *lock(&PENDING)
         .entry(player)
         .or_default()
-        .entry(skill)
+        .entry(skill.to_string())
         .or_default() += hundredths;
 }
 
-fn in_tag(host: &dyn Host, item: &str, tag: &str) -> bool {
-    matches(
-        &Matcher::Tag(tag.into()),
-        TargetKind::Item,
-        item,
-        &HostFacts(host),
-    )
+/// Notes the work for every skill one of whose rules `worth` prices, at that price times `amount`.
+fn credit(player: u128, amount: f64, worth: impl Fn(&EarnRule) -> Option<f64>) {
+    let Some(data) = current() else { return };
+    for (id, skill) in &data.defs.skills {
+        let actions: f64 = skill.earned_by.iter().filter_map(&worth).sum();
+        if actions > 0.0 {
+            note(player, id, actions * amount);
+        }
+    }
 }
 
-/// A block broken with what the main hand holds: a pickaxe grows Mining; an axe, shovel, hoe or shears Gathering.
+/// Whether one of the matchers picks the id. Entities and damage types are matched by id and pattern only.
+fn any_picks(matchers: &[Matcher], id: &str) -> bool {
+    matchers
+        .iter()
+        .any(|m| matches(m, TargetKind::Entity, id, &NoFacts))
+}
+
+/// A block broken with what the main hand holds.
 pub fn on_break(host: &dyn Host, player: u128, main_hand: Option<&str>) {
     let Some(item) = main_hand else { return };
-    if in_tag(host, item, "#minecraft:pickaxes") {
-        note(player, MINING, 1.0);
-    } else if item == "minecraft:shears"
-        || ["#minecraft:axes", "#minecraft:shovels", "#minecraft:hoes"]
-            .iter()
-            .any(|tag| in_tag(host, item, tag))
-    {
-        note(player, GATHERING, 1.0);
-    }
+    let facts = HostFacts(host);
+    credit(player, 1.0, |rule| match rule {
+        EarnRule::Break { with, worth } if picks_item(with, item, &facts) => Some(*worth),
+        _ => None,
+    });
 }
 
-/// Things a blow lands on that are not creatures: hitting them grows nothing.
-const NOT_CREATURES: [&str; 8] = [
-    "minecraft:armor_stand",
-    "minecraft:item_frame",
-    "minecraft:glow_item_frame",
-    "minecraft:painting",
-    "minecraft:end_crystal",
-    "minecraft:leash_knot",
-    "minecraft:interaction",
-    "minecraft:item",
-];
+fn picks_item(with: &Matcher, item: &str, facts: &dyn Facts) -> bool {
+    matches(with, TargetKind::Item, item, facts)
+}
 
-/// A blow on an entity of `kind`: Melee grows when it is a creature, not a boat, a minecart or a decoration.
+/// A blow on an entity of `kind`, unless the settings say it is not a creature.
 pub fn on_attack(player: u128, kind: &str) {
-    let vehicle = ["boat", "_raft", "minecart"]
-        .iter()
-        .any(|end| kind.ends_with(end));
-    if vehicle || NOT_CREATURES.contains(&kind) {
+    if current().is_some_and(|data| not_a_creature(&data.defs, kind)) {
         return;
     }
-    note(player, MELEE, 1.0);
+    credit(player, 1.0, |rule| match rule {
+        EarnRule::Attack { worth } => Some(*worth),
+        _ => None,
+    });
+}
+
+fn not_a_creature(defs: &Defs, kind: &str) -> bool {
+    any_picks(&defs.settings.not_creatures, kind)
 }
 
 pub fn on_projectile_hit(player: u128) {
-    note(player, RANGED, 1.0);
+    credit(player, 1.0, |rule| match rule {
+        EarnRule::ProjectileHit { worth } => Some(*worth),
+        _ => None,
+    });
 }
 
 pub fn on_hit_taken(player: u128) {
-    note(player, DEFENSE, 1.0);
+    credit(player, 1.0, |rule| match rule {
+        EarnRule::Hurt { worth } => Some(*worth),
+        _ => None,
+    });
 }
 
 pub fn on_travel(player: u128, blocks: f64) {
-    note(player, AGILITY, blocks * PER_BLOCK);
+    credit(player, blocks, |rule| match rule {
+        EarnRule::Travel { per_block } => Some(*per_block),
+        _ => None,
+    });
 }
 
 pub fn on_enchant(player: u128) {
-    note(player, ARCANE, ENCHANTING);
+    credit(player, 1.0, |rule| match rule {
+        EarnRule::Enchant { worth } => Some(*worth),
+        _ => None,
+    });
 }
 
 /// Spots where a placed block already counted, so placing and breaking at one spot grows nothing.
@@ -116,7 +121,7 @@ type Spot = (String, [i32; 3]);
 static BUILT: Mutex<(BTreeSet<Spot>, VecDeque<Spot>)> =
     Mutex::new((BTreeSet::new(), VecDeque::new()));
 
-/// A player placed a block at `pos`: Building grows, once for each spot.
+/// A player placed a block at `pos`: it counts once for each spot.
 pub fn on_place(player: u128, dimension: &str, pos: [i32; 3]) {
     let spot = (dimension.to_string(), pos);
     {
@@ -131,15 +136,17 @@ pub fn on_place(player: u128, dimension: &str, pos: [i32; 3]) {
             }
         }
     }
-    note(player, BUILDING, 1.0);
+    credit(player, 1.0, |rule| match rule {
+        EarnRule::Place { worth } => Some(*worth),
+        _ => None,
+    });
 }
 
-/// A hit: a projectile a player shot grows their Ranged, and a hit a player takes from something grows their
-/// Defense.
+/// A hit: a projectile a player shot (a damage type the settings' `projectile_damage` picks) counts for them, and a
+/// hit a player takes from something counts for them.
 pub fn hurt(victim: i32, causing: i32, damage_type: &str) {
-    let projectile = ["arrow", "trident", "thrown", "fireball", "wind_charge"]
-        .iter()
-        .any(|kind| damage_type.contains(kind));
+    let projectile =
+        current().is_some_and(|data| any_picks(&data.defs.settings.projectile_damage, damage_type));
     if let Some(shooter) = player_of_entity(causing).filter(|_| projectile) {
         on_projectile_hit(shooter);
     }
@@ -163,14 +170,14 @@ pub fn run_for(host: &mut dyn Host, player: u128) {
     };
     let mut climbed = Vec::new();
     for (skill, hundredths) in work {
-        if data.defs.skill(skill).is_none() {
+        if data.defs.skill(&skill).is_none() {
             continue;
         }
         let paced = hundredths.saturating_mul(u64::from(rules.earn_rate)) / PERCENT;
         let (next, gained) = earn(
             &data.defs,
             &state,
-            skill,
+            &skill,
             u32::try_from(paced).unwrap_or(u32::MAX),
         );
         state = next;
@@ -224,9 +231,44 @@ mod tests {
 
     const PLAYER: u128 = 0x1234;
 
+    /// How each of the eight skills grows, as the shipped skill files say.
+    fn earned_by(skill: &str) -> serde_json::Value {
+        match skill {
+            "mining" => json!([{"type": "break", "with": {"tag": "#minecraft:pickaxes"}}]),
+            "gathering" => json!([{"type": "break", "with": {"any_of": [{"id": "minecraft:shears"},
+                {"tag": "#minecraft:axes"}, {"tag": "#minecraft:shovels"}, {"tag": "#minecraft:hoes"}]}}]),
+            "melee" => json!([{"type": "attack"}]),
+            "ranged" => json!([{"type": "projectile_hit"}]),
+            "defense" => json!([{"type": "hurt"}]),
+            "agility" => json!([{"type": "travel", "per_block": 0.05}]),
+            "arcane" => json!([{"type": "enchant", "worth": 5}]),
+            "building" => json!([{"type": "place"}]),
+            _ => json!([]),
+        }
+    }
+
+    /// The settings lists as shipped, in part: what is not a creature, and which damage is a projectile's.
+    fn shipped_lists() -> serde_json::Value {
+        json!({"format": 1,
+            "not_creatures": [{"any_of": [{"id": "minecraft:armor_stand"}, {"id": "minecraft:item_frame"},
+                {"id": "minecraft:painting"}, {"id": "minecraft:end_crystal"}, {"pattern": "*:*boat"},
+                {"pattern": "*:*minecart*"}]}],
+            "projectile_damage": [{"any_of": [{"pattern": "*:*arrow*"}, {"pattern": "*:*trident*"}]}]})
+    }
+
     /// The eight skills known, the player online at level 1 in each, skills growing as `progression` says at
     /// `rate` percent.
     fn world(progression: Progression, rate: u32) -> TestHost {
+        world_with(progression, rate, &[], &[])
+    }
+
+    /// [`world`], with more skills and settings files beside the shipped ones.
+    fn world_with(
+        progression: Progression,
+        rate: u32,
+        more_skills: &[(&str, serde_json::Value)],
+        more_settings: &[(&str, serde_json::Value)],
+    ) -> TestHost {
         let mut host = TestHost::default();
         host.item_tags
             .push(("minecraft:iron_pickaxe".into(), "minecraft:pickaxes".into()));
@@ -247,15 +289,19 @@ mod tests {
             let id = format!("reskilled:{s}");
             (
                 id.clone(),
-                json!({"format": 1, "id": id, "name": "n", "icon": "minecraft:stone"}),
+                json!({"format": 1, "id": id, "name": "n", "icon": "minecraft:stone",
+                    "earned_by": earned_by(s)}),
             )
         })
         .collect();
-        let skills: Vec<(&str, serde_json::Value)> = skills
+        let mut skills: Vec<(&str, serde_json::Value)> = skills
             .iter()
             .map(|(id, j)| (id.as_str(), j.clone()))
             .collect();
-        load(&mut host, &[("skills", skills)]);
+        skills.extend(more_skills.iter().cloned());
+        let mut settings = vec![("reskilled:defaults", shipped_lists())];
+        settings.extend(more_settings.iter().cloned());
+        load(&mut host, &[("skills", skills), ("settings", settings)]);
         logged_in(PLAYER, "Pat");
         set_state(&mut host, PLAYER, PlayerState::default()).unwrap();
         force(Rules {
@@ -396,6 +442,56 @@ mod tests {
         ] {
             assert_eq!(at(&mut host, skill), 2, "{skill}");
         }
+    }
+
+    #[test]
+    fn a_packs_own_skill_grows_by_the_work_its_file_names() {
+        // Given another mod's Digging skill, grown two actions a block broken with its drill
+        let _serial = exclusive();
+        let digging = json!({"format": 1, "id": "othermod:digging", "name": "n", "icon": "minecraft:stone",
+            "earned_by": [{"type": "break", "with": {"id": "othermod:drill"}, "worth": 2}]});
+        let mut host = world_with(
+            Progression::Earn,
+            100,
+            &[("othermod:digging", digging)],
+            &[],
+        );
+
+        // When the player breaks five blocks with the drill, and their tick runs
+        for _ in 0..5 {
+            on_break(&host, PLAYER, Some("othermod:drill"));
+        }
+        run_for(&mut host, PLAYER);
+
+        // Then Digging climbs a level, and Mining (pickaxes only) does not
+        let digging = level(
+            &state_of(&mut host, PLAYER).unwrap(),
+            &current().unwrap().defs,
+            "othermod:digging",
+        );
+        assert_eq!((digging, at(&mut host, "mining")), (2, 1));
+    }
+
+    #[test]
+    fn other_mods_add_things_that_are_not_creatures_and_projectile_damage() {
+        // Given another mod's settings: its statue is not a creature, and its dart's damage is a projectile's
+        let _serial = exclusive();
+        let theirs = json!({"format": 1, "not_creatures": [{"id": "othermod:statue"}],
+            "projectile_damage": [{"id": "othermod:dart"}]});
+        let mut host = world_with(Progression::Earn, 100, &[], &[("othermod:lists", theirs)]);
+        crate::server::effects::remember_entity(PLAYER, 7);
+
+        // When the player strikes the statue and a modded cart ten times each, and hits a zombie (entity 9) with ten
+        // darts, and their tick runs
+        for _ in 0..10 {
+            on_attack(PLAYER, "othermod:statue");
+            on_attack(PLAYER, "othermod:rail_minecart");
+            hurt(9, 7, "othermod:dart");
+        }
+        run_for(&mut host, PLAYER);
+
+        // Then Melee stays at 1, and Ranged climbs
+        assert_eq!((at(&mut host, "melee"), at(&mut host, "ranged")), (1, 2));
     }
 
     #[test]

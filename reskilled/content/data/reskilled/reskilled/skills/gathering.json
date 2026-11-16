@@ -8,5 +8,26 @@
     "8": "minecraft:iron_axe",
     "16": "minecraft:diamond_axe",
     "24": "minecraft:netherite_axe"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "break",
+      "with": {
+        "any_of": [
+          {
+            "id": "minecraft:shears"
+          },
+          {
+            "tag": "#minecraft:axes"
+          },
+          {
+            "tag": "#minecraft:shovels"
+          },
+          {
+            "tag": "#minecraft:hoes"
+          }
+        ]
+      }
+    }
+  ]
 }

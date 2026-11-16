@@ -8,5 +8,10 @@
     "8": "minecraft:iron_sword",
     "16": "minecraft:diamond_sword",
     "24": "minecraft:netherite_sword"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "attack"
+    }
+  ]
 }

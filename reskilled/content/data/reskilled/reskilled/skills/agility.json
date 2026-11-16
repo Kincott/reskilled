@@ -6,5 +6,11 @@
   "icon_levels": {
     "8": "minecraft:rabbit_foot",
     "16": "minecraft:elytra"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "travel",
+      "per_block": 0.05
+    }
+  ]
 }

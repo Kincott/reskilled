@@ -11,9 +11,9 @@ use horizon_client::mod_api::{
     Compound, EntityRef, EquipmentSlot, Flow, Host, ItemStack, NativeInventoryKind,
     NativeServerPlayer, Tag,
 };
-use skills_core::defs::{Action, Settings};
+use skills_core::defs::{Action, Settings, WornSlot};
 use skills_core::locks::{
-    Facts, TargetKind, Unmet, check, enchantment_cause, enchantment_requirements,
+    TargetKind, Unmet, check, enchantment_cause, enchantment_requirements, matches,
 };
 use skills_core::progress::level;
 use skills_core::registry::Defs;
@@ -401,9 +401,6 @@ const WINDOW_HOTBAR: std::ops::RangeInclusive<i32> = 36..=44;
 const HOTBAR_SIZE: i32 = 9;
 /// A click on an equipment slot counts for the equip that follows within this many ticks.
 const CLICK_TICKS: u64 = 2;
-/// Wearables vanilla puts on by shift-click that no armor tag names.
-const ELYTRA: &str = "minecraft:elytra";
-const SHIELD: &str = "minecraft:shield";
 
 /// The tick each player last clicked one of their equipment slots, so the item they placed from the cursor can go
 /// back to it.
@@ -479,20 +476,23 @@ fn carried_at(host: &dyn Host, player: u128, window_slot: i32) -> Option<String>
     )
 }
 
-/// Whether a shift-click would put the item on: it is a wearable whose slot is empty.
+/// Whether a shift-click would put the item on: the first of the settings' `equip_slots` rules that picks it names
+/// a worn slot, and that slot is empty.
 fn equips_into_empty_slot(host: &dyn Host, player: u128, item: &str) -> bool {
     let facts = HostFacts(host);
-    let slot = [
-        ("minecraft:head_armor", EquipmentSlot::Head),
-        ("minecraft:chest_armor", EquipmentSlot::Chest),
-        ("minecraft:leg_armor", EquipmentSlot::Legs),
-        ("minecraft:foot_armor", EquipmentSlot::Feet),
-    ]
-    .into_iter()
-    .find(|(tag, _)| facts.item_in_tag(item, tag))
-    .map(|(_, slot)| slot)
-    .or_else(|| (item == ELYTRA).then_some(EquipmentSlot::Chest))
-    .or_else(|| (item == SHIELD).then_some(EquipmentSlot::OffHand));
+    let rules = current()
+        .map(|data| data.defs.settings.equip_slots.clone())
+        .unwrap_or_default();
+    let slot = rules
+        .iter()
+        .find(|rule| matches(&rule.items, TargetKind::Item, item, &facts))
+        .map(|rule| match rule.slot {
+            WornSlot::Head => EquipmentSlot::Head,
+            WornSlot::Chest => EquipmentSlot::Chest,
+            WornSlot::Legs => EquipmentSlot::Legs,
+            WornSlot::Feet => EquipmentSlot::Feet,
+            WornSlot::Offhand => EquipmentSlot::OffHand,
+        });
     slot.is_some_and(|slot| host.player_equipment(player, slot).is_none())
 }
 
@@ -865,6 +865,11 @@ mod tests {
 
     /// Five skills and one lock per action kind.
     fn with_locks(host: &mut TestHost) {
+        with_locks_and(host, Vec::new());
+    }
+
+    /// [`with_locks`], with more settings files beside the shipped list of what shift-clicks put on.
+    fn with_locks_and(host: &mut TestHost, more_settings: Vec<(&str, Value)>) {
         let skills: Vec<(String, Value)> = SKILLS
             .iter()
             .map(|s| {
@@ -880,6 +885,7 @@ mod tests {
             entry(item("minecraft:shield"), &["use", "equip"], "defense", 4),
             entry(item("minecraft:wolf_armor"), &["use"], "taming", 6),
             entry(item("minecraft:diamond_chestplate"), &["equip"], "defense", 16),
+            entry(item("othermod:backpack"), &["equip"], "defense", 16),
             entry(json!({"block": {"id": "minecraft:tnt"}}), &["place"], "mining", 10),
             entry(json!({"block": {"id": "minecraft:anvil"}}), &["open"], "arcane", 6),
             entry(json!({"entity": {"id": "minecraft:horse"}}), &["mount"], "taming", 4),
@@ -893,11 +899,23 @@ mod tests {
             .iter()
             .map(|(id, json)| (id.as_str(), json.clone()))
             .collect();
+        let equip_slots = json!({"format": 1, "equip_slots": [
+            {"items": {"tag": "#minecraft:head_armor"}, "slot": "head"},
+            {"items": {"tag": "#minecraft:chest_armor"}, "slot": "chest"},
+            {"items": {"tag": "#minecraft:leg_armor"}, "slot": "legs"},
+            {"items": {"tag": "#minecraft:foot_armor"}, "slot": "feet"},
+            {"items": {"id": "minecraft:elytra"}, "slot": "chest"},
+            {"items": {"id": "minecraft:shield"}, "slot": "offhand"}]});
         load(
             host,
             &[
                 ("skills", skills),
                 ("locks", vec![("reskilled:test", locks)]),
+                ("settings", {
+                    let mut settings = vec![("reskilled:defaults", equip_slots)];
+                    settings.extend(more_settings);
+                    settings
+                }),
             ],
         );
         take_queued();
@@ -1407,6 +1425,25 @@ mod tests {
 
         // Then both clicks are refused, so the chestplate stays where it is
         assert_eq!((main, hotbar), (Flow::Cancel, Flow::Cancel));
+    }
+
+    #[test]
+    fn another_mods_wearable_named_in_settings_is_not_shift_clicked_on() {
+        // Given another mod's settings saying its backpack is worn on the chest, a level-1 player (the backpack
+        // needs Defense 16) with it in slot 12, and nothing worn
+        let _serial = exclusive();
+        let mut host = TestHost::default();
+        let theirs = json!({"format": 1, "equip_slots": [{"items": {"id": "othermod:backpack"}, "slot": "chest"}]});
+        with_locks_and(&mut host, vec![("othermod:wearables", theirs)]);
+        let actor = player(&mut host, false);
+        host.slots = vec![None; 41];
+        host.slots[12] = Some(stack("othermod:backpack"));
+
+        // When it is shift-clicked
+        let flow = on_inventory_click(&mut host, &actor, PLAYER_WINDOW, 12, 0, QUICK_MOVE);
+
+        // Then the click is refused, so the backpack stays where it is
+        assert_eq!(flow, Flow::Cancel);
     }
 
     #[test]

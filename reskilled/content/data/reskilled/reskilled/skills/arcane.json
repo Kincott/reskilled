@@ -8,5 +8,11 @@
     "8": "minecraft:enchanted_book",
     "16": "minecraft:experience_bottle",
     "32": "minecraft:nether_star"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "enchant",
+      "worth": 5
+    }
+  ]
 }

@@ -10,5 +10,103 @@
   "focus_cost": 10,
   "death_penalty_levels": 0,
   "creative_ignores_locks": true,
-  "lock_message_cooldown_ticks": 20
+  "lock_message_cooldown_ticks": 20,
+  "not_creatures": [
+    {
+      "any_of": [
+        {
+          "id": "minecraft:armor_stand"
+        },
+        {
+          "id": "minecraft:item_frame"
+        },
+        {
+          "id": "minecraft:glow_item_frame"
+        },
+        {
+          "id": "minecraft:painting"
+        },
+        {
+          "id": "minecraft:end_crystal"
+        },
+        {
+          "id": "minecraft:leash_knot"
+        },
+        {
+          "id": "minecraft:interaction"
+        },
+        {
+          "id": "minecraft:item"
+        },
+        {
+          "pattern": "*:*boat"
+        },
+        {
+          "pattern": "*:*_raft"
+        },
+        {
+          "pattern": "*:*minecart*"
+        }
+      ]
+    }
+  ],
+  "projectile_damage": [
+    {
+      "any_of": [
+        {
+          "pattern": "*:*arrow*"
+        },
+        {
+          "pattern": "*:*trident*"
+        },
+        {
+          "pattern": "*:*thrown*"
+        },
+        {
+          "pattern": "*:*fireball*"
+        },
+        {
+          "pattern": "*:*wind_charge*"
+        }
+      ]
+    }
+  ],
+  "equip_slots": [
+    {
+      "items": {
+        "tag": "#minecraft:head_armor"
+      },
+      "slot": "head"
+    },
+    {
+      "items": {
+        "tag": "#minecraft:chest_armor"
+      },
+      "slot": "chest"
+    },
+    {
+      "items": {
+        "tag": "#minecraft:leg_armor"
+      },
+      "slot": "legs"
+    },
+    {
+      "items": {
+        "tag": "#minecraft:foot_armor"
+      },
+      "slot": "feet"
+    },
+    {
+      "items": {
+        "id": "minecraft:elytra"
+      },
+      "slot": "chest"
+    },
+    {
+      "items": {
+        "id": "minecraft:shield"
+      },
+      "slot": "offhand"
+    }
+  ]
 }

@@ -117,6 +117,7 @@ mod tests {
             cost: None,
             points_every: None,
             icon_levels: [(8, "minecraft:iron_pickaxe".to_string())].into(),
+            earned_by: Vec::new(),
         };
         (id, def)
     }

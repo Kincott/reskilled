@@ -40,6 +40,81 @@ pub struct SkillDef {
     pub cost: Option<CostCurve>,
     /// Overrides the settings' `points_every` for this skill.
     pub points_every: Option<u32>,
+    /// The work that grows the skill when the server's rules let skills grow by doing.
+    #[serde(default)]
+    pub earned_by: Vec<EarnRule>,
+}
+
+fn crops() -> Matcher {
+    Matcher::Tag("#minecraft:crops".into())
+}
+
+fn one_action() -> f64 {
+    1.0
+}
+
+/// A kind of work that grows a skill, and what it is worth in actions (a level L takes ten actions times L at the
+/// rules' usual pace).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum EarnRule {
+    /// Breaking a block with an item in the main hand that `with` picks.
+    Break {
+        with: Matcher,
+        #[serde(default = "one_action")]
+        worth: f64,
+    },
+    /// Placing a block, once for each spot.
+    Place {
+        #[serde(default = "one_action")]
+        worth: f64,
+    },
+    /// A blow on a creature (anything the settings' `not_creatures` does not pick).
+    Attack {
+        #[serde(default = "one_action")]
+        worth: f64,
+    },
+    /// A projectile the player shot hitting something (a damage type the settings' `projectile_damage` picks).
+    ProjectileHit {
+        #[serde(default = "one_action")]
+        worth: f64,
+    },
+    /// A hit the player takes from something.
+    Hurt {
+        #[serde(default = "one_action")]
+        worth: f64,
+    },
+    /// Each block travelled is worth `per_block` actions.
+    Travel { per_block: f64 },
+    /// Enchanting an item.
+    Enchant {
+        #[serde(default = "one_action")]
+        worth: f64,
+    },
+}
+
+impl EarnRule {
+    fn validate(&self) -> Result<(), String> {
+        let (field, worth) = match self {
+            EarnRule::Break { with, worth } => {
+                with.validate(TargetKind::Item)?;
+                ("worth", *worth)
+            }
+            EarnRule::Travel { per_block } => ("per_block", *per_block),
+            EarnRule::Place { worth }
+            | EarnRule::Attack { worth }
+            | EarnRule::ProjectileHit { worth }
+            | EarnRule::Hurt { worth }
+            | EarnRule::Enchant { worth } => ("worth", *worth),
+        };
+        if worth.is_finite() && worth >= 0.0 {
+            Ok(())
+        } else {
+            Err(format!(
+                "{field} must be a number of at least 0, found {worth}"
+            ))
+        }
+    }
 }
 
 /// Raising a skill from level L to L + 1 costs `base + floor((L - 1) / every)` XP levels.
@@ -114,11 +189,14 @@ pub enum Effect {
         amplifier: u8,
         mobs: Matcher,
     },
-    /// Every `interval_seconds`, each crop within `radius` blocks grows a stage with `chance`.
+    /// Every `interval_seconds`, each of `blocks` (by default `#minecraft:crops`) within `radius` blocks grows a
+    /// stage with `chance`; a block grows by its `age` property.
     CropGrowth {
         radius: u32,
         interval_seconds: u32,
         chance: f64,
+        #[serde(default = "crops")]
+        blocks: Matcher,
     },
     /// Breaking one of these crops ripe plants it again, taking one seed from what it drops.
     Replant { crops: Vec<ReplantCrop> },
@@ -344,6 +422,34 @@ pub struct SettingsPatch {
     pub death_penalty_levels: Option<u32>,
     pub creative_ignores_locks: Option<bool>,
     pub lock_message_cooldown_ticks: Option<u32>,
+    /// Entities a blow on grows no skill; added to every other file's.
+    #[serde(default)]
+    pub not_creatures: Vec<Matcher>,
+    /// Damage types that are a projectile's hit; added to every other file's.
+    #[serde(default)]
+    pub projectile_damage: Vec<Matcher>,
+    /// Items a shift-click puts on, and where; added to every other file's.
+    #[serde(default)]
+    pub equip_slots: Vec<EquipSlotRule>,
+}
+
+/// Items a shift-click in the inventory puts into a worn slot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EquipSlotRule {
+    pub items: Matcher,
+    pub slot: WornSlot,
+}
+
+/// A slot worn rather than held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WornSlot {
+    Head,
+    Chest,
+    Legs,
+    Feet,
+    Offhand,
 }
 
 /// The effective settings, after every settings file is merged.
@@ -362,6 +468,15 @@ pub struct Settings {
     pub death_penalty_levels: u32,
     pub creative_ignores_locks: bool,
     pub lock_message_cooldown_ticks: u32,
+    /// Entities (ids and patterns) a blow on grows no skill: decorations and vehicles.
+    #[serde(default)]
+    pub not_creatures: Vec<Matcher>,
+    /// Damage types (ids and patterns) that count as a projectile's hit.
+    #[serde(default)]
+    pub projectile_damage: Vec<Matcher>,
+    /// The first rule picking an item says which worn slot a shift-click puts it in.
+    #[serde(default)]
+    pub equip_slots: Vec<EquipSlotRule>,
 }
 
 impl Default for Settings {
@@ -375,6 +490,9 @@ impl Default for Settings {
             death_penalty_levels: 0,
             creative_ignores_locks: true,
             lock_message_cooldown_ticks: DEFAULT_LOCK_MESSAGE_COOLDOWN_TICKS,
+            not_creatures: Vec::new(),
+            projectile_damage: Vec::new(),
+            equip_slots: Vec::new(),
         }
     }
 }
@@ -473,7 +591,8 @@ impl SkillDef {
             .try_for_each(|item| check_id("icon_levels", item))?;
         check_at_least_one("max_level", self.max_level)?;
         check_cost(self.cost)?;
-        check_at_least_one("points_every", self.points_every)
+        check_at_least_one("points_every", self.points_every)?;
+        self.earned_by.iter().try_for_each(EarnRule::validate)
     }
 }
 
@@ -524,7 +643,9 @@ impl Effect {
                 radius,
                 interval_seconds,
                 chance,
+                blocks,
             } => {
+                blocks.validate(TargetKind::Block)?;
                 if !(0.0..=1.0).contains(chance) {
                     return Err(format!("chance must be between 0 and 1, found {chance}"));
                 }
@@ -742,7 +863,14 @@ impl SettingsPatch {
     fn validate(&self) -> Result<(), String> {
         check_at_least_one("max_level", self.max_level)?;
         check_cost(self.cost)?;
-        check_at_least_one("points_every", self.points_every)
+        check_at_least_one("points_every", self.points_every)?;
+        self.not_creatures
+            .iter()
+            .chain(&self.projectile_damage)
+            .try_for_each(|m| m.validate(TargetKind::Entity))?;
+        self.equip_slots
+            .iter()
+            .try_for_each(|rule| rule.items.validate(TargetKind::Item))
     }
 }
 
@@ -817,6 +945,101 @@ mod tests {
     }
 
     #[test]
+    fn a_skill_says_what_work_grows_it() {
+        // Given a skill grown by breaking with pickaxes or a modded drill, by hits taken, and by travel
+        let json = r##"{"format": 1, "id": "othermod:digging", "name": "n", "icon": "minecraft:stone",
+            "earned_by": [
+                {"type": "break", "with": {"any_of": [{"tag": "#minecraft:pickaxes"}, {"id": "othermod:drill"}]}},
+                {"type": "hurt", "worth": 2},
+                {"type": "travel", "per_block": 0.1},
+                {"type": "place"}, {"type": "attack"}, {"type": "projectile_hit"}, {"type": "enchant", "worth": 5}
+            ]}"##;
+
+        // When it is parsed
+        let DefFile::Skill(skill) = parse_ok(DefKind::Skill, json) else {
+            panic!("a skill");
+        };
+
+        // Then each kind of work is read, with a worth of one action unless it says otherwise
+        assert_eq!(
+            skill.earned_by,
+            vec![
+                EarnRule::Break {
+                    with: Matcher::AnyOf(vec![
+                        Matcher::Tag("#minecraft:pickaxes".into()),
+                        Matcher::Id("othermod:drill".into()),
+                    ]),
+                    worth: 1.0,
+                },
+                EarnRule::Hurt { worth: 2.0 },
+                EarnRule::Travel { per_block: 0.1 },
+                EarnRule::Place { worth: 1.0 },
+                EarnRule::Attack { worth: 1.0 },
+                EarnRule::ProjectileHit { worth: 1.0 },
+                EarnRule::Enchant { worth: 5.0 },
+            ]
+        );
+    }
+
+    #[test]
+    fn bad_earning_rules_are_refused() {
+        let skill = |rule: &str| {
+            format!(
+                r#"{{"format": 1, "id": "a:b", "name": "n", "icon": "minecraft:stone", "earned_by": [{rule}]}}"#
+            )
+        };
+        assert!(
+            refusal(
+                DefKind::Skill,
+                &skill(r#"{"type": "break", "with": {"tag": "pickaxes"}}"#)
+            )
+            .contains("tag")
+        );
+        assert!(
+            refusal(DefKind::Skill, &skill(r#"{"type": "hurt", "worth": -1}"#)).contains("worth")
+        );
+        assert!(
+            refusal(
+                DefKind::Skill,
+                &skill(r#"{"type": "travel", "per_block": -0.5}"#)
+            )
+            .contains("per_block")
+        );
+        assert!(refusal(DefKind::Skill, &skill(r#"{"type": "fishing"}"#)).contains("fishing"));
+    }
+
+    #[test]
+    fn crop_growth_grows_crops_unless_it_names_other_blocks() {
+        // Given a crop growth perk that names no blocks, and one that also grows a modded bush
+        let plain = perk_with(
+            r#"{"type": "crop_growth", "radius": 5, "interval_seconds": 10, "chance": 0.25}"#,
+        );
+        let modded = perk_with(
+            r##"{"type": "crop_growth", "radius": 5, "interval_seconds": 10, "chance": 0.25,
+                "blocks": {"any_of": [{"tag": "#minecraft:crops"}, {"id": "othermod:berry_bush"}]}}"##,
+        );
+
+        // When they are parsed
+        let blocks = |json: &str| match parse_ok(DefKind::Perk, json) {
+            DefFile::Perk(perk) => match &perk.effects[0] {
+                Effect::CropGrowth { blocks, .. } => blocks.clone(),
+                other => panic!("{other:?}"),
+            },
+            other => panic!("{other:?}"),
+        };
+
+        // Then the first grows #minecraft:crops, and the second also the bush
+        assert_eq!(blocks(&plain), Matcher::Tag("#minecraft:crops".into()));
+        assert_eq!(
+            blocks(&modded),
+            Matcher::AnyOf(vec![
+                Matcher::Tag("#minecraft:crops".into()),
+                Matcher::Id("othermod:berry_bush".into())
+            ])
+        );
+    }
+
+    #[test]
     fn parses_a_skill() {
         // Given a skill file with every field, and one with only the required ones
         let full = r#"{"format": 1, "id": "reskilled:mining", "priority": 5,
@@ -841,6 +1064,7 @@ mod tests {
                 cost: Some(CostCurve { base: 3, every: 5 }),
                 points_every: Some(5),
                 icon_levels: Default::default(),
+                earned_by: Vec::new(),
             })
         );
         assert_eq!(
@@ -854,6 +1078,7 @@ mod tests {
                 cost: None,
                 points_every: None,
                 icon_levels: Default::default(),
+                earned_by: Vec::new(),
             })
         );
     }
@@ -1273,6 +1498,9 @@ mod tests {
                 death_penalty_levels: 0,
                 creative_ignores_locks: true,
                 lock_message_cooldown_ticks: 20,
+                not_creatures: Vec::new(),
+                projectile_damage: Vec::new(),
+                equip_slots: Vec::new(),
             }
         );
     }

@@ -64,6 +64,7 @@ mod tests {
             cost: None,
             points_every: None,
             icon_levels: Default::default(),
+            earned_by: Vec::new(),
         };
         let needs = |level: u32| Requirements {
             by_action: [(Action::Break, [(MINING.to_string(), level)].into())].into(),

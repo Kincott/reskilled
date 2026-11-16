@@ -629,6 +629,7 @@ mod tests {
             cost: None,
             points_every: None,
             icon_levels: Default::default(),
+            earned_by: Vec::new(),
         }
     }
 

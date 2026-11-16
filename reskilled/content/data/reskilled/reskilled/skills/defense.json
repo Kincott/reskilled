@@ -8,5 +8,10 @@
     "8": "minecraft:iron_chestplate",
     "16": "minecraft:diamond_chestplate",
     "24": "minecraft:netherite_chestplate"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "hurt"
+    }
+  ]
 }

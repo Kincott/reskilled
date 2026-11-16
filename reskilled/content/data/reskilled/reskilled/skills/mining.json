@@ -8,5 +8,13 @@
     "8": "minecraft:iron_pickaxe",
     "16": "minecraft:diamond_pickaxe",
     "24": "minecraft:netherite_pickaxe"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "break",
+      "with": {
+        "tag": "#minecraft:pickaxes"
+      }
+    }
+  ]
 }

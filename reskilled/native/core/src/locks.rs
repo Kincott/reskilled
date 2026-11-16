@@ -148,8 +148,8 @@ pub fn enchantment_cause(
         })
 }
 
-/// For matchers that ask no tags (enchantments): every question answers no.
-struct NoFacts;
+/// For matchers that ask no tags (enchantments, entities, damage types): every question answers no.
+pub struct NoFacts;
 
 impl Facts for NoFacts {
     fn item_in_tag(&self, _item: &str, _tag: &str) -> bool {

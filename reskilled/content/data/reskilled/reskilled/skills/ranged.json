@@ -6,5 +6,10 @@
   "icon_levels": {
     "6": "minecraft:crossbow",
     "16": "minecraft:trident"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "projectile_hit"
+    }
+  ]
 }

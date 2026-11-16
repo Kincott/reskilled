@@ -42,7 +42,8 @@ pub struct ActiveEffects {
     /// Potion effects for kills: effect, seconds, amplifier, which mobs.
     pub on_kill: Vec<(String, u32, u8, Matcher)>,
     /// The widest crop growth: radius, interval in seconds, chance.
-    pub crop_growth: Option<(u32, u32, f64)>,
+    /// Radius, interval in seconds, chance, and the blocks it grows.
+    pub crop_growth: Option<(u32, u32, f64, Matcher)>,
     /// Crops broken ripe are planted again.
     pub replant: Vec<ReplantCrop>,
     /// The biggest enchanted weapon bonus: per enchantment, most.
@@ -165,10 +166,15 @@ pub fn active_effects(defs: &Defs, state: &PlayerState) -> ActiveEffects {
                     radius,
                     interval_seconds,
                     chance,
+                    blocks,
                 } => {
-                    let wider = effects.crop_growth.is_none_or(|(r, _, _)| *radius > r);
+                    let wider = effects
+                        .crop_growth
+                        .as_ref()
+                        .is_none_or(|(r, ..)| *radius > *r);
                     if wider {
-                        effects.crop_growth = Some((*radius, *interval_seconds, *chance));
+                        effects.crop_growth =
+                            Some((*radius, *interval_seconds, *chance, blocks.clone()));
                     }
                 }
                 Effect::Replant { crops } => {
@@ -340,6 +346,7 @@ mod tests {
             cost: None,
             points_every: None,
             icon_levels: Default::default(),
+            earned_by: Vec::new(),
         };
         let mut state = PlayerState::default();
         let owned = perks.iter().map(|p| p.id.clone()).collect();
@@ -461,6 +468,7 @@ mod tests {
                         radius: 5,
                         interval_seconds: 10,
                         chance: 0.25,
+                        blocks: Matcher::Tag("#minecraft:crops".into()),
                     },
                     Effect::Replant {
                         crops: vec![crop.clone()],
@@ -476,7 +484,10 @@ mod tests {
         // Then the readier last stand is kept, and the others are all there
         assert_eq!(effects.last_stand, Some((4.0, 120)));
         assert_eq!(effects.on_kill.len(), 1);
-        assert_eq!(effects.crop_growth, Some((5, 10, 0.25)));
+        assert_eq!(
+            effects.crop_growth,
+            Some((5, 10, 0.25, Matcher::Tag("#minecraft:crops".into())))
+        );
         assert_eq!(effects.replant, vec![crop]);
     }
 

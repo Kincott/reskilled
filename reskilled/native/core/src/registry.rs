@@ -263,7 +263,8 @@ fn merge_locks(
     locks
 }
 
-/// Applies settings patches lowest priority first, ties in load order, so the highest priority sets each field.
+/// Applies settings patches lowest priority first, ties in load order, so the highest priority sets each field; the
+/// list fields add up instead.
 fn merge_settings(mut patches: Vec<Ranked<SettingsPatch>>) -> Settings {
     patches.sort_by_key(|patch| (patch.priority, patch.order));
     let mut settings = Settings::default();
@@ -281,6 +282,9 @@ fn merge_settings(mut patches: Vec<Ranked<SettingsPatch>>) -> Settings {
         s.lock_message_cooldown_ticks = patch
             .lock_message_cooldown_ticks
             .unwrap_or(s.lock_message_cooldown_ticks);
+        s.not_creatures.extend(patch.not_creatures);
+        s.projectile_damage.extend(patch.projectile_damage);
+        s.equip_slots.extend(patch.equip_slots);
     }
     settings
 }
@@ -288,7 +292,7 @@ fn merge_settings(mut patches: Vec<Ranked<SettingsPatch>>) -> Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::defs::{Action, Matcher, Target};
+    use crate::defs::{Action, EquipSlotRule, Matcher, Target, WornSlot};
 
     fn source(path: &str, order: usize, kind: DefKind, json: &str) -> SourceFile {
         SourceFile {
@@ -483,6 +487,90 @@ mod tests {
         assert_eq!(defs.settings.focus_cost, 30);
         assert_eq!(defs.settings.death_penalty_levels, 1);
         assert_eq!(defs.settings.points_every, Settings::default().points_every);
+    }
+
+    #[test]
+    fn settings_lists_add_up_across_files() {
+        // Given the mod's defaults and another mod's settings file, each adding to the lists
+        let files = vec![
+            source(
+                "reskilled:reskilled/settings/defaults",
+                0,
+                DefKind::Settings,
+                r##"{"format": 1,
+                    "not_creatures": [{"id": "minecraft:armor_stand"}],
+                    "projectile_damage": [{"pattern": "*:*arrow*"}],
+                    "equip_slots": [{"items": {"tag": "#minecraft:head_armor"}, "slot": "head"}]}"##,
+            ),
+            source(
+                "othermod:reskilled/settings/othermod",
+                1,
+                DefKind::Settings,
+                r#"{"format": 1, "priority": 5,
+                    "not_creatures": [{"id": "othermod:statue"}],
+                    "projectile_damage": [{"id": "othermod:dart"}],
+                    "equip_slots": [{"items": {"id": "othermod:backpack"}, "slot": "chest"}]}"#,
+            ),
+        ];
+
+        // When they are merged
+        let (defs, errors) = build(files);
+
+        // Then each list holds both files' entries, the mod's first
+        assert_eq!(errors, vec![]);
+        let s = &defs.settings;
+        assert_eq!(
+            s.not_creatures,
+            vec![
+                Matcher::Id("minecraft:armor_stand".into()),
+                Matcher::Id("othermod:statue".into())
+            ]
+        );
+        assert_eq!(
+            s.projectile_damage,
+            vec![
+                Matcher::Pattern("*:*arrow*".into()),
+                Matcher::Id("othermod:dart".into())
+            ]
+        );
+        assert_eq!(
+            s.equip_slots,
+            vec![
+                EquipSlotRule {
+                    items: Matcher::Tag("#minecraft:head_armor".into()),
+                    slot: WornSlot::Head
+                },
+                EquipSlotRule {
+                    items: Matcher::Id("othermod:backpack".into()),
+                    slot: WornSlot::Chest
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn bad_settings_list_entries_are_refused() {
+        let refused = |json: &str| {
+            let (_, errors) = build(vec![source(
+                "p:reskilled/settings/x",
+                0,
+                DefKind::Settings,
+                json,
+            )]);
+            errors
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        assert!(
+            refused(r##"{"format": 1, "not_creatures": [{"tag": "#minecraft:boats"}]}"##)
+                .contains("tag")
+        );
+        assert!(
+            refused(r#"{"format": 1, "equip_slots": [{"items": {"id": "a:b"}, "slot": "tail"}]}"#)
+                .contains("tail")
+        );
     }
 
     #[test]

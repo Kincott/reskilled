@@ -124,6 +124,7 @@ mod tests {
             cost: None,
             points_every: None,
             icon_levels: Default::default(),
+            earned_by: Vec::new(),
         };
         let mut state = PlayerState::default();
         let progress = SkillProgress {

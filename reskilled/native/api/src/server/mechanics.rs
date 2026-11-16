@@ -7,7 +7,6 @@ use std::sync::Mutex;
 use horizon_client::mod_api::{
     EquipmentSlot, Flow, Host, ItemStack, NativeEffect, NativeInventoryKind, RandomSource,
 };
-use skills_core::defs::Matcher;
 use skills_core::locks::{TargetKind, matches};
 
 use super::data::HostFacts;
@@ -21,7 +20,6 @@ use skills_core::effects::ActiveEffects;
 const TICKS_PER_SECOND: u64 = 20;
 /// How long a noted replant waits for its drops and the player's tick, in ticks.
 const REPLANT_TICKS: u64 = 40;
-const CROPS: &str = "#minecraft:crops";
 const AGE: &str = "age";
 const PART: &str = "part";
 const HALF: &str = "half";
@@ -562,7 +560,9 @@ fn plant_again(host: &mut dyn Host, player: u128) {
 }
 
 fn grow_crops(host: &mut dyn Host, player: u128, dimension: &str, feet: [f64; 3]) {
-    let Some((radius, interval, chance)) = effects_of(player).and_then(|e| e.crop_growth) else {
+    let Some((radius, interval, chance, crops)) =
+        effects_of(player).and_then(|e| e.crop_growth.clone())
+    else {
         return;
     };
     if !due(&GROWTH_DUE, player, u64::from(interval) * TICKS_PER_SECOND) {
@@ -571,7 +571,6 @@ fn grow_crops(host: &mut dyn Host, player: u128, dimension: &str, feet: [f64; 3]
     let Some(level) = host.level(dimension) else {
         return;
     };
-    let crops = Matcher::Tag(CROPS.into());
     let centre = feet.map(|v| v.floor() as i32);
     let r = i32::try_from(radius).unwrap_or(0);
     let mut growing = Vec::new();

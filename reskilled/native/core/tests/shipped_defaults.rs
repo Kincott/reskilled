@@ -199,9 +199,16 @@ fn defaults_load_without_errors() {
     // When they are merged
     let (defs, errors) = build(shipped_files());
 
-    // Then nothing is refused, and the settings file restates the built-in defaults
+    // Then nothing is refused, and the settings file restates the built-in defaults (the lists, empty when built in,
+    // are what the file adds; see shipped_settings_lists_cover_vanilla)
     assert_eq!(errors, vec![]);
-    assert_eq!(defs.settings, Settings::default());
+    let scalars = Settings {
+        not_creatures: Vec::new(),
+        projectile_damage: Vec::new(),
+        equip_slots: Vec::new(),
+        ..defs.settings.clone()
+    };
+    assert_eq!(scalars, Settings::default());
 }
 
 #[test]
@@ -823,4 +830,118 @@ fn every_text_key_exists_in_en_us() {
         assert_eq!(perk.name, format!("reskilled.perk.{path}"));
         assert_eq!(perk.description, format!("reskilled.perk.{path}.desc"));
     }
+}
+
+#[test]
+fn each_shipped_skill_grows_by_its_own_work() {
+    // Given the shipped data
+    let defs = defaults();
+    let rules = |skill: &str| defs.skills[skill].earned_by.clone();
+    let tag = |t: &str| Matcher::Tag(t.into());
+
+    // When each skill's rules are read
+    // Then they are what the mod grew each skill by before the rules were data
+    use skills_core::defs::EarnRule;
+    assert_eq!(
+        rules(MINING),
+        vec![EarnRule::Break {
+            with: tag("#minecraft:pickaxes"),
+            worth: 1.0
+        }]
+    );
+    assert_eq!(
+        rules(GATHERING),
+        vec![EarnRule::Break {
+            with: Matcher::AnyOf(vec![
+                Matcher::Id("minecraft:shears".into()),
+                tag("#minecraft:axes"),
+                tag("#minecraft:shovels"),
+                tag("#minecraft:hoes"),
+            ]),
+            worth: 1.0
+        }]
+    );
+    assert_eq!(rules(MELEE), vec![EarnRule::Attack { worth: 1.0 }]);
+    assert_eq!(rules(RANGED), vec![EarnRule::ProjectileHit { worth: 1.0 }]);
+    assert_eq!(rules(DEFENSE), vec![EarnRule::Hurt { worth: 1.0 }]);
+    assert_eq!(rules(AGILITY), vec![EarnRule::Travel { per_block: 0.05 }]);
+    assert_eq!(rules(ARCANE), vec![EarnRule::Enchant { worth: 5.0 }]);
+    assert_eq!(rules(BUILDING), vec![EarnRule::Place { worth: 1.0 }]);
+}
+
+#[test]
+fn shipped_settings_lists_cover_vanilla() {
+    // Given the shipped data
+    let defs = defaults();
+    let s = &defs.settings;
+    let picks = |list: &[Matcher], id: &str| {
+        list.iter().any(|m| {
+            skills_core::locks::matches(m, TargetKind::Entity, id, &skills_core::locks::NoFacts)
+        })
+    };
+
+    // When vanilla's decorations, vehicles, creatures and damage types are checked
+    // Then decorations and vehicles are not creatures, mobs are; projectile damage is told from the rest
+    for thing in [
+        "minecraft:armor_stand",
+        "minecraft:item_frame",
+        "minecraft:glow_item_frame",
+        "minecraft:painting",
+        "minecraft:end_crystal",
+        "minecraft:leash_knot",
+        "minecraft:interaction",
+        "minecraft:item",
+        "minecraft:oak_boat",
+        "minecraft:cherry_chest_boat",
+        "minecraft:bamboo_raft",
+        "minecraft:bamboo_chest_raft",
+        "minecraft:minecart",
+        "minecraft:hopper_minecart",
+    ] {
+        assert!(picks(&s.not_creatures, thing), "{thing}");
+    }
+    for creature in [
+        "minecraft:zombie",
+        "minecraft:cow",
+        "minecraft:player",
+        "minecraft:ender_dragon",
+    ] {
+        assert!(!picks(&s.not_creatures, creature), "{creature}");
+    }
+    for projectile in [
+        "minecraft:arrow",
+        "minecraft:trident",
+        "minecraft:thrown",
+        "minecraft:fireball",
+        "minecraft:unattributed_fireball",
+        "minecraft:wind_charge",
+    ] {
+        assert!(picks(&s.projectile_damage, projectile), "{projectile}");
+    }
+    for other in [
+        "minecraft:player_attack",
+        "minecraft:fall",
+        "minecraft:magic",
+    ] {
+        assert!(!picks(&s.projectile_damage, other), "{other}");
+    }
+
+    // And shift-clicks put on armor by its slot tag, the elytra on the chest and the shield in the off hand
+    let slot_of = |item: &str| {
+        s.equip_slots
+            .iter()
+            .find(|rule| {
+                skills_core::locks::matches(&rule.items, TargetKind::Item, item, &Vanilla::new())
+            })
+            .map(|rule| rule.slot)
+    };
+    use skills_core::defs::WornSlot;
+    assert_eq!(
+        slot_of("minecraft:diamond_chestplate"),
+        Some(WornSlot::Chest)
+    );
+    assert_eq!(slot_of("minecraft:iron_helmet"), Some(WornSlot::Head));
+    assert_eq!(slot_of("minecraft:elytra"), Some(WornSlot::Chest));
+    assert_eq!(slot_of("minecraft:shield"), Some(WornSlot::Offhand));
+    assert_eq!(slot_of("minecraft:stick"), None);
 }

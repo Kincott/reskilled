@@ -8,5 +8,10 @@
     "8": "minecraft:piston",
     "16": "minecraft:beacon",
     "24": "minecraft:conduit"
-  }
+  },
+  "earned_by": [
+    {
+      "type": "place"
+    }
+  ]
 }
