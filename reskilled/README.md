@@ -13,6 +13,31 @@ of it, and the server's rules change in game.
 *The screen images are drawn by the mod's own screen code with the game's textures and font, by
 `tools/preview.py`.*
 
+## What it does
+
+In plain Minecraft, a new player who finds diamonds can use a diamond pickaxe straight away, and XP is only for
+enchanting. Reskilled adds a character to grow: eight skills, each with its own level from 1 to 32, that decide
+what you can use and make you better at what you do.
+
+- **Your XP buys skill levels.** Instead of (or as well as) enchanting, you spend XP levels to raise a skill, one
+  level at a time, each a little dearer than the last. A server can also have skills grow simply by doing the work:
+  mining raises Mining, fighting raises Melee, travelling raises Agility, and so on.
+- **Gear waits for your skills.** Better tools, weapons and armor work only once the matching skill is high enough:
+  an iron pickaxe from Mining 8, a diamond one from Mining 16, netherite from 24, and the same for axes, swords and
+  armor. Strong enchantments need Arcane, riding needs Agility, and advanced blocks like beacons need Building. Until
+  then the item shows a padlock and what it needs, and using it is refused with a message that says why. Progress
+  follows the player, not just the loot they find.
+- **Levels earn perks.** Every two levels give a perk point, spent on perks along each skill's road: faster mining,
+  extra crop drops, more armor, surviving a killing blow, no monsters spawning around your bed. Each skill has five,
+  and owning all five at the top level masters it.
+- **Focus areas reward a play style.** Pick Fighting, Working or Roaming to earn extra XP from kills, ores and work,
+  or travel and animals; the first is free.
+- **Everything is yours to tune.** Server operators change the rules in game (how raises are paid, how skills grow,
+  shared skills for parties). Packs and other mods change any skill, perk or lock with data files, add their own,
+  or remove the shipped ones.
+
+It fills the role that Reskillable and Level Up! Reloaded have on Forge, for Horizon.
+
 ## The skills window
 
 Press **K** (or `/skills open`). The window has a tab for Home, one per skill, and one for Options; a gold dot on a
