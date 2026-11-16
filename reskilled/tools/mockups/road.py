@@ -622,20 +622,14 @@ def you_doll(c, x0, y0, cw, y1):
     c.right("65", x0 + cw - 8, y0 + 6, GOLD)
     c.right("Lv ", x0 + cw - 8 - FONT.width("65"), y0 + 6, DIM, False)
     c.fill(x0 + 8, y0 + 18, cw - 16, 1, BRASS_DARK)
-    # Steve in a stone alcove, the gear in slots either side
-    ax, ay, aw, ah = x0 + 8, y0 + 23, cw - 16, 90
+    # Steve alone in a stone alcove
+    ax, ay, aw, ah = x0 + 8, y0 + 23, cw - 16, 116
     c.fill(ax, ay, aw, ah, INSET)
     c.tile("gui/advancements/backgrounds/stone", ax + 1, ay + 1, aw - 2, ah - 2, 0.72)
-    c.fill(mx - 18, ay + ah - 9, 36, 4, 0x66000000)
-    c.art(STEVE, STEVE_PAL, mx - 16, ay + 13, 2)
-    for i, item in enumerate(["minecraft:iron_helmet", "minecraft:iron_chestplate", "minecraft:iron_leggings",
-                              "minecraft:iron_boots"]):
-        c.slot(ax + 3, ay + 5 + i * 20, item)
-    c.slot(ax + aw - 21, ay + 25, "minecraft:diamond_pickaxe", locked=True)
-    c.slot(ax + aw - 21, ay + 45, None)
-    c.centred("\u2718 Pickaxe: Mining 16", x0, ay + ah + 4, cw, RED, False)
-    sy = ay + ah + 18
-    c.fill(x0 + 8, sy - 4, cw - 16, 1, BRASS_DARK)
+    c.fill(mx - 26, ay + ah - 10, 52, 5, 0x66000000)
+    c.art(STEVE, STEVE_PAL, mx - 24, ay + 9, 3)
+    sy = ay + ah + 9
+    c.fill(x0 + 8, sy - 5, cw - 16, 1, BRASS_DARK)
     stats = [("Perks", "7 / 40", WHITE), ("Mastered", "1 / 8", GOLD), ("Points", "12", GOLD)]
     for i, (label, value, colour) in enumerate(stats):
         y = sy + i * 11

@@ -39,14 +39,12 @@ medallions) were set aside by the user; focus is now the structure of the skill 
 Left column, "you":
 
 - The player's name and total level ("Lv 65") on one line.
-- **Steve** in a stone alcove (vanilla's advancement stone, darkened), drawn by the mod in pixel art (16 x 32 pixels at
-  twice the size), front on, with a shadow under him. His eyes follow the mouse, as the player in the inventory does.
-  Horizon does not let mods draw the player's real model or skin in a screen at the pinned commit; if a later
-  Horizon offers the inventory's player preview to mods, it takes Steve's place.
-- **Gear** around him: head, chest, legs and feet down the left, main hand and off hand on the right, the player's
-  real items. An item the player may not fully use is dimmed with a padlock, and under the alcove the first unmet
-  need of the hovered (else the first locked) item: "✘ Pickaxe: Mining 16". Hovering a slot shows the item's own
-  tooltip with its requirement lines.
+- **Steve**, alone in a stone alcove (vanilla's advancement stone, darkened), drawn by the mod in pixel art (16 x 32
+  pixels at three times the size), front on, with a shadow under him. His eyes follow the mouse, as the player in
+  the inventory does. Horizon does not let mods draw the player's real model or skin in a screen at the pinned
+  commit; if a later Horizon offers the inventory's player preview to mods, it takes Steve's place.
+- No gear slots (removed at the user's request). **Later, not in this build**: the figure wears the player's
+  equipped armor and holds the item in their hand.
 - **Stats**: perks owned out of all perks, skills mastered out of all skills, perk points waiting to be spent.
 
 Right, the skills **grouped by focus area**, in the areas' order, then skills in no area under "Other":
