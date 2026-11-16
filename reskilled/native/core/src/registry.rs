@@ -110,13 +110,28 @@ pub fn build(files: Vec<SourceFile>) -> (Defs, Vec<DefError>) {
         };
         match parsed {
             DefFile::Skill(def) => {
-                keep_highest(&mut skills, def.id.clone(), def.priority, def, &file)
+                keep_highest(&mut skills, def.id.clone(), def.priority, Some(def), &file)
             }
             DefFile::Perk(def) => {
-                keep_highest(&mut perks, def.id.clone(), def.priority, def, &file)
+                keep_highest(&mut perks, def.id.clone(), def.priority, Some(def), &file)
             }
             DefFile::Focus(def) => {
-                keep_highest(&mut focus, def.id.clone(), def.priority, def, &file)
+                keep_highest(&mut focus, def.id.clone(), def.priority, Some(def), &file)
+            }
+            DefFile::Removal(removal) => {
+                let into = match file.kind {
+                    DefKind::Skill => &mut skills,
+                    DefKind::Perk => {
+                        keep_highest(&mut perks, removal.id, removal.priority, None, &file);
+                        continue;
+                    }
+                    DefKind::Focus => {
+                        keep_highest(&mut focus, removal.id, removal.priority, None, &file);
+                        continue;
+                    }
+                    DefKind::Lock | DefKind::Settings => continue,
+                };
+                keep_highest(into, removal.id, removal.priority, None, &file);
             }
             DefFile::Lock(def) => lock_files.push(ranked(def, 0, &file)),
             DefFile::Settings(def) => {
@@ -126,11 +141,18 @@ pub fn build(files: Vec<SourceFile>) -> (Defs, Vec<DefError>) {
         }
     }
 
+    let (skills, removed_skills) = split_removed(skills);
     let skills: BTreeMap<String, SkillDef> =
         skills.into_iter().map(|(id, r)| (id, r.def)).collect();
-    let perks = resolve_perks(perks, &skills, &mut errors);
-    let focus = resolve_focus(focus, &skills, &mut errors);
-    let locks = merge_locks(lock_files, &skills, &mut errors);
+    let (perks, removed_perks) = split_removed(perks);
+    let (focus, _) = split_removed(focus);
+    let gone = Gone {
+        skills: removed_skills,
+        perks: removed_perks,
+    };
+    let perks = resolve_perks(perks, &skills, &gone, &mut errors);
+    let focus = resolve_focus(focus, &skills, &gone, &mut errors);
+    let locks = merge_locks(lock_files, &skills, &gone, &mut errors);
     let settings = merge_settings(patches);
     (
         Defs {
@@ -142,6 +164,39 @@ pub fn build(files: Vec<SourceFile>) -> (Defs, Vec<DefError>) {
         },
         errors,
     )
+}
+
+/// Ids a removal file took out. What needs only these goes quietly; a need for an id nobody defined is an error.
+struct Gone {
+    skills: BTreeSet<String>,
+    perks: BTreeSet<String>,
+}
+
+/// The kept definitions, and the ids whose highest-ranked file was a removal.
+fn split_removed<T>(
+    defs: BTreeMap<String, Ranked<Option<T>>>,
+) -> (BTreeMap<String, Ranked<T>>, BTreeSet<String>) {
+    let mut kept = BTreeMap::new();
+    let mut removed = BTreeSet::new();
+    for (id, ranked) in defs {
+        match ranked.def {
+            Some(def) => {
+                kept.insert(
+                    id,
+                    Ranked {
+                        def,
+                        priority: ranked.priority,
+                        order: ranked.order,
+                        path: ranked.path,
+                    },
+                );
+            }
+            None => {
+                removed.insert(id);
+            }
+        }
+    }
+    (kept, removed)
 }
 
 fn ranked<T>(def: T, priority: i32, file: &SourceFile) -> Ranked<T> {
@@ -173,14 +228,22 @@ fn keep_highest<T>(
 fn resolve_perks(
     mut perks: BTreeMap<String, Ranked<PerkDef>>,
     skills: &BTreeMap<String, SkillDef>,
+    gone: &Gone,
     errors: &mut Vec<DefError>,
 ) -> BTreeMap<String, PerkDef> {
+    let mut gone_perks = gone.perks.clone();
     perks.retain(|id, perk| {
         let unknown = std::iter::once(&perk.def.skill)
             .chain(perk.def.also_needs.keys())
             .find(|skill| !skills.contains_key(*skill));
-        if let Some(unknown) = unknown {
-            errors.push(perk.error(format!("perk {id:?} names unknown skill {unknown:?}")));
+        match unknown {
+            Some(removed) if gone.skills.contains(removed) => {
+                gone_perks.insert(id.clone());
+            }
+            Some(unknown) => {
+                errors.push(perk.error(format!("perk {id:?} names unknown skill {unknown:?}")));
+            }
+            None => {}
         }
         unknown.is_none()
     });
@@ -189,6 +252,10 @@ fn resolve_perks(
         let before = perks.len();
         perks.retain(
             |id, perk| match perk.def.requires.iter().find(|r| !present.contains(*r)) {
+                Some(removed) if gone_perks.contains(removed) => {
+                    gone_perks.insert(id.clone());
+                    false
+                }
                 Some(missing) => {
                     errors
                         .push(perk.error(format!("perk {id:?} requires unknown perk {missing:?}")));
@@ -207,9 +274,16 @@ fn resolve_perks(
 fn resolve_focus(
     focus: BTreeMap<String, Ranked<FocusDef>>,
     skills: &BTreeMap<String, SkillDef>,
+    gone: &Gone,
     errors: &mut Vec<DefError>,
 ) -> BTreeMap<String, FocusDef> {
     let mut areas: Vec<Ranked<FocusDef>> = focus.into_values().collect();
+    // A removed skill leaves its areas quietly; an area it left with no skill goes too.
+    areas.retain_mut(|area| {
+        let had_skills = !area.def.skills.is_empty();
+        area.def.skills.retain(|skill| !gone.skills.contains(skill));
+        !had_skills || !area.def.skills.is_empty()
+    });
     areas.sort_by_key(|area| area.order);
     let mut claimed: BTreeMap<String, String> = BTreeMap::new();
     let mut kept = BTreeMap::new();
@@ -242,12 +316,23 @@ fn resolve_focus(
 fn merge_locks(
     mut files: Vec<Ranked<LockFile>>,
     skills: &BTreeMap<String, SkillDef>,
+    gone: &Gone,
     errors: &mut Vec<DefError>,
 ) -> Vec<LockEntry> {
     files.sort_by_key(|file| file.order);
     let mut locks: Vec<LockEntry> = Vec::new();
     for file in &files {
         for (index, entry) in file.def.entries.iter().enumerate() {
+            // A removed skill's needs go quietly; an entry that needed nothing else goes with them.
+            let mut entry = entry.clone();
+            let needed_something = !entry.requires.is_empty();
+            entry
+                .requires
+                .retain(|skill, _| !gone.skills.contains(skill));
+            if needed_something && entry.requires.is_empty() {
+                continue;
+            }
+            let entry = &entry;
             if let Some(unknown) = entry.requires.keys().find(|s| !skills.contains_key(*s)) {
                 errors.push(file.error(format!(
                     "lock entry {index} requires unknown skill {unknown:?}"
@@ -487,6 +572,107 @@ mod tests {
         assert_eq!(defs.settings.focus_cost, 30);
         assert_eq!(defs.settings.death_penalty_levels, 1);
         assert_eq!(defs.settings.points_every, Settings::default().points_every);
+    }
+
+    #[test]
+    fn removing_a_skill_quietly_takes_what_needs_it() {
+        // Given Mining and Melee, a Mining perk, a perk needing it, a focus on both skills, locks on each, and a
+        // pack's file removing Mining
+        let files = vec![
+            skill("r:reskilled/skills/mining", 0, MINING, 0, "minecraft:stone"),
+            skill("r:reskilled/skills/melee", 1, MELEE, 0, "minecraft:stone"),
+            perk("r:reskilled/perks/a", 2, "reskilled:a", MINING, ""),
+            perk(
+                "r:reskilled/perks/b",
+                3,
+                "reskilled:b",
+                MELEE,
+                r#""reskilled:a""#,
+            ),
+            focus(
+                "r:reskilled/focus/f",
+                4,
+                "reskilled:f",
+                r#""reskilled:mining", "reskilled:melee""#,
+            ),
+            lock(
+                "r:reskilled/locks/l",
+                5,
+                "minecraft:diamond_pickaxe",
+                MINING,
+                16,
+                false,
+            ),
+            lock(
+                "r:reskilled/locks/m",
+                6,
+                "minecraft:diamond_sword",
+                MELEE,
+                16,
+                false,
+            ),
+            source(
+                "pack:reskilled/skills/no_mining",
+                7,
+                DefKind::Skill,
+                r#"{"format": 1, "id": "reskilled:mining", "priority": 1, "remove": true}"#,
+            ),
+        ];
+
+        // When they are merged
+        let (defs, errors) = build(files);
+
+        // Then Mining, its perk and the perk needing that one are gone, the focus keeps Melee, only the sword's
+        // lock is left, and nothing is reported as an error
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            defs.skills.keys().collect::<Vec<_>>(),
+            vec!["reskilled:melee"]
+        );
+        assert!(defs.perks.is_empty());
+        assert_eq!(defs.focus["reskilled:f"].skills, vec!["reskilled:melee"]);
+        assert_eq!(defs.locks.len(), 1);
+    }
+
+    #[test]
+    fn a_removal_only_wins_by_priority_and_works_on_perks_and_focus() {
+        // Given a perk and a focus area, a removal of each at priority 1, and a skill removal at priority -1
+        let files = vec![
+            skill("r:reskilled/skills/melee", 0, MELEE, 0, "minecraft:stone"),
+            perk("r:reskilled/perks/b", 1, "reskilled:b", MELEE, ""),
+            focus(
+                "r:reskilled/focus/f",
+                2,
+                "reskilled:f",
+                r#""reskilled:melee""#,
+            ),
+            source(
+                "p:reskilled/perks/x",
+                3,
+                DefKind::Perk,
+                r#"{"format": 1, "id": "reskilled:b", "priority": 1, "remove": true}"#,
+            ),
+            source(
+                "p:reskilled/focus/x",
+                4,
+                DefKind::Focus,
+                r#"{"format": 1, "id": "reskilled:f", "priority": 1, "remove": true}"#,
+            ),
+            source(
+                "p:reskilled/skills/x",
+                5,
+                DefKind::Skill,
+                r#"{"format": 1, "id": "reskilled:melee", "priority": -1, "remove": true}"#,
+            ),
+        ];
+
+        // When they are merged
+        let (defs, errors) = build(files);
+
+        // Then the perk and the area are gone, and the outranked removal leaves Melee in place
+        assert_eq!(errors, vec![]);
+        assert!(defs.perks.is_empty() && defs.focus.is_empty());
+        assert!(defs.skills.contains_key("reskilled:melee"));
     }
 
     #[test]

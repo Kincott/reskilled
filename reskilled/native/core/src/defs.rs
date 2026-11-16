@@ -515,6 +515,19 @@ pub enum DefFile {
     Focus(FocusDef),
     Lock(LockFile),
     Settings(SettingsPatch),
+    /// `"remove": true`: the skill, perk or focus area with this id is taken out, when this file outranks the
+    /// others naming it.
+    Removal(Removal),
+}
+
+/// A file that takes a skill, perk or focus area out: `{"format": 1, "id": "...", "priority": 1, "remove": true}`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Removal {
+    pub id: String,
+    #[serde(default)]
+    pub priority: i32,
+    pub remove: bool,
 }
 
 /// A data file, or an entry in one, that was skipped.
@@ -530,7 +543,11 @@ pub struct DefError {
 pub fn parse_file(kind: DefKind, json: &str) -> Result<DefFile, DefError> {
     let mut value: Value = serde_json::from_str(json).map_err(refused)?;
     take_format(&mut value).map_err(refused)?;
+    let removes = value.get("remove") == Some(&Value::Bool(true));
     let file = match kind {
+        DefKind::Skill | DefKind::Perk | DefKind::Focus if removes => {
+            DefFile::Removal(serde_json::from_value(value).map_err(refused)?)
+        }
         DefKind::Skill => DefFile::Skill(serde_json::from_value(value).map_err(refused)?),
         DefKind::Perk => DefFile::Perk(serde_json::from_value(value).map_err(refused)?),
         DefKind::Focus => DefFile::Focus(serde_json::from_value(value).map_err(refused)?),
@@ -565,6 +582,7 @@ fn take_format(value: &mut Value) -> Result<(), String> {
 impl DefFile {
     fn validate(&self) -> Result<(), String> {
         match self {
+            DefFile::Removal(removal) => check_id("id", &removal.id),
             DefFile::Skill(skill) => skill.validate(),
             DefFile::Perk(perk) => perk.validate(),
             DefFile::Focus(focus) => focus.validate(),
