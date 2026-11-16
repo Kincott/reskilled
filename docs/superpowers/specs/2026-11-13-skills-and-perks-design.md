@@ -287,9 +287,10 @@ world (`Holder::Level`), sent to every player, and changed only by operators (ch
   levels. Arcane became magic and enchanted gear: Spellward, Runeblade, Warding Runes, Antidote, Living Runes; no
   shipped perk raises XP gain any more. The table and mock-ups above still show Taming as first designed.
 - Skill strip: a display setting showing the player's skills and levels beside the inventory and crafting table.
-- Enchantment locks (2026-11-16, after play): every enchantment lock also needs Arcane, at the level it asks of the
-  gear's skill (Sharpness III: Melee 12 and Arcane 12; Protection IV: Defense 20 and Arcane 20). A refusal or
-  tooltip line brought by an enchantment names it ("Sharpness III: Melee 12").
+- Enchantment locks (2026-11-16, after play): enchantments need Arcane only; the gear's own skill already locks the
+  gear. Level I is free and each level above it needs 3 more Arcane (Sharpness, Smite, Bane and Power up to V: 12;
+  Protection IV: 9; Unbreaking III: 6); Fortune and Looting climb 6 a level (III: 12); Mending needs 12. A refusal or
+  tooltip line brought by an enchantment names it ("Sharpness III: Arcane 6").
 - Perk guide removed (2026-11-16, after play): the G page with animated scenes and value cards was taken out at
   the user's request; some perks had no scene. A perk's tooltip (name, description, cost, needs) is its only
   explanation, and every perk description is to be rewritten.

@@ -595,55 +595,65 @@ fn golden_tools_need_their_skill_at_2_and_arcane_at_4() {
 }
 
 #[test]
-fn strong_enchantments_need_their_skill() {
+fn enchantments_need_arcane_three_levels_a_step() {
     // Given the shipped data
     let defs = defaults();
-    let need = |enchantment: &str, level: u32, action: Action, skill: &str| {
+    let need = |enchantment: &str, level: u32, action: Action| {
         let reqs = skills_core::locks::enchantment_requirements(
             &defs.locks,
             &[(enchantment.to_string(), level)],
         );
-        reqs.by_action
-            .get(&action)
-            .and_then(|l| l.get(skill))
+        reqs.by_action.get(&action).cloned().unwrap_or_default()
+    };
+    let arcane = |enchantment: &str, level: u32, action: Action| {
+        need(enchantment, level, action)
+            .get(ARCANE)
             .copied()
             .unwrap_or(0)
     };
 
-    // When enchantments are checked at their levels
-    // Then the low levels are free and the strong ones need the skill they serve
-    assert_eq!(need("minecraft:sharpness", 2, Action::Attack, MELEE), 0);
-    assert_eq!(need("minecraft:sharpness", 3, Action::Attack, MELEE), 12);
-    assert_eq!(need("minecraft:sharpness", 5, Action::Attack, MELEE), 20);
-    assert_eq!(need("minecraft:power", 5, Action::Use, RANGED), 20);
-    assert_eq!(
-        need("minecraft:blast_protection", 4, Action::Equip, DEFENSE),
-        20
-    );
-    assert_eq!(need("minecraft:fortune", 3, Action::Break, MINING), 20);
-    assert_eq!(need("minecraft:mending", 1, Action::Equip, ARCANE), 16);
-    assert_eq!(need("minecraft:unbreaking", 3, Action::Break, ARCANE), 8);
-}
-
-#[test]
-fn strong_enchantments_also_need_arcane_at_the_same_level() {
-    // Given the shipped data
-    let defs = defaults();
-
-    // When each enchantment lock is read
-    // Then every one asks Arcane, and one that asks another skill asks Arcane at that skill's level
-    let enchantment_locks: Vec<_> = defs
+    // When enchantments are checked at each level
+    // Then level I is free and each level above it needs 3 more Arcane; Fortune and Looting climb twice as fast;
+    // Mending needs Arcane 12; and no enchantment asks any other skill
+    for (enchantment, action, top) in [
+        ("minecraft:sharpness", Action::Attack, 5),
+        ("minecraft:smite", Action::Attack, 5),
+        ("minecraft:bane_of_arthropods", Action::Attack, 5),
+        ("minecraft:power", Action::Use, 5),
+        ("minecraft:protection", Action::Equip, 4),
+        ("minecraft:blast_protection", Action::Equip, 4),
+        ("minecraft:unbreaking", Action::Break, 3),
+    ] {
+        for level in 1..=top {
+            assert_eq!(
+                arcane(enchantment, level, action),
+                3 * (level - 1),
+                "{enchantment} {level}"
+            );
+        }
+    }
+    for (enchantment, action) in [
+        ("minecraft:fortune", Action::Break),
+        ("minecraft:looting", Action::Attack),
+    ] {
+        let ladder: Vec<u32> = (1..=3)
+            .map(|level| arcane(enchantment, level, action))
+            .collect();
+        assert_eq!(ladder, vec![0, 6, 12], "{enchantment}");
+    }
+    assert_eq!(arcane("minecraft:mending", 1, Action::Equip), 12);
+    assert_eq!(arcane("minecraft:unbreaking", 3, Action::Equip), 6);
+    for entry in defs
         .locks
         .iter()
         .filter(|e| matches!(e.target, skills_core::defs::Target::Enchantment(_)))
-        .collect();
-    assert_eq!(enchantment_locks.len(), 10);
-    for entry in enchantment_locks {
-        let arcane = entry.requires.get(ARCANE).copied();
-        assert!(arcane.is_some(), "{:?} asks no Arcane", entry.label);
-        for (skill, level) in &entry.requires {
-            assert_eq!(Some(*level), arcane, "{:?}: {skill}", entry.label);
-        }
+    {
+        assert_eq!(
+            entry.requires.keys().collect::<Vec<_>>(),
+            vec![ARCANE],
+            "{:?}",
+            entry.label
+        );
     }
 }
 

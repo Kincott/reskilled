@@ -17,15 +17,64 @@
           ]
         }
       },
+      "enchantment_level": 2,
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:arcane": 3
+      },
+      "label": "reskilled.lock.ench.sharp_2"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "any_of": [
+            {
+              "id": "minecraft:sharpness"
+            },
+            {
+              "id": "minecraft:smite"
+            },
+            {
+              "id": "minecraft:bane_of_arthropods"
+            }
+          ]
+        }
+      },
       "enchantment_level": 3,
       "actions": [
         "attack"
       ],
       "requires": {
-        "reskilled:melee": 12,
-        "reskilled:arcane": 12
+        "reskilled:arcane": 6
       },
       "label": "reskilled.lock.ench.sharp_3"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "any_of": [
+            {
+              "id": "minecraft:sharpness"
+            },
+            {
+              "id": "minecraft:smite"
+            },
+            {
+              "id": "minecraft:bane_of_arthropods"
+            }
+          ]
+        }
+      },
+      "enchantment_level": 4,
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:arcane": 9
+      },
+      "label": "reskilled.lock.ench.sharp_4"
     },
     {
       "target": {
@@ -48,10 +97,24 @@
         "attack"
       ],
       "requires": {
-        "reskilled:melee": 20,
-        "reskilled:arcane": 20
+        "reskilled:arcane": 12
       },
       "label": "reskilled.lock.ench.sharp_5"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "id": "minecraft:power"
+        }
+      },
+      "enchantment_level": 2,
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:arcane": 3
+      },
+      "label": "reskilled.lock.ench.power_2"
     },
     {
       "target": {
@@ -64,10 +127,24 @@
         "use"
       ],
       "requires": {
-        "reskilled:ranged": 12,
-        "reskilled:arcane": 12
+        "reskilled:arcane": 6
       },
       "label": "reskilled.lock.ench.power_3"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "id": "minecraft:power"
+        }
+      },
+      "enchantment_level": 4,
+      "actions": [
+        "use"
+      ],
+      "requires": {
+        "reskilled:arcane": 9
+      },
+      "label": "reskilled.lock.ench.power_4"
     },
     {
       "target": {
@@ -80,10 +157,37 @@
         "use"
       ],
       "requires": {
-        "reskilled:ranged": 20,
-        "reskilled:arcane": 20
+        "reskilled:arcane": 12
       },
       "label": "reskilled.lock.ench.power_5"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "any_of": [
+            {
+              "id": "minecraft:protection"
+            },
+            {
+              "id": "minecraft:fire_protection"
+            },
+            {
+              "id": "minecraft:blast_protection"
+            },
+            {
+              "id": "minecraft:projectile_protection"
+            }
+          ]
+        }
+      },
+      "enchantment_level": 2,
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:arcane": 3
+      },
+      "label": "reskilled.lock.ench.protection_2"
     },
     {
       "target": {
@@ -109,8 +213,7 @@
         "equip"
       ],
       "requires": {
-        "reskilled:defense": 12,
-        "reskilled:arcane": 12
+        "reskilled:arcane": 6
       },
       "label": "reskilled.lock.ench.protection_3"
     },
@@ -138,42 +241,27 @@
         "equip"
       ],
       "requires": {
-        "reskilled:defense": 20,
-        "reskilled:arcane": 20
+        "reskilled:arcane": 9
       },
       "label": "reskilled.lock.ench.protection_4"
     },
     {
       "target": {
         "enchantment": {
-          "id": "minecraft:fortune"
+          "id": "minecraft:unbreaking"
         }
       },
-      "enchantment_level": 3,
+      "enchantment_level": 2,
       "actions": [
-        "break"
+        "use",
+        "attack",
+        "break",
+        "equip"
       ],
       "requires": {
-        "reskilled:mining": 20,
-        "reskilled:arcane": 20
+        "reskilled:arcane": 3
       },
-      "label": "reskilled.lock.ench.fortune_3"
-    },
-    {
-      "target": {
-        "enchantment": {
-          "id": "minecraft:looting"
-        }
-      },
-      "enchantment_level": 3,
-      "actions": [
-        "attack"
-      ],
-      "requires": {
-        "reskilled:melee": 20,
-        "reskilled:arcane": 20
-      },
-      "label": "reskilled.lock.ench.looting_3"
+      "label": "reskilled.lock.ench.unbreaking_2"
     },
     {
       "target": {
@@ -189,9 +277,69 @@
         "equip"
       ],
       "requires": {
-        "reskilled:arcane": 8
+        "reskilled:arcane": 6
       },
       "label": "reskilled.lock.ench.unbreaking_3"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "id": "minecraft:fortune"
+        }
+      },
+      "enchantment_level": 2,
+      "actions": [
+        "break"
+      ],
+      "requires": {
+        "reskilled:arcane": 6
+      },
+      "label": "reskilled.lock.ench.fortune_2"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "id": "minecraft:fortune"
+        }
+      },
+      "enchantment_level": 3,
+      "actions": [
+        "break"
+      ],
+      "requires": {
+        "reskilled:arcane": 12
+      },
+      "label": "reskilled.lock.ench.fortune_3"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "id": "minecraft:looting"
+        }
+      },
+      "enchantment_level": 2,
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:arcane": 6
+      },
+      "label": "reskilled.lock.ench.looting_2"
+    },
+    {
+      "target": {
+        "enchantment": {
+          "id": "minecraft:looting"
+        }
+      },
+      "enchantment_level": 3,
+      "actions": [
+        "attack"
+      ],
+      "requires": {
+        "reskilled:arcane": 12
+      },
+      "label": "reskilled.lock.ench.looting_3"
     },
     {
       "target": {
@@ -199,7 +347,6 @@
           "id": "minecraft:mending"
         }
       },
-      "enchantment_level": 1,
       "actions": [
         "use",
         "attack",
@@ -207,7 +354,7 @@
         "equip"
       ],
       "requires": {
-        "reskilled:arcane": 16
+        "reskilled:arcane": 12
       },
       "label": "reskilled.lock.ench.mending"
     }
