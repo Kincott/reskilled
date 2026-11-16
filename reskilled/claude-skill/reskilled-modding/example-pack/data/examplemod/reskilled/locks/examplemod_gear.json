@@ -1,0 +1,65 @@
+{
+  "format": 1,
+  "entries": [
+    {
+      "target": {
+        "item": {
+          "id": "examplemod:drill"
+        }
+      },
+      "actions": [
+        "break",
+        "attack"
+      ],
+      "requires": {
+        "examplemod:digging": 12,
+        "reskilled:mining": 8
+      },
+      "label": "examplemod.lock.drill"
+    },
+    {
+      "target": {
+        "item": {
+          "pattern": "examplemod:*_backpack"
+        }
+      },
+      "actions": [
+        "equip"
+      ],
+      "requires": {
+        "reskilled:agility": 6
+      },
+      "label": "examplemod.lock.backpacks"
+    },
+    {
+      "target": {
+        "entity": {
+          "id": "examplemod:mammoth"
+        }
+      },
+      "actions": [
+        "mount"
+      ],
+      "requires": {
+        "reskilled:agility": 16
+      },
+      "label": "examplemod.lock.mammoth"
+    },
+    {
+      "target": {
+        "item": {
+          "id": "minecraft:shield"
+        }
+      },
+      "actions": [
+        "equip",
+        "use"
+      ],
+      "requires": {
+        "reskilled:defense": 8
+      },
+      "replace": true,
+      "label": "reskilled.lock.shield"
+    }
+  ]
+}

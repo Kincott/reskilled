@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "reskilled:agility_light_step",
+  "priority": 1,
+  "skill": "reskilled:agility",
+  "name": "reskilled.perk.agility_light_step",
+  "description": "examplemod.perk.agility_light_step.desc",
+  "cost": 2,
+  "min_level": 4,
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:movement_speed",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

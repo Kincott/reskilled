@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "not_creatures": [
+    {
+      "id": "examplemod:scarecrow"
+    }
+  ],
+  "projectile_damage": [
+    {
+      "id": "examplemod:dart"
+    }
+  ],
+  "equip_slots": [
+    {
+      "items": {
+        "pattern": "examplemod:*_backpack"
+      },
+      "slot": "chest"
+    }
+  ]
+}

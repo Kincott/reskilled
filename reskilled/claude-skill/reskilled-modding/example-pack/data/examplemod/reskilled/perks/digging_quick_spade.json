@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "id": "examplemod:digging_quick_spade",
+  "skill": "examplemod:digging",
+  "name": "examplemod.perk.digging_quick_spade",
+  "description": "examplemod.perk.digging_quick_spade.desc",
+  "cost": 2,
+  "min_level": 4,
+  "effects": [
+    {
+      "type": "attribute",
+      "attribute": "minecraft:block_break_speed",
+      "amount": 0.1,
+      "operation": "add_multiplied_base"
+    }
+  ]
+}

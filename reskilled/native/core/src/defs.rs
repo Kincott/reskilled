@@ -213,7 +213,8 @@ pub enum Effect {
     RuneRepair { interval_seconds: u32, points: u32 },
     /// Blocks the player placed drop themselves when they break them.
     Salvage,
-    /// Waking from a full sleep heals the player and takes these effects off them.
+    /// In bed, these effects lift (so their damage cannot wake the player); a full night's sleep ends them and
+    /// heals the player, and leaving the bed early brings them back as they were.
     RestfulSleep { clears: Vec<String> },
     /// Within `radius` blocks of their respawn point the player has `effect`.
     NearHome {

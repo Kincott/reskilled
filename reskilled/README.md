@@ -32,10 +32,23 @@ Every skill, perk, focus area, lock and setting is a JSON file under `data/<name
 (`skills`, `perks`, `focus`, `locks`, `settings`). The files this mod ships have priority 0. To change one, ship a
 file with the same id and `"priority": 1` or more in your pack's data; lock files add up, and an entry with
 `"replace": true` drops earlier locks on the same target. `settings` files merge field by field, highest priority
-last. `/reload` applies changes, and gear a player may no longer wear comes off.
+last, except the lists `not_creatures`, `projectile_damage` and `equip_slots`, which add up. A file with the same id,
+a higher priority and `"remove": true` removes a skill, perk or focus area. Each skill's `earned_by` says what work
+grows it. `/reload` applies changes, and gear a player may no longer wear comes off. Every field is in the
+[data reference](claude-skill/reskilled-modding/reference.md).
 
 Other mods can add their own unlockables, including abilities with no item behind them: see
 [INTEGRATION.md](INTEGRATION.md).
+
+### Customizing with Claude
+
+Reskilled ships a Claude Code skill that knows its data format, the override and removal rules, and the usual
+mistakes. Copy the folder `claude-skill/reskilled-modding` into `~/.claude/skills/` (every project) or into your
+pack's `.claude/skills/` (that pack only), then ask Claude for the change ("lock my mod's drill behind Mining 12",
+"add a Fishing skill with three perks", "remove Keen Eye"). Other agents can read the same folder:
+[SKILL.md](claude-skill/reskilled-modding/SKILL.md) and its
+[field reference](claude-skill/reskilled-modding/reference.md). The skill's example pack is loaded by the mod's
+tests, so it always matches the format the game reads.
 
 ## Building
 

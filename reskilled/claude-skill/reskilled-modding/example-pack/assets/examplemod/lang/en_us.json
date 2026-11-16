@@ -1,0 +1,11 @@
+{
+  "examplemod.skill.digging": "Digging",
+  "examplemod.perk.digging_quick_spade": "Quick Spade",
+  "examplemod.perk.digging_quick_spade.desc": "+10% break speed.",
+  "examplemod.perk.digging_deep_roots": "Deep Roots",
+  "examplemod.perk.digging_deep_roots.desc": "20% chance of extra clay and gravel drops.",
+  "examplemod.perk.agility_light_step.desc": "+10% movement speed.",
+  "examplemod.lock.drill": "Drill",
+  "examplemod.lock.backpacks": "Backpacks",
+  "examplemod.lock.mammoth": "Riding a mammoth"
+}

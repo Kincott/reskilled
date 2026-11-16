@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "id": "examplemod:digging",
+  "name": "examplemod.skill.digging",
+  "icon": "minecraft:wooden_shovel",
+  "icon_levels": {
+    "16": "examplemod:drill"
+  },
+  "earned_by": [
+    {
+      "type": "break",
+      "with": {
+        "any_of": [
+          {
+            "tag": "#minecraft:shovels"
+          },
+          {
+            "id": "examplemod:drill"
+          }
+        ]
+      }
+    }
+  ]
+}
