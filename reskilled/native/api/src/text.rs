@@ -7,6 +7,7 @@ use skills_core::progress::{Refusal, Request};
 use skills_core::registry::Defs;
 
 /// A translation key and its English, which is also the template when the key is missing.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Message {
     pub key: &'static str,
     pub english: &'static str,
@@ -125,18 +126,21 @@ messages! {
     PERK_AT = "reskilled.ui.perk_at" => "%s perk \u{b7} level %s";
     AT_LEVEL = "reskilled.ui.at_level" => "Level %s";
     XP_CHIP = "reskilled.ui.xp_chip" => "%s XP";
-    OPTIONS_TITLE = "reskilled.ui.options_title" => "Reskilled Options";
     TAB_DISPLAY = "reskilled.ui.tab.display" => "Display";
     TAB_RULES = "reskilled.ui.tab.rules" => "Server rules";
     DONE = "reskilled.ui.done" => "Done";
-    NAMED_VALUE = "reskilled.ui.named_value" => "%s: %s";
-    ONLY_OPS = "reskilled.ui.only_ops" => "Operators only.";
-    RULE_COST = "reskilled.ui.rule.cost" => "Raise cost";
+    SECTION_WARNING = "reskilled.ui.section.warning" => "Lock warning";
+    SECTION_ICON = "reskilled.ui.section.icon" => "Lock icon";
+    SECTION_TOOLTIPS = "reskilled.ui.section.tooltips" => "Tooltips";
+    SECTION_STRIP = "reskilled.ui.section.strip" => "Skill strip";
+    SECTION_SOUNDS = "reskilled.ui.section.sounds" => "Sounds";
+    ONLY_OPS = "reskilled.ui.only_ops" => "Only operators can change these.";
+    RULE_COST = "reskilled.ui.rule.cost" => "Raises cost";
     RULE_POINTS = "reskilled.ui.rule.points" => "Points a level";
     RULE_PROGRESSION = "reskilled.ui.rule.progression" => "Skills grow by";
     RULE_EARN_RATE = "reskilled.ui.rule.earn_rate" => "Earning pace";
     RULE_SWITCHES = "reskilled.ui.rule.switches" => "Perk switches";
-    RULE_ENCHANT = "reskilled.ui.rule.enchant" => "Enchant locks";
+    RULE_ENCHANT = "reskilled.ui.rule.enchant" => "Enchantment locks";
     RULE_SHARING = "reskilled.ui.rule.sharing" => "Shared skills";
     VAL_LEVELS = "reskilled.ui.val.levels" => "XP levels";
     VAL_POINTS = "reskilled.ui.val.points" => "XP points";
@@ -152,19 +156,18 @@ messages! {
     HELP_SWITCHES = "reskilled.ui.help.switches" => "Players may switch owned perks off and on.";
     HELP_ENCHANT = "reskilled.ui.help.enchant" => "Enchanted gear needs the levels its enchantments ask for.";
     HELP_SHARING = "reskilled.ui.help.sharing" => "Who shares skill levels: nobody, a party, or everyone online.";
-    RESET = "reskilled.ui.reset" => "Reset to defaults";
-    CLICK_TO_CHANGE = "reskilled.ui.click_to_change" => "Click to change.";
-    OPT_PLACE = "reskilled.ui.opt.place" => "Warning";
-    OPT_TIME = "reskilled.ui.opt.time" => "Warning time";
-    OPT_SHOW = "reskilled.ui.opt.show" => "Padlock";
-    OPT_CORNER = "reskilled.ui.opt.corner" => "Lock corner";
-    OPT_DIM = "reskilled.ui.opt.dim" => "Dim locked";
-    OPT_HIDE_MET = "reskilled.ui.opt.hide_met" => "Hide met";
-    OPT_OWN = "reskilled.ui.opt.own" => "Your level";
-    OPT_STRIP = "reskilled.ui.opt.strip" => "Skill strip";
-    OPT_CLICKS = "reskilled.ui.opt.clicks" => "Click sounds";
-    OPT_CHIMES = "reskilled.ui.opt.chimes" => "Level-up sounds";
-    OPT_REFUSAL = "reskilled.ui.opt.refusal" => "Refusal sound";
+    RESET = "reskilled.ui.reset" => "Defaults";
+    OPT_PLACE = "reskilled.ui.opt.place" => "Position";
+    OPT_TIME = "reskilled.ui.opt.time" => "Stays for";
+    OPT_SHOW = "reskilled.ui.opt.show" => "Padlock on items";
+    OPT_CORNER = "reskilled.ui.opt.corner" => "Padlock corner";
+    OPT_DIM = "reskilled.ui.opt.dim" => "Dim locked items";
+    OPT_HIDE_MET = "reskilled.ui.opt.hide_met" => "Hide met needs";
+    OPT_OWN = "reskilled.ui.opt.own" => "Show your level";
+    OPT_STRIP = "reskilled.ui.opt.strip" => "Beside the inventory";
+    OPT_CLICKS = "reskilled.ui.opt.clicks" => "Clicks";
+    OPT_CHIMES = "reskilled.ui.opt.chimes" => "Level-up";
+    OPT_REFUSAL = "reskilled.ui.opt.refusal" => "Refusal";
     VAL_ON = "reskilled.ui.val.on" => "On";
     VAL_OFF = "reskilled.ui.val.off" => "Off";
     VAL_ABOVE = "reskilled.ui.val.above" => "Above hotbar";

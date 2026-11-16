@@ -193,8 +193,8 @@ pub struct ClientCache {
     pub outgoing: Vec<ToServer>,
     /// The lock warning on show, if one is.
     pub warning: Option<Warning>,
-    /// The options' tab on show.
-    pub options_tab: super::options::Tab,
+    /// The first line the options show when they make one scrolling column.
+    pub options_first: usize,
     /// The server's rules, and whether this player may change them.
     pub rules: Rules,
     pub rules_editable: bool,

@@ -283,15 +283,10 @@ fn hovering_shows_one_tooltip() {
         ),
     );
     with(|cache| cache.tab = Tab::Options);
-    let page = super::options::page(size, 11);
-    scene(&host, "options", USUAL, over(&page.buttons[3]));
-    with(|cache| cache.options_tab = super::options::Tab::Rules);
-    scene(
-        &host,
-        "options_rules",
-        USUAL,
-        over(&super::options::page(size, 9).buttons[5]),
-    );
+    let page = super::options::options_layout(&super::window::window(size, 8, 0).body, 0);
+    scene(&host, "options", USUAL, over(&page.display[3].1));
+    with(|cache| cache.rules_editable = true);
+    scene(&host, "options_rules", USUAL, over(&page.rules[4].1));
     scene(&host, "options_320", SMALLEST, AWAY);
 
     // Then each shows exactly one tooltip

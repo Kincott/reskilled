@@ -12,9 +12,10 @@ use crate::text::{
     HELP_SHOW, HELP_STRIP, HELP_SWITCHES, HELP_TIME, Message, OPT_CHIMES, OPT_CLICKS, OPT_CORNER,
     OPT_DIM, OPT_HIDE_MET, OPT_OWN, OPT_PLACE, OPT_REFUSAL, OPT_SHOW, OPT_STRIP, OPT_TIME,
     RULE_COST, RULE_EARN_RATE, RULE_ENCHANT, RULE_POINTS, RULE_PROGRESSION, RULE_SHARING,
-    RULE_SWITCHES, VAL_ABOVE, VAL_BOTH, VAL_BOTTOM_LEFT, VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN,
-    VAL_EVERYONE, VAL_LEVELS, VAL_OFF, VAL_ON, VAL_PARTY, VAL_POINTS, VAL_SECONDS, VAL_TOP,
-    VAL_TOP_LEFT, VAL_TOP_RIGHT, number, say,
+    RULE_SWITCHES, SECTION_ICON, SECTION_SOUNDS, SECTION_STRIP, SECTION_TOOLTIPS, SECTION_WARNING,
+    VAL_ABOVE, VAL_BOTH, VAL_BOTTOM_LEFT, VAL_BOTTOM_RIGHT, VAL_BUY, VAL_EARN, VAL_EVERYONE,
+    VAL_LEVELS, VAL_OFF, VAL_ON, VAL_PARTY, VAL_POINTS, VAL_SECONDS, VAL_TOP, VAL_TOP_LEFT,
+    VAL_TOP_RIGHT, number, say,
 };
 
 /// The warning's lengths a click goes through, in seconds.
@@ -50,6 +51,17 @@ pub const CHOICES: [Choice; 11] = [
     Choice::ProgressSounds,
     Choice::RefusalSound,
 ];
+
+/// The section of the options a setting sits in.
+pub fn section(choice: Choice) -> &'static Message {
+    match choice {
+        Choice::WarningPlace | Choice::WarningSeconds => &SECTION_WARNING,
+        Choice::LockIcon | Choice::LockCorner | Choice::DimLocked => &SECTION_ICON,
+        Choice::HideMet | Choice::OwnLevel => &SECTION_TOOLTIPS,
+        Choice::SkillStrip => &SECTION_STRIP,
+        Choice::ClickSounds | Choice::ProgressSounds | Choice::RefusalSound => &SECTION_SOUNDS,
+    }
+}
 
 fn on_off(on: bool) -> Text {
     say(if on { &VAL_ON } else { &VAL_OFF }, &[])

@@ -725,7 +725,7 @@ pub fn scroll(host: &dyn Host, amount: f64) -> Flow {
                     cache.road_scroll = super::road::scrolled(&r, cache.road_scroll, amount);
                 }
             }
-            Tab::Options => {}
+            Tab::Options => super::options::scroll(cache, size, amount),
         }
     });
     Flow::Cancel
