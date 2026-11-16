@@ -77,9 +77,24 @@ pub fn defer(player: u128, xp_levels: u32, request: Request, reply: Reply) {
     pending.push((player, xp_levels, request, reply));
 }
 
-/// The player's own tick: their waiting requests, in order, judged against their XP level now (Horizon's acting
-/// player, else the server's list, else the level they asked with), less what the requests granted before them
-/// took, so requests sent together cannot each spend the same levels.
+/// A player's XP level as read: live (Horizon's acting player, which already shows what this tick's requests took)
+/// or from a copy made earlier (the server's list, or the level they asked with), which does not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Seen {
+    Live(u32),
+    Copy(u32),
+}
+
+/// The levels a request may spend after earlier requests of the tick took `taken_so_far`.
+fn levels_left(seen: Seen, taken_so_far: u32) -> u32 {
+    match seen {
+        Seen::Live(levels) => levels,
+        Seen::Copy(levels) => levels.saturating_sub(taken_so_far),
+    }
+}
+
+/// The player's own tick: their waiting requests, in order, judged against the XP levels they have left, so
+/// requests sent together cannot each spend the same levels.
 pub fn run_pending_for(host: &mut dyn Host, player: u128) {
     let pending: Vec<(u128, u32, Request, Reply)> = {
         let mut all = lock(&PENDING);
@@ -91,8 +106,8 @@ pub fn run_pending_for(host: &mut dyn Host, player: u128) {
     };
     let mut taken_so_far = 0u32;
     for (player, asked_with, request, reply) in pending {
-        let now = live_xp_levels(host, player).unwrap_or(asked_with);
-        let xp_levels = now.saturating_sub(taken_so_far);
+        let seen = seen_xp_levels(host, player).unwrap_or(Seen::Copy(asked_with));
+        let xp_levels = levels_left(seen, taken_so_far);
         let outcome = act_taking(host, player, xp_levels, &request).map(|(state, taken)| {
             taken_so_far = taken_so_far.saturating_add(taken);
             state
@@ -138,12 +153,14 @@ pub(crate) fn reset() {
     lock(&PENDING).clear();
 }
 
-/// The player's XP level as their own hook sees it: Horizon's acting player when it is them, else the server's
-/// player list.
-fn live_xp_levels(host: &dyn Host, player: u128) -> Option<u32> {
+/// The player's XP level as their own hook sees it: live from Horizon's acting player when it is them, else a copy
+/// from the server's player list.
+fn seen_xp_levels(host: &dyn Host, player: u128) -> Option<Seen> {
     match host.acting_player() {
-        Some(acting) if acting.uuid == player => Some(u32::try_from(acting.xp_level).unwrap_or(0)),
-        _ => xp_levels(host, player),
+        Some(acting) if acting.uuid == player => {
+            Some(Seen::Live(u32::try_from(acting.xp_level).unwrap_or(0)))
+        }
+        _ => xp_levels(host, player).map(Seen::Copy),
     }
 }
 
@@ -461,6 +478,20 @@ mod tests {
             2
         );
         assert_eq!(host.action_bars_of(PLAYER), vec!["Needs 2 XP levels."]);
+    }
+
+    #[test]
+    fn a_live_level_already_shows_what_earlier_requests_took() {
+        // Given a player who had 10 levels and whose first request of the tick took 2
+        let taken_so_far = 2;
+
+        // When the next request reads their level live (Horizon's acting player: 8 now), or from a copy made
+        // before the first was paid (the server's list or the level asked with: still 10)
+        let live = levels_left(Seen::Live(8), taken_so_far);
+        let copy = levels_left(Seen::Copy(10), taken_so_far);
+
+        // Then both judge it against the 8 levels the player has
+        assert_eq!((live, copy), (8, 8));
     }
 
     #[test]
