@@ -2,12 +2,17 @@
 
 Skills, perks and gear locks for [Minecraft Horizon](https://github.com/horizon-rust/horizon) (26.3).
 
-Reskilled gives every player a character to grow. Eight skills (Melee, Ranged, Defense, Mining, Gathering,
-Agility, Arcane, Building) each have a level from 1 to 32, raised by spending XP or by doing the work. Better gear
-waits for them: a diamond pickaxe works from Mining 16, netherite armor from Defense 24, Sharpness V from Arcane 12.
-Levels also earn perk points for perks such as extra ore drops, more armor, or surviving a killing blow. So
-progress comes from playing, not only from the loot you find. Everything is data: servers change the rules in game,
-and packs and other mods can change, add or remove any skill, perk or lock.
+**Grow a character, not just a pile of loot.**
+
+- 🗡️ **Eight skills**: Melee, Ranged, Defense, Mining, Gathering, Agility, Arcane and Building, each from level 1
+  to 32.
+- ⬆️ **Level up your way**: spend XP, or, if the server allows it, just do the work (mining raises Mining,
+  fighting raises Melee).
+- 🔒 **Gear that waits for you**: a diamond pickaxe needs Mining 16, netherite armor Defense 24, Sharpness V
+  Arcane 12.
+- ⭐ **40 perks** to unlock with the points your levels earn, such as extra ore drops, more armor, or surviving a
+  killing blow.
+- 🛠️ **Fully tunable**: servers change the rules in game; packs and mods can add, change or remove anything.
 
 ![The skills window's Home tab](reskilled/screenshots/home.png)
 
