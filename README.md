@@ -4,6 +4,12 @@ Skills, perks and gear locks for [Minecraft Horizon](https://github.com/horizon-
 eight skills with XP, unlock perks along each skill's road, and need levels to use gear. Everything is data, so
 packs and other mods can change, add or remove any of it.
 
+![The skills window's Home tab](reskilled/screenshots/home.png)
+
+![A skill's road of gear and perks](reskilled/screenshots/road.png)
+
+See [reskilled/README.md](reskilled/README.md) for every skill, perk and lock.
+
 - **Players and server operators:** [reskilled/README.md](reskilled/README.md). The mod file is on the
   [releases page](../../releases).
 - **Pack and mod makers:** [reskilled/claude-skill/reskilled-modding](reskilled/claude-skill/reskilled-modding/SKILL.md)
