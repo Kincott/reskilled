@@ -449,3 +449,188 @@ def options():
 road()
 home()
 options()
+
+
+FOCUS_GROUPS = [("Fighting", "minecraft:iron_sword", False, ["Melee", "Ranged", "Defense"], "+50% kill XP"),
+                ("Working", "minecraft:iron_pickaxe", True, ["Mining", "Gathering", "Arcane"], "+50% ore XP"),
+                ("Roaming", "minecraft:feather", False, ["Agility", "Building"], "travel XP")]
+
+
+def skill_row(c, rx, y, rw, h, skill):
+    name, icon, lvl, pts = skill
+    hover = name == "Mining"
+    mastered = lvl == 32
+    c.fill(rx, y, rw, h, BLACK)
+    c.fill(rx + 1, y + 1, rw - 2, h - 2, 0xFF332B1D if mastered else (CARD_HI if hover else CARD))
+    c.fill(rx + 1, y + 1, 2, h - 2, ACCENT[name])
+    if hover:
+        c.edge(rx, y, rw, h, BRASS_LIGHT)
+    ty = y + (h - 8) // 2 + 1
+    c.item(icon, rx + 6, y + (h - 16) // 2)
+    c.text(name, rx + 26, ty, WHITE)
+    c.right(str(lvl), rx + 108, ty, GOLD if mastered else WHITE)
+    c.right("Lv ", rx + 108 - FONT.width(str(lvl)), ty, DIM, False)
+    mx0, mx1 = rx + 116, rx + rw - 62
+    my = y + h // 2 - 1
+
+    def mat(lv):
+        return round(mx0 + (lv - 1) * (mx1 - mx0) / 31)
+
+    c.fill(mx0 - 1, my - 1, mx1 - mx0 + 2, 4, BLACK)
+    c.fill(mx0, my, mx1 - mx0, 2, 0xFF3A4152)
+    c.fill(mx0, my, mat(lvl) - mx0, 2, 0xFFF2C14E)
+    for lv in PERK_LEVELS:
+        state = perk_state(name, lvl, lv)
+        colour = {"owned": 0xFFF2C14E, "open": 0xFF67C14A, "locked": 0xFF2A2F3B}[state]
+        px = mat(lv)
+        c.fill(px - 3, my - 3, 7, 8, BLACK)
+        c.fill(px - 2, my - 2, 5, 6, colour)
+    if mastered:
+        c.right("★ Mastered", rx + rw - 6, ty, GOLD)
+    else:
+        if pts:
+            c.right(f"◆{pts}", rx + rw - 44, ty, GOLD)
+        c.button(rx + rw - 40, y + (h - 13) // 2, 35, 13, str(lvl), GO, arrow=True)
+
+
+def you_panel(c, x0, y0, cw, y1, tail):
+    c.fill(x0, y0, cw, y1 - y0, BLACK)
+    c.fill(x0 + 1, y0 + 1, cw - 2, y1 - y0 - 2, CARD)
+    mx = x0 + cw // 2
+    c.sprite("advancements/goal_frame_obtained", mx - 16, y0 + 6, 32, 32)
+    c.art(FACE, FACE_PAL, mx - 8, y0 + 14, 2)
+    c.centred("xKincott", x0, y0 + 42, cw, WHITE)
+    c.centred("Total level 65", x0, y0 + 52, cw, GOLD)
+    c.fill(x0 + 8, y0 + 64, cw - 16, 1, BRASS_DARK)
+    c.text("GEAR", x0 + 8, y0 + 69, DIM, False)
+    gx, gy = mx - 29, y0 + 80
+    gear = ["minecraft:iron_helmet", "minecraft:iron_chestplate", "minecraft:diamond_pickaxe",
+            "minecraft:iron_leggings", "minecraft:iron_boots", None]
+    for i, item in enumerate(gear):
+        c.slot(gx + (i % 3) * 20, gy + (i // 3) * 20, item, locked=item == "minecraft:diamond_pickaxe")
+    c.centred("✘ Pickaxe: Mining 16", x0, gy + 45, cw, RED, False)
+    tail(gy + 58)
+
+
+def home_medallions():
+    c = Canvas()
+    chrome(c, "Home")
+    x0, x1, y0, y1 = WX + 8, WX + WW - 8, WY + 9, WY + WH - 8
+    cw = 104
+
+    def focus(y):
+        c.fill(x0 + 8, y, cw - 16, 1, BRASS_DARK)
+        c.text("FOCUS", x0 + 8, y + 4, DIM, False)
+        for i, (name, icon, on, _, _) in enumerate(FOCUS_GROUPS):
+            fx = x0 + 10 + i * 30
+            fy = y + 15
+            c.sprite("advancements/goal_frame_obtained" if on else "advancements/goal_frame_unobtained",
+                     fx, fy, 26, 26)
+            c.item(icon, fx + 5, fy + 5, 16, dim=not on)
+            if on:
+                c.fill(fx + 17, fy + 17, 8, 8, BLACK)
+                c.text("✔", fx + 18, fy + 17, GOLD, False)
+        c.centred("Working", x0, y + 45, cw, GOLD, False)
+
+    you_panel(c, x0, y0, cw, y1, focus)
+    rx = x0 + cw + 6
+    rw = x1 - rx
+    rh = (y1 - y0 - 7 * 2) / 8
+    for i, skill in enumerate(SKILLS):
+        skill_row(c, rx, round(y0 + i * (rh + 2)), rw, round(rh), skill)
+    c.save("focus_a_medallions")
+
+
+def home_groups():
+    c = Canvas()
+    chrome(c, "Home")
+    x0, x1, y0, y1 = WX + 8, WX + WW - 8, WY + 9, WY + WH - 8
+    cw = 104
+    you_panel(c, x0, y0, cw, y1, lambda y: None)
+    rx = x0 + cw + 6
+    rw = x1 - rx
+    head_h, row_h, gap = 12, 16, 1
+    y = y0
+    by_name = {s[0]: s for s in SKILLS}
+    for name, icon, on, skills, bonus in FOCUS_GROUPS:
+        c.text(name.upper(), rx + 2, y + 2, GOLD if on else GRAY)
+        tx = rx + 4 + FONT.width(name.upper())
+        c.text(bonus, tx + 4, y + 2, DIM, False)
+        lx = tx + 8 + FONT.width(bonus)
+        c.fill(lx, y + 6, rw - (lx - rx) - 62, 1, BRASS if on else 0xFF3A4152)
+        if on:
+            c.right("✔ Focused", rx + rw - 4, y + 2, GOLD, False)
+        else:
+            c.button(rx + rw - 56, y, 56, head_h - 1, "Focus", PLAIN)
+        y += head_h + 1
+        for s in skills:
+            skill_row(c, rx, y, rw, row_h, by_name[s])
+            y += row_h + gap
+        y += 3
+    c.save("focus_b_groups")
+
+
+home_medallions()
+home_groups()
+
+
+def you_doll(c, x0, y0, cw, y1):
+    c.fill(x0, y0, cw, y1 - y0, BLACK)
+    c.fill(x0 + 1, y0 + 1, cw - 2, y1 - y0 - 2, CARD)
+    mx = x0 + cw // 2
+    c.art(FACE, FACE_PAL, x0 + 7, y0 + 5, 1)
+    c.edge(x0 + 6, y0 + 4, 10, 10, BRASS)
+    c.text("xKincott", x0 + 20, y0 + 6, WHITE)
+    c.right("65", x0 + cw - 8, y0 + 6, GOLD)
+    c.right("Lv ", x0 + cw - 8 - FONT.width("65"), y0 + 6, DIM, False)
+    c.fill(x0 + 8, y0 + 18, cw - 16, 1, BRASS_DARK)
+    # the doll: the gear shaped like a body in a stone alcove
+    ax, ay, aw, ah = x0 + 8, y0 + 23, cw - 16, 90
+    c.fill(ax, ay, aw, ah, INSET)
+    c.tile("gui/advancements/backgrounds/stone", ax + 1, ay + 1, aw - 2, ah - 2, 0.72)
+    for i, item in enumerate(["minecraft:iron_helmet", "minecraft:iron_chestplate", "minecraft:iron_leggings",
+                              "minecraft:iron_boots"]):
+        c.slot(mx - 9, ay + 6 + i * 20, item)
+    c.slot(mx - 31, ay + 26, "minecraft:diamond_pickaxe", locked=True)
+    c.slot(mx + 13, ay + 26, None)
+    c.centred("\u2718 Pickaxe: Mining 16", x0, ay + ah + 4, cw, RED, False)
+    # stats
+    sy = ay + ah + 18
+    c.fill(x0 + 8, sy - 4, cw - 16, 1, BRASS_DARK)
+    stats = [("Perks", "7 / 40", WHITE), ("Mastered", "1 / 8", GOLD), ("Points", "12", GOLD)]
+    for i, (label, value, colour) in enumerate(stats):
+        y = sy + i * 11
+        c.text(label, x0 + 8, y, DIM, False)
+        c.right(value, x0 + cw - 8, y, colour)
+
+
+def home_groups_doll():
+    c = Canvas()
+    chrome(c, "Home")
+    x0, x1, y0, y1 = WX + 8, WX + WW - 8, WY + 9, WY + WH - 8
+    cw = 104
+    you_doll(c, x0, y0, cw, y1)
+    rx = x0 + cw + 6
+    rw = x1 - rx
+    head_h, row_h, gap = 12, 16, 1
+    y = y0
+    by_name = {s[0]: s for s in SKILLS}
+    for name, icon, on, skills, bonus in FOCUS_GROUPS:
+        c.text(name.upper(), rx + 2, y + 2, GOLD if on else GRAY)
+        tx = rx + 4 + FONT.width(name.upper())
+        c.text(bonus, tx + 4, y + 2, DIM, False)
+        lx = tx + 8 + FONT.width(bonus)
+        c.fill(lx, y + 6, rw - (lx - rx) - 62, 1, BRASS if on else 0xFF3A4152)
+        if on:
+            c.right("✔ Focused", rx + rw - 4, y + 2, GOLD, False)
+        else:
+            c.button(rx + rw - 56, y, 56, head_h - 1, "Focus", PLAIN)
+        y += head_h + 1
+        for s in skills:
+            skill_row(c, rx, y, rw, row_h, by_name[s])
+            y += row_h + gap
+        y += 3
+    c.save("home_doll")
+
+
+home_groups_doll()
