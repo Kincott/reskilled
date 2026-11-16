@@ -9,7 +9,7 @@ use super::cache::{WarningPlace, with};
 use super::layout::Rect;
 use super::paint::{self, PADLOCK_SIZE, RED, WHITE};
 use super::tooltip::action_name;
-use crate::text::{LEVEL, REQUIRES, number, say, skill_name};
+use crate::text::{LEVEL, REQUIRES, enchantment_name, number, say, skill_name};
 
 const HEIGHT: f32 = 28.0;
 /// Where the text starts, after the skill's icon.
@@ -58,11 +58,11 @@ pub fn draw(host: &dyn Host, batch: &mut HudBatch, hidden: bool) {
             WarningPlace::AboveHotbar => playing,
         };
         let d = &defs.defs;
-        let needs = [
-            say(action_name(warning.action), &[]),
-            skill_name(d, &warning.skill),
-            number(warning.level),
-        ];
+        let what = match &warning.because {
+            Some((enchantment, at)) => enchantment_name(enchantment, *at),
+            None => say(action_name(warning.action), &[]),
+        };
+        let needs = [what, skill_name(d, &warning.skill), number(warning.level)];
         let line = say(&REQUIRES, &needs).plain();
         let have = level(&cache.state, d, &warning.skill);
         let count = say(&LEVEL, &[number(have), number(warning.level)]).plain();
@@ -145,6 +145,7 @@ mod tests {
                 skill: DEFENSE.into(),
                 level: 16,
                 action: Action::Equip,
+                because: None,
                 ticks_left: WARNING_TICKS,
             });
         });
@@ -196,6 +197,25 @@ mod tests {
             let fits = px >= x && py >= y && px + pw <= x + w && py + ph <= y + h;
             assert!(fits, "{paint:?} leaves the panel");
         }
+    }
+
+    #[test]
+    fn a_warning_from_an_enchantment_names_it() {
+        // Given a warning up for wearing something whose Protection IV needs Defense 16
+        let _serial = exclusive();
+        let host = TestHost::default();
+        warned();
+        with(|cache| {
+            if let Some(warning) = cache.warning.as_mut() {
+                warning.because = Some(("minecraft:protection".into(), 4));
+            }
+        });
+
+        // When the GUI is drawn
+        painted(&host, false);
+
+        // Then it names the enchantment where it would name the action
+        assert_eq!(host.drawn_text(), vec!["Protection IV: Defense 16", "3/16"]);
     }
 
     #[test]

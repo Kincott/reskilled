@@ -51,6 +51,10 @@ pub enum ToClient {
         skill: String,
         level: u32,
         action: Action,
+        /// The enchantment on the item (id, and the level the item has it at) that brings the need, when the item
+        /// alone would not ask it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        because: Option<(String, u32)>,
     },
     /// The player this client plays as, so it can read its own synced state.
     You { player: u128 },
@@ -334,6 +338,13 @@ mod tests {
                 skill: MINING.into(),
                 level: 16,
                 action: Action::Break,
+                because: None,
+            },
+            ToClient::Refused {
+                skill: "reskilled:melee".into(),
+                level: 12,
+                action: Action::Attack,
+                because: Some(("minecraft:sharpness".into(), 3)),
             },
             ToClient::You {
                 player: u128::MAX - 7,
@@ -361,6 +372,20 @@ mod tests {
         // Then they come back equal
         assert_eq!(back_to_server, to_server);
         assert_eq!(back_to_client, to_client);
+    }
+
+    #[test]
+    fn a_refusal_without_a_cause_reads_as_before() {
+        // Given a refusal as servers sent it before causes were named
+        let old = br#"{"refused": {"skill": "reskilled:mining", "level": 16, "action": "break"}}"#;
+
+        // When it is read, and a refusal with no cause is written
+        let read: ToClient = serde_json::from_slice(old).unwrap();
+        let written = serde_json::to_string(&read).unwrap();
+
+        // Then it has no cause, and none is written
+        assert!(matches!(read, ToClient::Refused { because: None, .. }));
+        assert!(!written.contains("because"), "{written}");
     }
 
     #[test]

@@ -23,6 +23,8 @@ macro_rules! messages {
 
 messages! {
     NEEDS = "reskilled.msg.needs" => "Needs %s %s";
+    CAUSE_NEEDS = "reskilled.msg.cause_needs" => "%s needs %s %s";
+    FOR_ENCHANTMENT = "reskilled.ui.for_enchantment" => "for %s";
     UNKNOWN_SKILL = "reskilled.msg.unknown_skill" => "Unknown skill.";
     UNKNOWN_PERK = "reskilled.msg.unknown_perk" => "Unknown perk.";
     UNKNOWN_FOCUS = "reskilled.msg.unknown_focus" => "Unknown focus.";
@@ -259,6 +261,29 @@ pub fn fallback_name(id: &str) -> String {
 /// A data name (translation key) with the id's English as its fallback.
 pub fn name(key: &str, id: &str) -> Text {
     Text::translate_with_fallback(key, &english(key, &fallback_name(id)), &[])
+}
+
+/// An enchantment and its level as the game names them ("Sharpness III"), through vanilla's own translation keys,
+/// so a client without the mod's language file reads them too.
+pub fn enchantment_name(id: &str, level: u32) -> Text {
+    let (namespace, path) = id.split_once(':').unwrap_or(("minecraft", id));
+    let name = Text::translate_with_fallback(
+        &format!("enchantment.{namespace}.{path}"),
+        &fallback_name(id),
+        &[],
+    );
+    let numeral =
+        Text::translate_with_fallback(&format!("enchantment.level.{level}"), &roman(level), &[]);
+    name.append(Text::literal(" ")).append(numeral)
+}
+
+/// The level as vanilla writes enchantment levels: I to X, then digits.
+fn roman(level: u32) -> String {
+    const NUMERALS: [&str; 10] = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+    level
+        .checked_sub(1)
+        .and_then(|at| NUMERALS.get(at as usize))
+        .map_or_else(|| level.to_string(), |numeral| (*numeral).to_string())
 }
 
 pub fn skill_name(defs: &Defs, skill: &str) -> Text {

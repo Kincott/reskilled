@@ -12,7 +12,9 @@ use horizon_client::mod_api::{
     NativeServerPlayer, Tag,
 };
 use skills_core::defs::{Action, Settings};
-use skills_core::locks::{Facts, TargetKind, Unmet, check, enchantment_requirements};
+use skills_core::locks::{
+    Facts, TargetKind, Unmet, check, enchantment_cause, enchantment_requirements,
+};
 use skills_core::progress::level;
 use skills_core::registry::Defs;
 use skills_core::wire::ToClient;
@@ -23,7 +25,7 @@ use super::lock;
 use super::queue::{self, Job};
 use super::state::{runs_mod, state_of};
 use crate::MSG_CHANNEL;
-use crate::text::{NEEDS, number, say, skill_name};
+use crate::text::{CAUSE_NEEDS, NEEDS, enchantment_name, number, say, skill_name};
 
 /// `NativeServerPlayer::game_mode` values that may ignore locks.
 const CREATIVE: i32 = 1;
@@ -121,21 +123,30 @@ fn guard_enchanted(
         return Flow::Continue;
     }
     match first_unmet(host, actor.player, checks, enchanted) {
-        Some((defs, unmet, action)) => {
-            refuse(host, actor.player, &defs, &unmet, action);
+        Some(refusal) => {
+            refuse(host, actor.player, &refusal);
             Flow::Cancel
         }
         None => Flow::Continue,
     }
 }
 
-/// The first requirement the player does not meet, with the definitions it was judged by and the action it is for.
+/// A requirement the player does not meet: the definitions it was judged by, what is unmet, the action it is for,
+/// and the enchantment on the item that brings it, when the item alone would not ask it.
+struct Refusal {
+    defs: std::sync::Arc<Defs>,
+    unmet: Unmet,
+    action: Action,
+    because: Option<(String, u32)>,
+}
+
+/// The first requirement the player does not meet.
 fn first_unmet(
     host: &mut dyn Host,
     player: u128,
     checks: &[(TargetKind, &str, Action)],
     enchanted: &[(String, u32)],
-) -> Option<(std::sync::Arc<Defs>, Unmet, Action)> {
+) -> Option<Refusal> {
     let data = current()?;
     let state = match state_of(host, player) {
         Ok(state) => state,
@@ -150,13 +161,35 @@ fn first_unmet(
     let enchantment_reqs = (!enchanted.is_empty() && super::rules::current(host).enchantment_locks)
         .then(|| enchantment_requirements(&data.defs.locks, enchanted));
     checks.iter().find_map(|(kind, id, action)| {
-        let mut reqs = requirements(host, *kind, id);
-        if let (TargetKind::Item, Some(more)) = (kind, &enchantment_reqs) {
-            reqs = reqs.merged(more);
-        }
-        check(&reqs, *action, &levels)
-            .err()
-            .map(|unmet| (data.defs.clone(), unmet, *action))
+        let own = requirements(host, *kind, id);
+        let reqs = match (kind, &enchantment_reqs) {
+            (TargetKind::Item, Some(more)) => own.clone().merged(more),
+            _ => own.clone(),
+        };
+        let unmet = check(&reqs, *action, &levels).err()?;
+        let own_need = own
+            .by_action
+            .get(action)
+            .and_then(|skills| skills.get(&unmet.skill))
+            .copied()
+            .unwrap_or(0);
+        let because = (enchantment_reqs.is_some() && own_need < unmet.level)
+            .then(|| {
+                enchantment_cause(
+                    &data.defs.locks,
+                    enchanted,
+                    *action,
+                    &unmet.skill,
+                    unmet.level,
+                )
+            })
+            .flatten();
+        Some(Refusal {
+            defs: data.defs.clone(),
+            unmet,
+            action: *action,
+            because,
+        })
     })
 }
 
@@ -169,7 +202,8 @@ static LAST_REFUSAL: Mutex<BTreeMap<u128, u64>> = Mutex::new(BTreeMap::new());
 
 /// Tells the player what they need, at most once per `lock_message_cooldown_ticks`: the action-bar line, and a
 /// message their client answers with a sound.
-fn refuse(host: &mut dyn Host, player: u128, defs: &Defs, unmet: &Unmet, action: Action) {
+fn refuse(host: &mut dyn Host, player: u128, refusal: &Refusal) {
+    let (defs, unmet) = (&refusal.defs, &refusal.unmet);
     let now = queue::now();
     let cooldown = u64::from(defs.settings.lock_message_cooldown_ticks);
     {
@@ -180,17 +214,23 @@ fn refuse(host: &mut dyn Host, player: u128, defs: &Defs, unmet: &Unmet, action:
         last.insert(player, now);
     }
     if !runs_mod(player) {
-        let needed = [
-            skill_name(defs, &unmet.skill).with_color(NEEDED_COLOUR),
-            number(unmet.level).with_color(NEEDED_COLOUR),
-        ];
-        host.action_bar(player, say(&NEEDS, &needed).with_color(REFUSED_COLOUR));
+        let skill = skill_name(defs, &unmet.skill).with_color(NEEDED_COLOUR);
+        let level = number(unmet.level).with_color(NEEDED_COLOUR);
+        let line = match &refusal.because {
+            Some((enchantment, at)) => {
+                let cause = enchantment_name(enchantment, *at).with_color(NEEDED_COLOUR);
+                say(&CAUSE_NEEDS, &[cause, skill, level])
+            }
+            None => say(&NEEDS, &[skill, level]),
+        };
+        host.action_bar(player, line.with_color(REFUSED_COLOUR));
         return;
     }
     let refused = ToClient::Refused {
         skill: unmet.skill.clone(),
         level: unmet.level,
-        action,
+        action: refusal.action,
+        because: refusal.because.clone(),
     };
     queue::send(
         player,
@@ -549,7 +589,7 @@ fn unequip(host: &mut dyn Host, player: u128, entity: u32, slot: EquipmentSlot, 
     let Some(worn) = host.player_equipment(player, slot) else {
         return;
     };
-    let Some((defs, unmet, action)) = first_unmet(
+    let Some(refusal) = first_unmet(
         host,
         player,
         &[(TargetKind::Item, &worn.item, Action::Equip)],
@@ -557,7 +597,7 @@ fn unequip(host: &mut dyn Host, player: u128, entity: u32, slot: EquipmentSlot, 
     ) else {
         return;
     };
-    refuse(host, player, &defs, &unmet, action);
+    refuse(host, player, &refusal);
     let from = (NativeInventoryKind::Player, index);
     let returned = match to {
         Return::Cursor => relocate(host, player, from, (NativeInventoryKind::Cursor, 0), &worn),
@@ -759,9 +799,12 @@ mod tests {
         // When they swing each
         let three = on_attack(&mut host, &actor, Some("minecraft:wooden_sword"));
 
-        // Then II swings and III is refused for Sharpness's Melee 12
+        // Then II swings, and III is refused with a line naming Sharpness III as what needs Melee 12
         assert_eq!((two, three), (Flow::Continue, Flow::Cancel));
-        assert_eq!(host.action_bars_of(PLAYER), vec!["Needs Melee 12"]);
+        assert_eq!(
+            host.action_bars_of(PLAYER),
+            vec!["Sharpness III needs Melee 12"]
+        );
     }
 
     #[test]
@@ -801,7 +844,10 @@ mod tests {
         // Then it goes into their inventory, and they read why
         assert_eq!(host.worn(EquipmentSlot::Chest), None);
         assert_eq!(host.carried(), vec![(0, chest)]);
-        assert_eq!(host.action_bars_of(PLAYER), vec!["Needs Defense 12"]);
+        assert_eq!(
+            host.action_bars_of(PLAYER),
+            vec!["Protection III needs Defense 12"]
+        );
     }
 
     fn stack(item: &str) -> ItemStack {
@@ -1215,10 +1261,42 @@ mod tests {
             skill: "reskilled:melee".into(),
             level: 8,
             action: Action::Attack,
+            because: None,
         };
         assert_eq!(flow, Flow::Cancel);
         assert_eq!(told, vec![refused]);
         assert!(host.action_bars.is_empty());
+    }
+
+    #[test]
+    fn a_client_with_the_mod_is_told_which_enchantment_locks_the_item() {
+        // Given a level-1 player whose client runs the mod, a Sharpness III wooden sword in hand
+        let _serial = exclusive();
+        let (mut host, actor) = setup(false);
+        crate::server::actions::handle(&mut host, PLAYER, skills_core::wire::ToServer::Hello);
+        host.slots = vec![Some(enchanted(
+            "minecraft:wooden_sword",
+            "minecraft:sharpness",
+            3,
+        ))];
+
+        // When they swing it and the tick runs
+        on_attack(&mut host, &actor, Some("minecraft:wooden_sword"));
+        run(&mut host, vec![]);
+
+        // Then the refusal names Sharpness III as the cause
+        let told: Vec<ToClient> = host
+            .sent_to(PLAYER, MSG_CHANNEL)
+            .iter()
+            .map(|m| serde_json::from_slice(m).unwrap())
+            .collect();
+        let refused = ToClient::Refused {
+            skill: "reskilled:melee".into(),
+            level: 12,
+            action: Action::Attack,
+            because: Some(("minecraft:sharpness".into(), 3)),
+        };
+        assert_eq!(told, vec![refused]);
     }
 
     #[test]

@@ -338,6 +338,7 @@ fn the_warning_the_badge_and_the_item_tooltip_draw() {
             skill: skill("defense"),
             level: 16,
             action: Action::Equip,
+            because: None,
             ticks_left: WARNING_TICKS,
         });
         let known = [

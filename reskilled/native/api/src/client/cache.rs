@@ -145,6 +145,8 @@ pub struct Warning {
     pub skill: String,
     pub level: u32,
     pub action: Action,
+    /// The enchantment (id and level) that brings the need, when the item alone would not ask it.
+    pub because: Option<(String, u32)>,
     pub ticks_left: u32,
 }
 
@@ -320,6 +322,7 @@ pub fn on_message(host: &mut dyn Host, channel: &str, data: &[u8]) {
             skill,
             level,
             action,
+            because,
         }) => {
             let settings = with(|cache| cache.settings.clone());
             if settings.refusal_sound
@@ -332,6 +335,7 @@ pub fn on_message(host: &mut dyn Host, channel: &str, data: &[u8]) {
                     skill,
                     level,
                     action,
+                    because,
                     ticks_left: settings
                         .warning_seconds
                         .saturating_mul(TICKS_PER_SECOND)
@@ -619,6 +623,7 @@ mod tests {
                 skill: "reskilled:mining".into(),
                 level: 16,
                 action: Action::Break,
+                because: None,
             },
         );
 
@@ -632,6 +637,7 @@ mod tests {
             skill: "reskilled:mining".into(),
             level: 16,
             action: Action::Break,
+            because: None,
             ticks_left: 60,
         };
         assert_eq!(with(|cache| cache.warning.clone()), Some(warning));
@@ -655,6 +661,7 @@ mod tests {
             skill: "reskilled:mining".into(),
             level: 16,
             action: Action::Break,
+            because: None,
         };
         send_msg(&mut host, &refused);
 
@@ -756,6 +763,7 @@ mod tests {
             skill: "reskilled:mining".into(),
             level: 16,
             action: Action::Break,
+            because: None,
         };
         send_msg(&mut host, &refused);
 

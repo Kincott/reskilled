@@ -4,12 +4,14 @@
 
 use horizon_client::mod_api::{ItemStack, Text};
 use skills_core::defs::Action;
+use skills_core::locks::enchantment_cause;
 use skills_core::progress::level;
 
 use super::cache::with;
 use crate::text::{
     ACTION_ATTACK, ACTION_BREAK, ACTION_EQUIP, ACTION_INTERACT, ACTION_MOUNT, ACTION_OPEN,
-    ACTION_PLACE, ACTION_USE, Message, REQUIREMENTS, REQUIRES, YOU_HAVE, number, say, skill_name,
+    ACTION_PLACE, ACTION_USE, FOR_ENCHANTMENT, Message, REQUIREMENTS, REQUIRES, YOU_HAVE,
+    enchantment_name, number, say, skill_name,
 };
 
 /// A tooltip line's colour that keeps the text's own colours.
@@ -36,6 +38,12 @@ pub fn requirement_lines(stack: &ItemStack) -> Vec<(Text, u32)> {
             return Vec::new();
         };
         let reqs = &reqs;
+        let own = cache.reqs.get(&*stack.item).cloned().unwrap_or_default();
+        let enchanted: Vec<(String, u32)> = stack
+            .enchantments()
+            .iter()
+            .map(|(id, at)| (id.to_string(), *at))
+            .collect();
         let mut lines = Vec::new();
         for (action, skills) in &reqs.by_action {
             for (skill, needed) in skills {
@@ -52,6 +60,23 @@ pub fn requirement_lines(stack: &ItemStack) -> Vec<(Text, u32)> {
                 ];
                 let mut line = Text::colored(format!("{mark} "), colour)
                     .append(say(&REQUIRES, &parts).with_color(HEADING));
+                let own_need = own
+                    .by_action
+                    .get(action)
+                    .and_then(|skills| skills.get(skill))
+                    .copied()
+                    .unwrap_or(0);
+                let cause = (own_need < *needed)
+                    .then(|| {
+                        enchantment_cause(&defs.defs.locks, &enchanted, *action, skill, *needed)
+                    })
+                    .flatten();
+                if let Some((enchantment, at)) = cause {
+                    let name = enchantment_name(&enchantment, at).with_color(HEADING);
+                    line = line
+                        .append(Text::literal(" "))
+                        .append(say(&FOR_ENCHANTMENT, &[name]).with_color(HEADING));
+                }
                 if !met && cache.settings.show_own_level {
                     let own = say(&YOU_HAVE, &[number(have)]).with_color(ASIDE);
                     line = line.append(Text::literal(" ")).append(own);
@@ -321,11 +346,11 @@ mod tests {
         let mut off: Vec<(Text, u32)> = vec![(Text::literal("Wooden Sword"), WHITE)];
         dispatch_tooltip(&host, &mods(), &sword, &mut off);
 
-        // Then it lists the attack requirement Sharpness brings, and nothing once the rule is off
+        // Then it lists the attack requirement Sharpness brings, naming Sharpness, and nothing once the rule is off
         let text: Vec<String> = lines.iter().map(|(t, _)| t.plain()).collect();
         assert_eq!(
             text.last().map(String::as_str),
-            Some("\u{2718} Attack: Melee 12 (you: 10)")
+            Some("\u{2718} Attack: Melee 12 for Sharpness III (you: 10)")
         );
         assert_eq!(off.len(), 1);
     }

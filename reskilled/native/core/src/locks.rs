@@ -120,6 +120,34 @@ pub fn enchantment_requirements(
     reqs
 }
 
+/// The enchantment of `enchantments` (id and the level the item has it at) whose lock asks `level` of `skill` for
+/// `action`: the reason an enchanted item needs that much. None when no enchantment lock on the item asks it.
+pub fn enchantment_cause(
+    entries: &[LockEntry],
+    enchantments: &[(String, u32)],
+    action: Action,
+    skill: &str,
+    level: u32,
+) -> Option<(String, u32)> {
+    entries
+        .iter()
+        .filter(|entry| {
+            entry.actions.contains(&action) && entry.requires.get(skill) == Some(&level)
+        })
+        .find_map(|entry| {
+            let Target::Enchantment(matcher) = &entry.target else {
+                return None;
+            };
+            let from = entry.enchantment_level.unwrap_or(1);
+            enchantments
+                .iter()
+                .find(|(id, at)| {
+                    *at >= from && matches(matcher, TargetKind::Enchantment, id, &NoFacts)
+                })
+                .cloned()
+        })
+}
+
 /// For matchers that ask no tags (enchantments): every question answers no.
 struct NoFacts;
 
@@ -641,6 +669,45 @@ mod tests {
         ]
         .into();
         assert_eq!(labels, expected);
+    }
+
+    #[test]
+    fn the_enchantment_behind_a_requirement_is_named() {
+        // Given Sharpness locked for attacking at Melee 12 from level III and Melee 20 from level V
+        let json = r#"{"format": 1, "entries": [
+            {"target": {"enchantment": {"id": "minecraft:sharpness"}}, "enchantment_level": 3, "actions": ["attack"],
+             "requires": {"reskilled:melee": 12}},
+            {"target": {"enchantment": {"id": "minecraft:sharpness"}}, "enchantment_level": 5, "actions": ["attack"],
+             "requires": {"reskilled:melee": 20}}]}"#;
+        let crate::defs::DefFile::Lock(file) =
+            crate::defs::parse_file(crate::defs::DefKind::Lock, json).unwrap()
+        else {
+            panic!("a lock file");
+        };
+        let sword = |level: u32| {
+            vec![
+                ("minecraft:unbreaking".to_string(), 3),
+                ("minecraft:sharpness".to_string(), level),
+            ]
+        };
+        let cause = |enchanted: &[(String, u32)], action, level| {
+            enchantment_cause(&file.entries, enchanted, action, "reskilled:melee", level)
+        };
+
+        // When the requirement of Melee 12 or 20 to attack is traced on swords with Sharpness IV and V
+        // Then the Sharpness that brings it is named, at the level the sword has it; a need no enchantment lock asks
+        // (Melee 16, or Melee 12 to use) and a sword below the starting level have none
+        assert_eq!(
+            cause(&sword(4), Action::Attack, 12),
+            Some(("minecraft:sharpness".to_string(), 4))
+        );
+        assert_eq!(
+            cause(&sword(5), Action::Attack, 20),
+            Some(("minecraft:sharpness".to_string(), 5))
+        );
+        assert_eq!(cause(&sword(5), Action::Attack, 16), None);
+        assert_eq!(cause(&sword(4), Action::Use, 12), None);
+        assert_eq!(cause(&sword(2), Action::Attack, 12), None);
     }
 
     #[test]
