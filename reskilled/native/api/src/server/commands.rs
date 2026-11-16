@@ -440,9 +440,9 @@ mod tests {
         assert_eq!(
             host.told_to(ANN),
             vec![
-                "XP levels: 23. Focus: Working.",
-                "Melee 5/32: raise for 5 levels, 2 perk points.",
-                "Mining 12/32: raise for 12 levels, 5 perk points.",
+                "XP levels: 23 | Focus: Working",
+                "Melee 5/32 - raise: 5 levels, perk points: 2",
+                "Mining 12/32 - raise: 12 levels, perk points: 5",
             ]
         );
     }
@@ -464,11 +464,11 @@ mod tests {
         // Then Fighting costs 20 for her second area, both show in her summary, and Working is already hers
         let told = host.told_to(ANN);
         assert_eq!(host.levels_given.get(&ANN), Some(&-20));
-        assert_eq!(told[0], "Fighting is now one of your focus areas.");
-        assert_eq!(told[1], "XP levels: 5. Focus: Fighting, Working.");
+        assert_eq!(told[0], "Focus added: Fighting.");
+        assert_eq!(told[1], "XP levels: 5 | Focus: Fighting, Working");
         assert_eq!(
             told.last().map(String::as_str),
-            Some("That focus is already active.")
+            Some("Focus already active.")
         );
     }
 
@@ -502,7 +502,7 @@ mod tests {
             vec![
                 "Mining is now level 2.",
                 "Mining is now level 3.",
-                "There is no such skill."
+                "Unknown skill."
             ]
         );
     }
@@ -530,7 +530,7 @@ mod tests {
         assert_eq!(level(&state_of(&mut host, ANN).unwrap(), defs, MINING), 20);
         assert_eq!(
             host.told_to(BO),
-            vec!["You may not do that.", "Set Ann's Mining to level 20."]
+            vec!["You can't do that.", "Set Ann's Mining to level 20."]
         );
         assert_eq!(
             take_queued(),
@@ -636,8 +636,8 @@ mod tests {
             lines,
             vec![
                 "Set Bo's Melee to level 4.",
-                "No player named Cy is online.",
-                "Only players can do that."
+                "Cy isn't online.",
+                "Players only."
             ]
         );
     }

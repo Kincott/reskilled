@@ -468,7 +468,7 @@ mod tests {
         assert_eq!(greyed, 10);
         assert_eq!(
             tooltip(&painted).last().map(String::as_str),
-            Some("Only operators can change this.")
+            Some("Operators only.")
         );
         assert!(host.sent_to_server.iter().all(|(_, data)| !matches!(
             serde_json::from_slice(data).unwrap(),

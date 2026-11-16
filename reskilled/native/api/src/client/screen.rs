@@ -1498,7 +1498,7 @@ mod tests {
         let drawn = drawn(&host, AWAY);
 
         // Then it says nothing more unlocks
-        contains(&drawn, &["Nothing more to unlock here."]);
+        contains(&drawn, &["Everything here is unlocked."]);
     }
 
     #[test]
@@ -1585,7 +1585,7 @@ mod tests {
             ["Raise your own level to 5", "Cost: 4 XP levels"]
         );
         assert!(
-            card.contains(&"Shared by your group. Your own level: 4".to_string()),
+            card.contains(&"Shared level. Yours: 4".to_string()),
             "{card:?}"
         );
     }
@@ -1694,13 +1694,10 @@ mod tests {
                 "Chopping logs",
                 "Breaking blocks",
                 "Travelling",
-                "Click to add it for 20 XP levels."
+                "Click to add: 20 XP levels."
             ]
         );
-        assert_eq!(
-            tooltip(&host),
-            vec!["Working", "Gives XP for:", "Unlocked: always on."]
-        );
+        assert_eq!(tooltip(&host), vec!["Working", "Gives XP for:", "Active."]);
     }
 
     #[test]
@@ -1760,7 +1757,7 @@ mod tests {
         let flow = click(&host, SIZE, inside(&cards()[0].rect), LEFT_BUTTON);
 
         // Then it says it is waiting, and the click is taken without doing anything
-        contains(&drawn, &["Reskilled", "Waiting for the server."]);
+        contains(&drawn, &["Reskilled", "Waiting for the server..."]);
         assert_eq!(flow, Flow::Cancel);
         assert_eq!(with(|cache| cache.view), View::Overview);
     }

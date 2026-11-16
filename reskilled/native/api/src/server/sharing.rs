@@ -514,9 +514,9 @@ mod tests {
         assert_eq!(
             lines,
             vec![
-                "You made a party. Invite others with /skills party invite <player>.",
+                "Party created. Invite: /skills party invite <player>",
                 "Invited Bo.",
-                "Ann has not invited you.",
+                "No invite from Ann.",
                 "You joined Ann's party.",
                 "Your party: Ann, Bo.",
                 "You left your party."
@@ -524,7 +524,7 @@ mod tests {
         );
         assert_eq!(
             host.told_to(BO),
-            vec!["Ann invites you to their party: /skills party join Ann"]
+            vec!["Ann invited you to a party: /skills party join Ann"]
         );
     }
 }

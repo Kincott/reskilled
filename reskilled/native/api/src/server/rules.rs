@@ -216,7 +216,7 @@ mod tests {
 
         // Then nothing changes and they read why
         assert_eq!(current(&mut host), Rules::default());
-        assert_eq!(host.action_bars_of(PLAYER), vec!["You may not do that."]);
+        assert_eq!(host.action_bars_of(PLAYER), vec!["You can't do that."]);
     }
 
     #[test]

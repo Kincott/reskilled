@@ -776,10 +776,7 @@ mod tests {
 
         // Then it is refused as unavailable and Mining stays at 1
         let defs = &current().unwrap().defs;
-        assert_eq!(
-            result.unwrap_err().plain(),
-            "That cannot be done right now."
-        );
+        assert_eq!(result.unwrap_err().plain(), "Can't do that right now.");
         assert_eq!(
             level(&state_of(&mut host, PLAYER).unwrap(), defs, MINING),
             1
