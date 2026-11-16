@@ -147,6 +147,7 @@ pub fn logged_out(player: u128) {
     super::focus::forget(player);
     super::actions::forget(player);
     super::earning::forget(player);
+    super::mechanics::left_game(player);
 }
 
 /// Takes the settings' death penalty off a respawned player, then brings their perks' attributes in line.

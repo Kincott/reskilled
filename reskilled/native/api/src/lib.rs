@@ -84,6 +84,9 @@ impl Hooks for Mod {
     /// exit) the new player's modifiers are resynced in full.
     fn player_clone(&self, _host: &mut dyn Host, event: &mut PlayerCloneEvent<'_>) {
         server::effects::mark_full(event.player);
+        if event.was_death {
+            server::mechanics::respawned(event.player);
+        }
         queue(if event.was_death {
             Job::ApplyDeath(event.player)
         } else {

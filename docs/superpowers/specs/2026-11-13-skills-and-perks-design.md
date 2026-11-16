@@ -291,6 +291,9 @@ world (`Holder::Level`), sent to every player, and changed only by operators (ch
   gear. Level I is free and each level above it needs 3 more Arcane (Sharpness, Smite, Bane and Power up to V: 12;
   Protection IV: 9; Unbreaking III: 6); Fortune and Looting climb 6 a level (III: 12); Mending needs 12. A refusal or
   tooltip line brought by an enchantment names it ("Sharpness III: Arcane 6").
+- Restful Sleep (2026-11-16, after play): damage wakes a sleeping player, so poison kept the player from sleeping.
+  Getting into bed now lifts the effects it clears; a full night ends them and heals; leaving early (or the game)
+  brings them back as they were; dying drops them.
 - Perk guide removed (2026-11-16, after play): the G page with animated scenes and value cards was taken out at
   the user's request; some perks had no scene. A perk's tooltip (name, description, cost, needs) is its only
   explanation, and every perk description is to be rewritten.
