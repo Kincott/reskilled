@@ -84,3 +84,4 @@ mod pinned to one Horizon commit, see [HORIZON_PIN.md](HORIZON_PIN.md)).
   then `cargo horizon-mod check dist/reskilled.hmod` validates it.
 - Playing from source: `horizon-launcher native-build reskilled/native --instance <instance> --trust-native-code`,
   with the content mod built by `cargo horizon-mod build` in `content/`.
+- Before a release: the in-game checklist in [TESTING.md](TESTING.md).
