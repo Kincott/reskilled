@@ -92,7 +92,9 @@ messages! {
     REFUND_COST = "reskilled.ui.refund_cost" => "Refund: %s XP levels";
     REFUND_FREE = "reskilled.ui.refund_free" => "Refund: free";
     SWITCHED_OFF = "reskilled.ui.switched_off" => "Off: no effect until switched on.";
-    PERK_COST = "reskilled.ui.perk_cost" => "Cost: %s perk points";
+    PERK_COST = "reskilled.ui.perk_cost" => "%s perk points";
+    PERK_OF = "reskilled.ui.perk_of" => "%s perk";
+    TIP_NEED = "reskilled.ui.tip_need" => "%s %s";
     OWNED = "reskilled.ui.owned" => "Owned";
     GET = "reskilled.ui.get" => "Unlock";
     NEXT_UNLOCKS = "reskilled.ui.next_unlocks" => "Next unlocks";

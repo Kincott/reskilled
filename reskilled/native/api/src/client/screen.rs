@@ -21,11 +21,12 @@ use crate::MOD_ID;
 use crate::text::{
     ALL_UNLOCKED, AT_TOP, BACK, COST, COST_POINTS, FOCUS, FOCUS_ACTIVE, FOCUS_ADD, FOCUS_ADD_FREE,
     FOCUS_GIVES, GET, LEVEL, LEVEL_OF, LEVEL_UP, MASTERED, MISSING_PERK, NEEDS, NEXT_UNLOCKS,
-    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_POINTS, PERKS, PROGRESS, RAISE_BY,
-    RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT, RAISE_TO, REFUND, REFUND_COST,
+    NOT_ENOUGH_POINTS, OPEN_HINT, OWNED, PERK_COST, PERK_OF, PERK_POINTS, PERKS, PROGRESS,
+    RAISE_BY, RAISE_CTRL, RAISE_OWN_BY, RAISE_OWN_TO, RAISE_SHIFT, RAISE_TO, REFUND, REFUND_COST,
     REFUND_FREE, REWARD_BLOCK_XP, REWARD_BREAK, REWARD_BREED, REWARD_KILL, REWARD_SMELT,
-    REWARD_TAME, REWARD_TRAVEL, SETTINGS, SHARED_OWN, SWITCHED_OFF, TITLE, UNLOCK, VAL_OFF, VAL_ON,
-    WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say, skill_name,
+    REWARD_TAME, REWARD_TRAVEL, SETTINGS, SHARED_OWN, SWITCHED_OFF, TIP_NEED, TITLE, UNLOCK,
+    VAL_OFF, VAL_ON, WAITING, XP, focus_name, label_name, number, perk_description, perk_name, say,
+    skill_name,
 };
 
 /// The mouse buttons the screen answers, by GLFW index.
@@ -47,7 +48,7 @@ const SHINE_TICKS: f64 = 60.0;
 /// Laid over the cards of skills outside the focus area under the mouse.
 const FADED: u32 = 0xA014_161C;
 /// A perk's description wraps at this width in its tooltip.
-const TIP_WIDTH: f32 = 170.0;
+const TIP_WIDTH: f32 = 190.0;
 /// The unlock preview's heading takes 10 pixels, each line 9; two lines fit.
 const PREVIEW_HEADING: f32 = 10.0;
 const PREVIEW_LINE: f32 = 9.0;
@@ -791,20 +792,22 @@ fn draw_owned(pen: &mut Pen<'_>, row: &PerkRow, perk: &PerkDef, right: f32, y: f
     }
 }
 
-/// A perk's tooltip: its name, what it does, what it costs, and what it needs, each need green once met.
+/// A perk's tooltip: its name in bold and its skill; a bullet for each thing it does; then, after a gap, either
+/// that it is owned (and how to refund it) or its cost and needs, each marked met or not.
 fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
     let (d, state) = (pen.d, pen.state);
-    let met = |met: bool| if met { GREEN } else { RED };
-    let mut lines = vec![perk_name(d, &perk.id).with_color(GOLD)];
-    let does = perk_description(perk).plain();
-    let wrapped = paint::wrapped(pen.host, &does, TIP_WIDTH);
-    lines.extend(
-        wrapped
-            .into_iter()
-            .map(|line| Text::literal(line).with_color(GRAY)),
-    );
+    let mut lines = vec![
+        perk_name(d, &perk.id).with_color(GOLD).bold(),
+        say(&PERK_OF, &[skill_name(d, &perk.skill)]).with_color(SUBTLE),
+    ];
+    let does = description_lines(pen.host, &perk_description(perk).plain());
+    if !does.is_empty() {
+        lines.push(Text::literal(""));
+        lines.extend(does);
+    }
+    lines.push(Text::literal(""));
     if matches!(status, PerkStatus::Owned) {
-        lines.push(say(&OWNED, &[]).with_color(GOLD));
+        lines.push(marked(true, say(&OWNED, &[])).with_color(GOLD));
         if switched_off(state, &perk.id) {
             lines.push(say(&SWITCHED_OFF, &[]).with_color(DIM));
         }
@@ -816,22 +819,101 @@ fn perk_tip(pen: &Pen<'_>, perk: &PerkDef, status: &PerkStatus) -> Vec<Text> {
         return lines;
     }
     let enough = points_available(d, state, &perk.skill) >= perk.cost;
-    lines.push(say(&PERK_COST, &[number(perk.cost)]).with_color(met(enough)));
+    let cost =
+        Text::literal(format!("{} ", paint::POINT)).append(say(&PERK_COST, &[number(perk.cost)]));
+    lines.push(cost.with_color(met_colour(enough)));
+    let mut need = |reached: bool, what: Text| {
+        lines.push(marked(reached, what).with_color(met_colour(reached)))
+    };
     if perk.min_level > 1 {
         let reached = own_level(state, d, &perk.skill) >= perk.min_level;
-        let needs = [skill_name(d, &perk.skill), number(perk.min_level)];
-        lines.push(say(&NEEDS, &needs).with_color(met(reached)));
+        need(
+            reached,
+            say(
+                &TIP_NEED,
+                &[skill_name(d, &perk.skill), number(perk.min_level)],
+            ),
+        );
     }
     for (skill, needed) in &perk.also_needs {
         let reached = own_level(state, d, skill) >= *needed;
-        let needs = [skill_name(d, skill), number(*needed)];
-        lines.push(say(&NEEDS, &needs).with_color(met(reached)));
+        need(
+            reached,
+            say(&TIP_NEED, &[skill_name(d, skill), number(*needed)]),
+        );
     }
     for other in &perk.requires {
-        let first = say(&MISSING_PERK, &[perk_name(d, other)]);
-        lines.push(first.with_color(met(owns(state, other))));
+        need(owns(state, other), perk_name(d, other));
     }
     lines
+}
+
+fn met_colour(met: bool) -> u32 {
+    if met { GREEN } else { RED }
+}
+
+/// The line with a tick before it when met, a cross when not.
+fn marked(met: bool, what: Text) -> Text {
+    let mark = if met { paint::TICK } else { CROSS };
+    Text::literal(format!("{mark} ")).append(what)
+}
+
+/// A perk tooltip's second line: quieter than the description, still easy to read.
+const SUBTLE: u32 = 0x8C_92A0;
+const CROSS: &str = "\u{2718}";
+const BULLET: &str = "\u{2022} ";
+/// Lines after a bullet's first start under its words.
+const BULLET_INDENT: &str = "  ";
+
+/// A perk's description for its tooltip: a gold bullet for each sentence, its wrapped lines indented under it, and
+/// its numbers in white among gray words.
+fn description_lines(host: &dyn Host, text: &str) -> Vec<Text> {
+    let room = TIP_WIDTH - host.text_width(BULLET);
+    let mut lines = Vec::new();
+    for sentence in sentences(text) {
+        for (at, line) in paint::wrapped(host, &sentence, room)
+            .into_iter()
+            .enumerate()
+        {
+            let lead = if at == 0 {
+                Text::literal(BULLET).with_color(GOLD)
+            } else {
+                Text::literal(BULLET_INDENT)
+            };
+            lines.push(picked_out(lead, &line));
+        }
+    }
+    lines
+}
+
+/// The text's sentences, each keeping its full stop.
+fn sentences(text: &str) -> Vec<String> {
+    let parts: Vec<&str> = text.trim().split(". ").filter(|p| !p.is_empty()).collect();
+    let last = parts.len().saturating_sub(1);
+    parts
+        .iter()
+        .enumerate()
+        .map(|(at, part)| {
+            if at < last {
+                format!("{part}.")
+            } else {
+                (*part).to_string()
+            }
+        })
+        .collect()
+}
+
+/// `lead` followed by the words, those with a digit in white and the rest in gray.
+fn picked_out(lead: Text, words: &str) -> Text {
+    words.split(' ').enumerate().fold(lead, |line, (at, word)| {
+        let gap = if at == 0 { "" } else { " " };
+        let colour = if word.chars().any(|c| c.is_ascii_digit()) {
+            WHITE
+        } else {
+            GRAY
+        };
+        line.append(Text::literal(format!("{gap}{word}")).with_color(colour))
+    })
 }
 
 /// What the next levels of the skill unlock, as many lines as fit.
@@ -1565,6 +1647,41 @@ mod tests {
     }
 
     #[test]
+    fn a_description_is_a_bullet_per_sentence_with_its_numbers_picked_out() {
+        // Given a description of two sentences, the first too long for one line
+        let host = TestHost::default();
+        let text =
+            "+3% melee damage per enchantment on your weapon, up to 15% in all. -30% fall damage.";
+
+        // When it is laid out for a perk's tooltip
+        let lines = description_lines(&host, text);
+
+        // Then each sentence starts a bullet, a wrapped line is indented under it, and the numbers stand out in white
+        let plain: Vec<String> = lines.iter().map(Text::plain).collect();
+        let last = plain.len() - 1;
+        assert!(last >= 2, "{plain:?}");
+        assert!(plain[0].starts_with("\u{2022} +3% melee"), "{plain:?}");
+        assert!(
+            plain[1..last].iter().all(|l| l.starts_with("  ")),
+            "{plain:?}"
+        );
+        assert!(
+            plain[1..last].iter().any(|l| l.contains("15%")),
+            "{plain:?}"
+        );
+        assert_eq!(plain[last], "\u{2022} -30% fall damage.");
+        let colour_of = |line: &Text, word: &str| {
+            crate::test_host::spans_of(line)
+                .into_iter()
+                .find(|(t, _)| t.contains(word))
+                .and_then(|(_, c)| c)
+        };
+        assert_eq!(colour_of(&lines[last], "-30%"), Some(WHITE));
+        assert_eq!(colour_of(&lines[last], "fall"), Some(GRAY));
+        assert_eq!(colour_of(&lines[0], "\u{2022}"), Some(GOLD));
+    }
+
+    #[test]
     fn hovering_a_perk_shows_what_it_costs_and_needs() {
         // Given Mining's view, the mouse over its third perk by level (Deep Veins, level 16)
         let _serial = exclusive();
@@ -1574,13 +1691,16 @@ mod tests {
         // When the screen is drawn
         drawn(&host, inside(&row.rect));
 
-        // Then one tooltip names it, its cost and the level it needs
+        // Then one tooltip names it and its skill, then, after a gap, its cost and the level it needs, each marked
+        // met or not
         assert_eq!(
             tooltip(&host),
             vec![
                 "Mining deep veins",
-                "Cost: 1 perk points",
-                "Needs Mining 16"
+                "Mining perk",
+                "",
+                "\u{25C6} 1 perk points",
+                "\u{2718} Mining 16"
             ]
         );
     }
@@ -1603,7 +1723,7 @@ mod tests {
         // Then its tooltip also says it needs Melee 20
         assert_eq!(
             tooltip(&host).last().map(String::as_str),
-            Some("Needs Melee 20")
+            Some("\u{2718} Melee 20")
         );
     }
 
