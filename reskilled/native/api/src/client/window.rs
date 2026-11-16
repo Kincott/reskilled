@@ -23,9 +23,10 @@ const TAB_H: f32 = 28.0;
 const TAB_W: f32 = 28.0;
 const PITCH: f32 = 31.0;
 const LEAST_PITCH: f32 = 25.0;
-/// The frame's top, its greatest width, the margin under it and to the GUI's sides.
-const FRAME_TOP: f32 = 30.0;
+/// The frame sits this far below the tabs' top; its greatest size; the margin around the window.
+const TABS_ABOVE: f32 = 28.0;
 const FRAME_MOST_W: f32 = 383.0;
+const FRAME_MOST_H: f32 = 204.0;
 const MARGIN: f32 = 8.0;
 const BOTTOM: f32 = 6.0;
 
@@ -42,12 +43,17 @@ pub struct WindowLayout {
 
 /// The window on a GUI of `size` with `skills` skill tabs, the first shown being `first_tab`.
 pub fn window(size: [f32; 2], skills: usize, first_tab: usize) -> WindowLayout {
+    // The window keeps its usual size on a big screen, in the middle with its tabs
     let w = (size[0] - 2.0 * MARGIN).min(FRAME_MOST_W).floor();
+    let h = (size[1] - TAB_TOP - TABS_ABOVE - BOTTOM)
+        .min(FRAME_MOST_H)
+        .floor();
+    let tabs_top = ((size[1] - TABS_ABOVE - h) / 2.0).floor().max(TAB_TOP);
     let frame = Rect {
         x: ((size[0] - w) / 2.0).floor(),
-        y: FRAME_TOP,
+        y: tabs_top + TABS_ABOVE,
         w,
-        h: (size[1] - FRAME_TOP - BOTTOM).floor(),
+        h,
     };
     let body = Rect {
         x: frame.x + 8.0,
@@ -57,7 +63,7 @@ pub fn window(size: [f32; 2], skills: usize, first_tab: usize) -> WindowLayout {
     };
     let tab = |x: f32, w: f32| Rect {
         x,
-        y: TAB_TOP,
+        y: tabs_top,
         w,
         h: TAB_H,
     };
@@ -303,6 +309,26 @@ mod tests {
             assert_eq!(w.tabs[9].0, Tab::Options);
             assert!(w.scroll_left.is_none() && w.scroll_right.is_none());
         }
+    }
+
+    #[test]
+    fn the_window_keeps_its_size_in_the_middle_of_a_big_screen() {
+        // Given a big GUI (1920 by 1080 at GUI scale 3)
+        let size = [640.0, 360.0];
+
+        // When the window is laid out
+        let w = window(size, 8, 0);
+
+        // Then the frame keeps its usual size, centred both ways with its tabs, the tabs just above it
+        assert_eq!((w.frame.w, w.frame.h), (383.0, 204.0));
+        assert_eq!(w.frame.x, ((640.0 - 383.0) / 2.0_f32).floor());
+        let top = w.tabs[0].1.y;
+        let block = w.frame.y + w.frame.h - top;
+        assert!(
+            (top - (360.0 - block - top)).abs() <= 1.0,
+            "top {top}, block {block}"
+        );
+        assert_eq!(w.frame.y - top, 28.0);
     }
 
     #[test]

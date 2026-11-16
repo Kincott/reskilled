@@ -34,6 +34,7 @@ Window and raising
 - [ ] Holding Shift or Ctrl shows where the raise leads and its price.
 - [ ] Clicking raise many times fast never takes more levels than the skill went up by (the same-tick fix).
 - [ ] A focus area can be added with the Focus button by its heading on Home; the first is free.
+- [ ] On a big screen (a low GUI scale) the window keeps its size, in the middle with its tabs.
 - [ ] With the GUI scale set so the screen is 320 wide, Home, every road and Options fit (Options make one column
       that scrolls).
 
