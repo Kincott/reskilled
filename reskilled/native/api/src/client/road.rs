@@ -38,7 +38,8 @@ const LINE_Y: f32 = 45.0;
 const NODE: f32 = 26.0;
 const NODE_PITCH: f32 = 28.0;
 const MARK: f32 = 18.0;
-const MARK_PITCH: f32 = 20.0;
+/// The least gap between two marks' slots, and between a slot and the mastery frame.
+const MARK_GAP: f32 = 2.0;
 /// The header's raise button (narrower on a narrow body, where it shows only the price), the dock's button and its
 /// area button.
 const RAISE_W: f32 = 112.0;
@@ -208,35 +209,40 @@ pub fn road(
             (id, rect)
         })
         .collect();
-    let marks = side_by_side(marks, MARK_PITCH, at)
-        .into_iter()
-        .map(|(label, lvl, x)| {
-            let rect = Rect {
-                x: x - MARK / 2.0,
-                y: road.y + 7.0,
-                w: MARK,
-                h: MARK,
-            };
-            (label, lvl, rect)
-        })
-        .collect();
     let mastery = Rect {
         x: at(top) - NODE / 2.0,
         y: road.y + 5.0,
         w: NODE,
         h: NODE,
     };
+    // Each mark sits over its level; one that would crowd the slot before it, or run into the mastery frame,
+    // shares that slot instead
+    let mut slots: Vec<(String, u32, Rect)> = Vec::new();
+    for (label, lvl) in marks {
+        let ideal = at(*lvl) - MARK / 2.0;
+        let last = slots.last().map(|(.., m)| m.x);
+        let crowded = last.is_some_and(|x| ideal < x + MARK + MARK_GAP);
+        let past_top = ideal + MARK > mastery.x - MARK_GAP;
+        let x = match last {
+            Some(x) if crowded || past_top => x,
+            _ if past_top => mastery.x - MARK_GAP - MARK,
+            _ => ideal,
+        };
+        let rect = Rect {
+            x,
+            y: road.y + 7.0,
+            w: MARK,
+            h: MARK,
+        };
+        slots.push((label.clone(), *lvl, rect));
+    }
+    let marks = slots;
     let mut nodes: Vec<(String, Rect)> = nodes;
-    let mut marks: Vec<(String, u32, Rect)> = marks;
+    let marks: Vec<(String, u32, Rect)> = marks;
     let mut xs: Vec<f32> = nodes.iter().map(|(_, n)| n.x).collect();
     spread(&mut xs, NODE);
     for ((_, n), x) in nodes.iter_mut().zip(xs) {
         n.x = x;
-    }
-    let mut xs: Vec<f32> = marks.iter().map(|(.., m)| m.x).collect();
-    spread(&mut xs, MARK);
-    for ((.., m), x) in marks.iter_mut().zip(xs) {
-        m.x = x;
     }
     r.nodes = nodes;
     r.marks = marks;
@@ -507,13 +513,23 @@ fn draw_road(
             }
         }
     }
-    // The gear each level opens, above the road
+    // The gear each level opens, above the road: a slot for each, or for each crowd of them, with how many
+    let mut slots: Vec<(Rect, Vec<(&String, u32)>)> = Vec::new();
     for (label, lvl, rect) in &r.marks {
+        match slots.iter_mut().find(|(m, _)| m == rect) {
+            Some((_, members)) => members.push((label, *lvl)),
+            None => slots.push((*rect, vec![(label, *lvl)])),
+        }
+    }
+    for (rect, members) in &slots {
         if !visible(panel, rect) {
             continue;
         }
-        let got = *lvl <= reached;
-        let x = level_x(r, *lvl).min(rect.x + rect.w - 1.0).max(rect.x);
+        let (first, first_level) = members[0];
+        let got = first_level <= reached;
+        let x = level_x(r, first_level)
+            .min(rect.x + rect.w - 1.0)
+            .max(rect.x);
         let stem = rect.y + rect.h;
         pen.fill(
             &Rect {
@@ -525,7 +541,7 @@ fn draw_road(
             if got { ROAD_DONE } else { ROAD },
         );
         paint::slot(pen.host, pen.batch, rect);
-        if let Some(icon) = defs.label_icons.get(label) {
+        if let Some(icon) = defs.label_icons.get(first) {
             pen.host
                 .item(pen.batch, icon, [rect.x + 1.0, rect.y + 1.0], 16.0);
         }
@@ -533,11 +549,26 @@ fn draw_road(
             pen.fill(&rect.shrunk(1.0), DIMMED);
             paint::padlock(pen.host, pen.batch, [rect.x + 9.0, rect.y + 7.0]);
         }
+        if members.len() > 1 {
+            let count = members.len().to_string();
+            let at = [
+                rect.x + rect.w - 1.0 - pen.width(&count),
+                rect.y + rect.h - 8.0,
+            ];
+            pen.host.text(pen.batch, &count, at, WHITE, true);
+        }
         if pen.over(rect) {
-            pen.tip = Some(vec![
-                label_name(label).with_color(GOLD),
-                say(&AT_LEVEL, &[number(*lvl)]).with_color(if got { GREEN } else { GRAY }),
-            ]);
+            let mut tip = Vec::new();
+            for (label, lvl) in members {
+                let met = *lvl <= reached;
+                tip.push(label_name(label).with_color(GOLD));
+                tip.push(say(&AT_LEVEL, &[number(*lvl)]).with_color(if met {
+                    GREEN
+                } else {
+                    GRAY
+                }));
+            }
+            pen.tip = Some(tip);
         }
     }
     // Mastery at the top of the road
@@ -1169,13 +1200,41 @@ mod tests {
         // When the road is laid out
         let r = road(&body, 32, &perks, &marks, 0.0);
 
-        // Then no two marks and no two nodes overlap
-        for (i, (_, _, a)) in r.marks.iter().enumerate() {
-            for (_, _, b) in &r.marks[i + 1..] {
+        // Then no two marks' slots overlap (crowded marks share one), and no two nodes do
+        let mut slots: Vec<Rect> = Vec::new();
+        for (_, _, m) in &r.marks {
+            if !slots.contains(m) {
+                slots.push(*m);
+            }
+        }
+        for (i, a) in slots.iter().enumerate() {
+            for b in &slots[i + 1..] {
                 assert!(!overlap(a, b), "{a:?} and {b:?}");
             }
         }
         assert!(!overlap(&r.nodes[0].1, &r.nodes[1].1));
+    }
+
+    #[test]
+    fn many_marks_share_slots_and_stay_on_the_road() {
+        // Given twenty marks over levels 1 to 32 on the smallest body
+        let body = window(SMALLEST, 8, 0).body;
+        let marks: Vec<(String, u32)> = (0..20)
+            .map(|i| (format!("m{i}"), 1 + i * 31 / 19))
+            .collect();
+
+        // When the road is laid out
+        let r = road(&body, 32, &[], &marks, 0.0);
+
+        // Then every mark has a slot on the road, short of the mastery frame
+        for (label, _, m) in &r.marks {
+            assert!(
+                m.x + m.w <= r.mastery.x,
+                "{label}: {m:?} runs into {:?}",
+                r.mastery
+            );
+            assert!(m.x >= r.road.x, "{label}: {m:?}");
+        }
     }
 
     #[test]

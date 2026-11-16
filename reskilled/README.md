@@ -9,19 +9,23 @@ more. Everything is data, and the server's rules change in game.
 
 ## For players
 
-- **K** opens the skills screen (`/skills open` too). Click a skill to see its perks and what its next levels
-  unlock; the gear opens Reskilled Options.
+- **K** opens the skills window (`/skills open` too), with a tab for Home, one for each skill and one for
+  Options. **Home** shows you (Steve, whose eyes follow the mouse), your total level and counts, and your
+  skills grouped by focus area, each with its raise button. A **skill's tab** is a road from level 1 to the top:
+  the gear each level opens above it, the perks below it in advancement frames; hover or click a perk to see
+  it in the dock below, where you unlock it. **Options** holds your display settings and the server's rules.
 - Shift-click a raise button to raise 5 levels at once, Ctrl-click to raise as many as your XP pays for.
 - Locked items show a padlock and their requirements in the tooltip. A refused action shows what it needs.
 - Perks that act around your bed or around you (Hearth, Home Ward, Safe Haven, Green Aura) have an **Area**
-  button: it shows the ground they cover in the world.
-- Focus areas (Fighting, Working, Roaming) give extra XP for their tasks; the first is free.
+  button in the dock: it shows the ground they cover in the world.
+- Focus areas (Fighting, Working, Roaming) give extra XP for their tasks; the first is free. Add one with the
+  Focus button by its heading on Home.
 - `/skills` lists your skills; `/skills raise <skill>`, `perk <perk>`, `focus <area>` and `party ...` do the
   rest from chat.
 
 ## For server operators
 
-Reskilled Options' **Server rules** tab (operators only) sets how raises are paid (XP levels or points), perk
+The **Server rules** column of the Options tab (operators only) sets how raises are paid (XP levels or points), perk
 switches, enchantment locks, shared skills (off, parties or everyone) and how skills grow (buying, doing
 or both). The rules are kept with the world.
 

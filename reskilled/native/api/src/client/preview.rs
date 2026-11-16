@@ -189,56 +189,44 @@ fn assert_no_text_overlap(host: &TestHost, painted: &[Paint], what: &str) {
 }
 
 #[test]
-fn the_shipped_home_fits_the_window() {
+fn every_screen_fits_both_sizes() {
     for size in [SMALLEST, USUAL] {
         // Given the shipped mod and a player a few hours in
         let _serial = exclusive();
         let host = player(size);
+        let gui = [size[0] as f32, size[1] as f32];
+        let body = super::window::window(gui, 8, 0).body;
+        let skills: Vec<String> = with(|cache| {
+            let defs = cache.defs.as_ref().unwrap();
+            defs.defs.skills.keys().cloned().collect()
+        });
 
         // When Home is drawn
         let painted = scene(&host, &format!("home_{}", size[0]), size, AWAY);
 
-        // Then its eight skill rows are all there, inside the window's body, no text over another
+        // Then its eight skill rows are there, inside the window's body, no text over another
         let rows = painted
             .iter()
             .filter(|p| matches!(p, Paint::Item { at, .. } if !crate::client::screen::tests::in_tab_row(at[1])))
             .count();
         assert_eq!(rows, 8);
-        let body = super::window::window([size[0] as f32, size[1] as f32], 8, 0).body;
         assert_inside(&host, &painted, &body, "home");
         assert_no_text_overlap(&host, &painted, "home");
-    }
-}
 
-#[test]
-fn every_shipped_skill_view_fits_the_window() {
-    for size in [SMALLEST, USUAL] {
-        // Given the shipped mod and a player a few hours in
-        let _serial = exclusive();
-        let host = player(size);
-        let skills: Vec<String> = with(|cache| {
-            cache
-                .defs
-                .as_ref()
-                .unwrap()
-                .defs
-                .skills
-                .keys()
-                .cloned()
-                .collect()
-        });
-
+        // And so is every skill's road
         for id in &skills {
-            // When each skill's view is drawn
             let path = id.split_once(':').unwrap().1;
             open_skill(path);
-            let painted = scene(&host, &format!("skill_{path}_{}", size[0]), size, AWAY);
-
-            // Then it is inside the window, no text over another
-            let body = super::window::window([size[0] as f32, size[1] as f32], 8, 0).body;
+            let painted = scene(&host, &format!("road_{path}_{}", size[0]), size, AWAY);
             assert_inside(&host, &painted, &body, path);
             assert_no_text_overlap(&host, &painted, path);
         }
+
+        // And the options, as a player who is not an operator
+        with(|cache| cache.tab = Tab::Options);
+        let painted = scene(&host, &format!("options_{}", size[0]), size, AWAY);
+        assert_inside(&host, &painted, &body, "options");
+        assert_no_text_overlap(&host, &painted, "options");
     }
 }
 
@@ -287,7 +275,6 @@ fn hovering_shows_one_tooltip() {
     scene(&host, "options", USUAL, over(&page.display[3].1));
     with(|cache| cache.rules_editable = true);
     scene(&host, "options_rules", USUAL, over(&page.rules[4].1));
-    scene(&host, "options_320", SMALLEST, AWAY);
 
     // Then each shows exactly one tooltip
     assert_eq!(

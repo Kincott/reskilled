@@ -22,16 +22,24 @@ In the new world, `/gamemode survival` and `/xp add @s 200 levels`.
 
 ## Single player
 
-Screen and raising
-- [ ] K opens the skills screen; `/skills open` does too. All eight skills show, Building among them.
+Window and raising
+- [ ] K opens the window on Home; `/skills open` does too. Home shows your name, Steve (his eyes follow the mouse),
+      the counts, and all eight skills under Fighting, Working and Roaming, Building among them.
+- [ ] Each skill tab opens its road; a tab with points to spend has a gold pip. The Options tab's Done returns to
+      the tab you came from.
+- [ ] A road: gear marks above it (hover: what and at which level), perks below; hovering a perk shows its
+      tooltip and puts it in the dock; clicking keeps it there. Unlock in the dock buys a ready perk and does
+      nothing for a locked one (hover it: it says why).
 - [ ] A raise takes the shown price in XP levels. Shift-click raises 5, Ctrl-click raises as many as you can pay.
 - [ ] Holding Shift or Ctrl shows where the raise leads and its price.
 - [ ] Clicking raise many times fast never takes more levels than the skill went up by (the same-tick fix).
-- [ ] A focus area can be added; the first is free.
+- [ ] A focus area can be added with the Focus button by its heading on Home; the first is free.
+- [ ] With the GUI scale set so the screen is 320 wide, Home, every road and Options fit (Options make one column
+      that scrolls).
 
 Perks
 - [ ] Buying a perk spends its points; switching it off works as the server rules say.
-- [ ] Area on an owned Hearth, Home Ward, Safe Haven or Green Aura draws its box in the world (glowing edges,
+- [ ] Area (in the dock) on an owned Hearth, Home Ward, Safe Haven or Green Aura draws its box in the world (glowing edges,
       faint walls, the perk's colour) around your bed, or around you for Green Aura; Area again hides it.
 - [ ] Hovering a perk shows its description.
 
@@ -55,7 +63,9 @@ Mechanic perks
       back. Sleep the night through: it is gone and you are fully healed.
 
 Server rules and persistence
-- [ ] The gear on the screen opens Reskilled Options; Server rules change in game and survive a reload of the world.
+- [ ] On the Options tab, as an operator, the Server rules change in game and survive a reload of the world; as a
+      player they are greyed with "Only operators can change these." and clicks do nothing. Hovering a row
+      explains it in the box above Defaults and Done.
 - [ ] Skills survive quitting and reopening the world, `/reload`, and death.
 - [ ] Under "doing" earning, mining with a pickaxe climbs Mining; placing and breaking one block repeatedly does not
       climb Building.

@@ -214,20 +214,10 @@ Changed by the user on 2026-11-13: a focus no longer makes raising cheaper; it g
 
 - Opens with a hotkey (default K, rebindable if Horizon allows it) and with `/skills open`. Escape closes it. It does
   not pause single player (Horizon's own-screen behavior).
-- Shows the player's XP levels and focus; each skill's level and maximum, raise cost (after discount) and perk
-  points; for the selected skill, its perks (bought, buyable, or locked with the reason) and what its next levels
-  unlock; and the focus picker.
+- One window with tabs: Home (the player, their counts and the skills grouped by focus area), one tab per skill (a
+  road of the skill's gear and perks, with a dock for one perk), and Options (display settings and server
+  rules). The full design is in [the road interface spec](2026-11-16-road-ui-design.md).
 - Every button sends a request to the server; the screen redraws from the synced state.
-
-```
- Reskilled                         XP levels: 23    Focus: Working
- ----------------------------------------------------------------------
- Mining     12/32   raise: 3 levels   perk points: 2      [selected]
- Melee       8/32   raise: 3 levels   perk points: 1
- Taming      3/32   raise: 2 levels   perk points: 0
- ...
- Mining 16 unlocks: diamond pickaxe
-```
 
 ### 7.8 Tooltips (client)
 
