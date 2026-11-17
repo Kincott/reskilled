@@ -1,0 +1,18 @@
+name = "Reskilled"
+summary = "Eight skills raised with XP, 40 perks along each skill's road, and gear that waits for your levels. Fully data-driven."
+authors = ["Kincott"]
+license = "MIT"
+description = """
+**Grow a character, not just a pile of loot.**
+
+- **Eight skills**: Melee, Ranged, Defense, Mining, Gathering, Agility, Arcane and Building, each from level 1 to 32.
+- **Level up your way**: spend XP, or, if the server allows it, just do the work (mining raises Mining, fighting raises Melee).
+- **Gear that waits for you**: a diamond pickaxe needs Mining 16, netherite armor Defense 24, Sharpness V Arcane 12. A locked item shows a padlock and what it needs.
+- **40 perks** to unlock with the points your levels earn, such as extra ore drops, more armor, or surviving a killing blow.
+- **Focus areas** (Fighting, Working, Roaming) give extra XP for a play style.
+- **Fully tunable**: servers change the rules in game, and packs and mods can add, change or remove any skill, perk or lock with data files.
+
+Press **K** to open the skills window: Home with your skills grouped by focus area, a road per skill with its gear and perks, and Options.
+
+Every skill, perk and lock is listed in the [README](https://github.com/Kincott/reskilled/blob/main/reskilled/README.md).
+"""
